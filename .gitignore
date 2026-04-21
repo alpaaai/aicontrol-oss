@@ -20,3 +20,5 @@ docs/03-aicontrol-vision.md
 docs/04-aicontrol-battle-card.md
 docs/demo-scenarios-v2.md
 .claude/
+scripts/prospecting/.env
+scripts/prospecting/state.json
