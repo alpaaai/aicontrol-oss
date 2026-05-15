@@ -22,6 +22,7 @@ SCENARIOS = {
     "support":       "scripts.demos.demo_support",
     "itsm":          "scripts.demos.demo_itsm",
     "revops":        "scripts.demos.demo_revops",
+    "insurance":     "scripts.demos.demo_insurance",
 }
 
 
