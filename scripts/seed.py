@@ -53,6 +53,13 @@ AGENTS = [
         "status": "active",
         "tools": '["update_deal_stage", "log_sales_activity", "enrich_contact", "query_all_accounts"]',
     },
+    {
+        "id": "00000000-0000-0000-0000-000000000070",
+        "name": "insurance-claims-agent",
+        "owner": "claims-ops@aon.com",
+        "status": "active",
+        "tools": '["lookup_policy_coverage", "assess_claim_damage", "approve_claim_payment", "query_claims_database", "send_adjuster_notification", "flag_for_review"]',
+    },
 ]
 
 

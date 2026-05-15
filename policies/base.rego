@@ -272,6 +272,16 @@ needs_review if {
     contains(input.tool_name, pattern)
 }
 
+# Helper: true if tool matches a tool_denylist policy with action=review and numeric_conditions
+needs_review_numeric if {
+    some policy in input.policies
+    policy.rule_type == "tool_denylist"
+    policy.action == "review"
+    tool_matches(policy)
+    policy.condition.numeric_conditions
+    numeric_conditions_match(policy)
+}
+
 # Deny: global tool blacklist (highest priority)
 decision := "deny" if is_blacklisted
 
@@ -350,4 +360,23 @@ reason := "requires_human_review" if {
     not is_compound_violation
     not is_time_violation
     needs_review
+}
+
+# Review if tool matches a tool_denylist policy with numeric conditions and is not denied
+decision := "review" if {
+    not is_blacklisted
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    needs_review_numeric
+}
+
+reason := "requires_human_review" if {
+    not is_blacklisted
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    needs_review_numeric
 }

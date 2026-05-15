@@ -165,3 +165,31 @@ policies:
     severity: critical
     compliance_tags: ["HIPAA"]
     active: false
+
+# ── Insurance demo policies ───────────────────────────────────────────────────
+
+  - name: review_high_value_claim_payment
+    description: "Route claim payments above $5,000 to senior adjuster for human review — insurance demo"
+    rule_type: tool_denylist
+    condition:
+      blocked_tools: ["approve_claim_payment"]
+      numeric_conditions:
+        - parameter: amount
+          operator: gt
+          value: 5000
+    action: review
+    severity: high
+    active: true
+    compliance_tags: ["SOC2", "NAIC", "EU_AI_ACT"]
+
+  - name: deny_unscoped_claims_query
+    description: "Block wildcard insured_id in claims database queries — prevents bulk data access via prompt injection"
+    rule_type: tool_denylist
+    condition:
+      blocked_tools: ["query_claims_database"]
+      parameter_match:
+        insured_id: "*"
+    action: deny
+    severity: critical
+    active: true
+    compliance_tags: ["SOC2", "NAIC", "GDPR"]
