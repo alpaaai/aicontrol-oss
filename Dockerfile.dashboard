@@ -18,6 +18,8 @@ COPY scripts/ scripts/
 RUN useradd -m -u 1000 aicontrol && chown -R aicontrol:aicontrol /app
 USER aicontrol
 
+ENV PYTHONPATH=/app
+
 EXPOSE 8501
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
