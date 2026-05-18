@@ -6,6 +6,7 @@ set -euo pipefail
 PASS=0
 FAIL=0
 COMPOSE="-f docker-compose.yml -f docker-compose.app.yml"
+if [ -f .env ]; then set -a; source .env; set +a; fi
 
 check() {
   local label="$1"
@@ -36,20 +37,35 @@ check "OPA reachable" \
   "{}"
 
 check "API /health returns ok" \
-  "curl -s --max-time 5 http://localhost:8000/health" \
+  "curl -s --max-time 5 http://localhost:8001/health" \
   "ok"
 
 check "API /debug database ok" \
-  "curl -s --max-time 5 http://localhost:8000/debug" \
+  "curl -s --max-time 5 http://localhost:8001/debug" \
   "\"status\":\"ok\""
 
 check "Migrations applied" \
   "docker compose $COMPOSE exec -T postgres psql -U aicontrol -d aicontrol -c '\dt'" \
   "alembic_version"
 
+check "7 seed agents registered" \
+  "curl -s --max-time 5 \
+   -H \"Authorization: Bearer ${ADMIN_TOKEN:-}\" \
+   http://localhost:8001/agents | \
+   python3 -c \"import sys,json; print(len(json.load(sys.stdin)))\"" \
+  "7"
+
 check "Dashboard reachable" \
   "curl -s --max-time 10 http://localhost:8501/_stcore/health" \
   "ok"
+
+check "Lending demo runs (allow→allow→deny)" \
+  "docker compose $COMPOSE exec -T api \
+   python scripts/demos/run_demo.py \
+   --scenario lending \
+   --token \"${DEMO_TOKEN_LENDING:-}\" \
+   --mode fast" \
+  "DECISION: DENY"
 
 echo ""
 echo "=== Results: $PASS passed, $FAIL failed ==="
@@ -63,6 +79,6 @@ else
   echo "All checks passed. AIControl is ready."
   echo ""
   echo "  Dashboard: http://localhost:8501"
-  echo "  API docs:  http://localhost:8000/docs"
+  echo "  API docs:  http://localhost:8001/docs"
   echo ""
 fi
