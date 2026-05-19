@@ -3,6 +3,8 @@
 ## Prerequisites
 
 - Docker Engine 24+ and Docker Compose v2
+  - Linux: `curl -fsSL https://get.docker.com | sh`
+  - macOS / Windows: Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) — Compose v2 included
 - Ubuntu 22.04+ or macOS (Apple Silicon / arm64 supported)
 - 2 GB RAM minimum, 4 GB recommended
 - Ports 8001 (API) and 8501 (dashboard) available
@@ -145,3 +147,4 @@ bash diagnose.sh
 | `ADMIN_TOKEN` not set | `.env` not sourced | `source .env` |
 | `DEMO_TOKEN_*` not set | `install.sh` not run | Re-run `bash install.sh` |
 | Dashboard `ModuleNotFoundError` | Old image cached | `docker compose pull` then restart |
+| `ERROR: Unsupported operating system 'macOS'` | Used Linux install script on macOS | Install Docker Desktop instead: docker.com/products/docker-desktop |
