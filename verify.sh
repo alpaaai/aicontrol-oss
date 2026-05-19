@@ -60,7 +60,7 @@ check "Dashboard reachable" \
   "ok"
 
 check "Lending demo runs (allow→allow→deny)" \
-  "docker compose $COMPOSE exec -T api \
+  "PYTHONPATH=/home/deven/aicontrol \
    python scripts/demos/run_demo.py \
    --scenario lending \
    --token \"${DEMO_TOKEN_LENDING:-}\" \
