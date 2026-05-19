@@ -111,7 +111,7 @@ echo -e "${GREEN}[done]${NC} Migrations applied."
 # Seed demo agents
 echo "      Seeding demo agents..."
 docker compose -f docker-compose.yml -f docker-compose.app.yml \
-  run --rm api python scripts/seed.py
+  run --rm -e PYTHONPATH=/app api python scripts/seed.py
 echo -e "${GREEN}[done]${NC} Agents seeded."
 
 # Start app services
