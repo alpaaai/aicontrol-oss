@@ -5,6 +5,13 @@ from app.models.database import async_session_factory
 
 AGENTS = [
     {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "name": "claims-processing-agent",
+        "owner": "ai-team@acme-insurance.com",
+        "status": "active",
+        "tools": '["process_claim", "query_policy", "approve_payment", "flag_fraud"]',
+    },
+    {
         "id": "00000000-0000-0000-0000-000000000010",
         "name": "loan-underwriting-agent",
         "owner": "lending-team@bank.com",
