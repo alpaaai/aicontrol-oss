@@ -48,12 +48,12 @@ check "Migrations applied" \
   "docker compose $COMPOSE exec -T postgres psql -U aicontrol -d aicontrol -c '\dt'" \
   "alembic_version"
 
-check "7 seed agents registered" \
+check "8 seed agents registered" \
   "curl -s --max-time 5 \
    -H \"Authorization: Bearer ${ADMIN_TOKEN:-}\" \
    http://localhost:8001/agents | \
    python3 -c \"import sys,json; print(len(json.load(sys.stdin)))\"" \
-  "7"
+  "8"
 
 check "Dashboard reachable" \
   "curl -s --max-time 10 http://localhost:8501/_stcore/health" \
