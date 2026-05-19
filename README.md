@@ -5,6 +5,7 @@
 - Docker Engine 24+ and Docker Compose v2
   - Linux: `curl -fsSL https://get.docker.com | sh`
   - macOS / Windows: Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) — Compose v2 included
+  - macOS only: if `git clone` prompts for Xcode tools, run: `xcode-select --install` — click Install in the dialog, then re-run clone.
 - Ubuntu 22.04+ or macOS (Apple Silicon / arm64 supported)
 - 2 GB RAM minimum, 4 GB recommended
 - Ports 8001 (API) and 8501 (dashboard) available
