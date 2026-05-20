@@ -19,6 +19,7 @@ opa-python-client
 # Dashboard
 streamlit
 pandas
+plotly
 
 # Human review
 slack-bolt
