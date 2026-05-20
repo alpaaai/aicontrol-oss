@@ -24,9 +24,9 @@ COPY scripts/ scripts/
 RUN useradd -m -u 1000 aicontrol && chown -R aicontrol:aicontrol /app
 USER aicontrol
 
-EXPOSE 8000
+EXPOSE 8001
 
 HEALTHCHECK --interval=10s --timeout=5s --retries=5 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health').raise_for_status()"
+    CMD python3 -c "import httpx; httpx.get('http://localhost:8001/health').raise_for_status()"
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
