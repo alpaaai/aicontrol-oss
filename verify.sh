@@ -60,11 +60,9 @@ check "Dashboard reachable" \
   "ok"
 
 check "Lending demo runs (allow→allow→deny)" \
-  "PYTHONPATH=/home/deven/aicontrol \
-   python3 scripts/demos/run_demo.py \
-   --scenario lending \
-   --token \"${DEMO_TOKEN_LENDING:-}\" \
-   --mode fast" \
+  "docker compose -f docker-compose.yml -f docker-compose.app.yml \
+   exec -T api python3 scripts/demos/run_demo.py \
+   --scenario lending --token \"${DEMO_TOKEN_LENDING:-}\" --mode fast" \
   "DECISION: DENY"
 
 echo ""
