@@ -61,7 +61,7 @@ check "Dashboard reachable" \
 
 check "Lending demo runs (allow→allow→deny)" \
   "PYTHONPATH=/home/deven/aicontrol \
-   python scripts/demos/run_demo.py \
+   python3 scripts/demos/run_demo.py \
    --scenario lending \
    --token \"${DEMO_TOKEN_LENDING:-}\" \
    --mode fast" \
