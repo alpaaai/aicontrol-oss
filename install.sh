@@ -111,7 +111,7 @@ echo -e "${GREEN}[done]${NC} Migrations applied."
 # Seed demo agents
 echo "      Seeding demo agents..."
 docker compose -f docker-compose.yml -f docker-compose.app.yml \
-  run --rm -e PYTHONPATH=/app api python scripts/seed.py
+  run --rm -e PYTHONPATH=/app api python3 scripts/seed.py
 echo -e "${GREEN}[done]${NC} Agents seeded."
 
 # Start app services
@@ -123,7 +123,7 @@ echo ""
 echo "[4/4] Issuing initial admin token..."
 echo ""
 ADMIN_OUTPUT=$(docker compose -f docker-compose.yml -f docker-compose.app.yml \
-  exec api python -m scripts.issue_token \
+  exec api python3 -m scripts.issue_token \
   --role admin --desc "Initial admin token")
 echo "$ADMIN_OUTPUT"
 ADMIN_JWT=$(echo "$ADMIN_OUTPUT" | grep -oE 'eyJ[A-Za-z0-9._-]+')
@@ -160,7 +160,7 @@ DEMO_NAMES=(
 
 for i in "${!DEMO_LABELS[@]}"; do
   DEMO_OUTPUT=$(docker compose -f docker-compose.yml -f docker-compose.app.yml \
-    exec api python -m scripts.issue_token \
+    exec api python3 -m scripts.issue_token \
     --role agent --agent-id "${DEMO_UUIDS[$i]}" --desc "${DEMO_NAMES[$i]}")
   DEMO_JWT=$(echo "$DEMO_OUTPUT" | grep -oE 'eyJ[A-Za-z0-9._-]+')
   echo "DEMO_TOKEN_${DEMO_LABELS[$i]}=${DEMO_JWT}" >> .env
