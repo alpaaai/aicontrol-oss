@@ -127,7 +127,7 @@ ADMIN_OUTPUT=$(docker compose -f docker-compose.yml -f docker-compose.app.yml \
   --role admin --desc "Initial admin token")
 echo "$ADMIN_OUTPUT"
 ADMIN_JWT=$(echo "$ADMIN_OUTPUT" | grep -oE 'eyJ[A-Za-z0-9._-]+')
-sed -i "s|^ADMIN_TOKEN=.*|ADMIN_TOKEN=${ADMIN_JWT}|" .env
+sed -i '' "s|^ADMIN_TOKEN=.*|ADMIN_TOKEN=${ADMIN_JWT}|" .env
 echo -e "${GREEN}[done]${NC} Admin token written to .env."
 
 # Issue agent-scoped demo tokens
