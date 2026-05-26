@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     slack_bot_token: str = ""
     slack_signing_secret: str = ""
     slack_review_channel: str = "#aicontrol-reviews"
+    AICONTROL_LICENSE_KEY: str = ""
 
 
 settings = Settings()
