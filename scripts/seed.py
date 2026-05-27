@@ -3,62 +3,64 @@ import asyncio
 from sqlalchemy import text
 from app.models.database import async_session_factory
 
+# approved_tools: lending + healthcare agents are allowlisted (P1-1 enforcement).
+# All other agents use [] (unrestricted) — intentional contrast for future demo scenarios.
 AGENTS = [
     {
         "id": "00000000-0000-0000-0000-000000000001",
         "name": "claims-processing-agent",
         "owner": "ai-team@acme-insurance.com",
         "status": "active",
-        "tools": '["process_claim", "query_policy", "approve_payment", "flag_fraud"]',
+        "tools": '[]',
     },
     {
         "id": "00000000-0000-0000-0000-000000000010",
         "name": "loan-underwriting-agent",
         "owner": "lending-team@bank.com",
         "status": "active",
-        "tools": '["read_loan_application", "query_credit_bureau", "run_risk_model", "approve_loan"]',
+        "tools": '["query_credit_bureau", "run_risk_model"]',
     },
     {
         "id": "00000000-0000-0000-0000-000000000020",
         "name": "clinical-documentation-agent",
         "owner": "clinical-ops@hospital.org",
         "status": "active",
-        "tools": '["read_patient_record", "query_lab_results", "draft_clinical_note", "update_encounter"]',
+        "tools": '["read_patient_record", "query_lab_results"]',
     },
     {
         "id": "00000000-0000-0000-0000-000000000030",
         "name": "incident-response-agent",
         "owner": "platform-ops@company.com",
         "status": "active",
-        "tools": '["query_logs", "restart_service", "apply_config_patch", "escalate_incident", "execute_runbook"]',
+        "tools": '[]',
     },
     {
         "id": "00000000-0000-0000-0000-000000000040",
         "name": "supplier-sourcing-agent",
         "owner": "procurement@manufacturer.com",
         "status": "active",
-        "tools": '["query_inventory", "search_supplier_catalog", "create_purchase_order", "http_post"]',
+        "tools": '[]',
     },
     {
         "id": "00000000-0000-0000-0000-000000000050",
         "name": "support-resolution-agent",
         "owner": "cx-platform@company.com",
         "status": "active",
-        "tools": '["read_customer_account", "apply_service_credit", "resolve_ticket", "query_all_customers"]',
+        "tools": '[]',
     },
     {
         "id": "00000000-0000-0000-0000-000000000060",
         "name": "crm-automation-agent",
         "owner": "revops@company.com",
         "status": "active",
-        "tools": '["update_deal_stage", "log_sales_activity", "enrich_contact", "query_all_accounts"]',
+        "tools": '[]',
     },
     {
         "id": "00000000-0000-0000-0000-000000000070",
         "name": "insurance-claims-agent",
         "owner": "claims-ops@aon.com",
         "status": "active",
-        "tools": '["lookup_policy_coverage", "assess_claim_damage", "approve_claim_payment", "query_claims_database", "send_adjuster_notification", "flag_for_review"]',
+        "tools": '[]',
     },
 ]
 

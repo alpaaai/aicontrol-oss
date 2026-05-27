@@ -83,7 +83,7 @@ async def _seed_and_token_setup():
             await session.execute(text("""
                 INSERT INTO agents (id, name, owner, status, approved_tools)
                 VALUES (:id, :name, :owner, :status, CAST(:tools AS jsonb))
-                ON CONFLICT (id) DO NOTHING
+                ON CONFLICT (id) DO UPDATE SET approved_tools = EXCLUDED.approved_tools
             """), agent)
 
         # Issue admin token
