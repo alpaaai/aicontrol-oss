@@ -48,7 +48,7 @@ def get_agents() -> list[dict[str, Any]]:
     with get_sync_session() as session:
         rows = session.execute(text("""
             SELECT id, name, owner, status, framework,
-                   model_version, created_at
+                   model_version, approved_tools, created_at
             FROM agents
             ORDER BY created_at DESC
         """)).mappings().all()

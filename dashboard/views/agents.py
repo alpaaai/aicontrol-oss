@@ -33,3 +33,31 @@ def render() -> None:
         hide_index=True,
     )
     st.caption(f"{len(agents)} agents registered")
+
+    st.divider()
+    st.subheader("Agent Detail")
+
+    agent_names = [a["name"] for a in agents]
+    selected_name = st.selectbox("Select agent to inspect", agent_names)
+    selected = next((a for a in agents if a["name"] == selected_name), None)
+
+    if selected is None:
+        return
+
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**Owner:** {selected['owner']}")
+        st.markdown(f"**Status:** {selected['status']}")
+    with col2:
+        if selected.get("framework"):
+            st.markdown(f"**Framework:** {selected['framework']}")
+        if selected.get("model_version"):
+            st.markdown(f"**Model:** {selected['model_version']}")
+
+    st.markdown("**Approved Tools**")
+    approved = selected.get("approved_tools")
+    if approved:
+        for tool in approved:
+            st.write(f"✓ `{tool}`")
+    else:
+        st.warning("No tool restrictions — all tools permitted.")
