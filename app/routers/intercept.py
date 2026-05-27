@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import require_agent
 from app.core.logging import get_logger
 from app.models.database import get_db
-from app.models.schemas import Policy, Session
+from app.models.schemas import Agent, Policy, Session
 from app.services.audit_writer import write_event
 from app.services.hitl_service import create_hitl_review, post_slack_review
 from app.services.opa_client import evaluate
@@ -137,6 +137,39 @@ async def intercept(
             )
 
     start = time.monotonic()
+
+    # Step 2b: approved_tools enforcement gate — runs before OPA.
+    # Case-sensitive match: tool_name is never normalized upstream.
+    # approved_tools = [] means unrestricted (backward compatible).
+    # Agent not found in DB also means unrestricted (backward compatible).
+    agent_result = await db.execute(select(Agent).where(Agent.id == request.agent_id))
+    agent = agent_result.scalar_one_or_none()
+    if agent is not None and agent.approved_tools:
+        if request.tool_name not in agent.approved_tools:
+            early_duration_ms = int((time.monotonic() - start) * 1000)
+            enriched_early = enrich_parameters(request.tool_name, request.tool_parameters)
+            await ensure_session(db, request.session_id, request.agent_id)
+            early_event_id = await write_event(
+                session=db,
+                session_id=request.session_id,
+                agent_id=request.agent_id,
+                agent_name=request.agent_name,
+                tool_name=request.tool_name,
+                tool_parameters=enriched_early,
+                decision="deny",
+                decision_reason="tool_not_approved_for_agent",
+                sequence_number=request.sequence_number,
+                duration_ms=early_duration_ms,
+                risk_delta=RISK_SCORE_DELTA["deny"],
+                policy_name="approved_tools",
+                policy_id=None,
+            )
+            return InterceptResponse(
+                decision="deny",
+                reason="tool_not_approved_for_agent",
+                audit_event_id=early_event_id,
+                review_id=None,
+            )
 
     # Load active policies from DB
     policies = await get_active_policies(db)
