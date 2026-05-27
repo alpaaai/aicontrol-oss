@@ -33,8 +33,8 @@ async def test_numeric_gt_deny(client, agent_token, admin_token):
     })
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": "00000000-0000-0000-0000-000000000099",
-        "agent_id": "00000000-0000-0000-0000-000000000010",
-        "agent_name": "loan-underwriting-agent",
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
         "tool_parameters": {"loan_amount": 750000, "applicant_id": "APP-001"},
         "sequence_number": 1,
@@ -49,8 +49,8 @@ async def test_numeric_gt_allow_below_threshold(client, agent_token):
     """Allow when loan_amount is below threshold."""
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": "00000000-0000-0000-0000-000000000099",
-        "agent_id": "00000000-0000-0000-0000-000000000010",
-        "agent_name": "loan-underwriting-agent",
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
         "tool_parameters": {"loan_amount": 200000, "applicant_id": "APP-002"},
         "sequence_number": 2,
@@ -75,8 +75,8 @@ async def test_numeric_lt_deny(client, agent_token, admin_token):
     })
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": "00000000-0000-0000-0000-000000000099",
-        "agent_id": "00000000-0000-0000-0000-000000000010",
-        "agent_name": "loan-underwriting-agent",
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
         "tool_parameters": {"loan_amount": 100000, "credit_score": 520},
         "sequence_number": 3,
@@ -102,8 +102,8 @@ async def test_numeric_multi_condition_deny_both_match(client, agent_token, admi
     })
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": "00000000-0000-0000-0000-000000000099",
-        "agent_id": "00000000-0000-0000-0000-000000000010",
-        "agent_name": "loan-underwriting-agent",
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
         "tool_parameters": {"loan_amount": 750000, "loan_term_years": 35},
         "sequence_number": 4,
@@ -121,8 +121,8 @@ async def test_numeric_multi_condition_allow_one_fails(client, agent_token):
     """
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": "00000000-0000-0000-0000-000000000099",
-        "agent_id": "00000000-0000-0000-0000-000000000010",
-        "agent_name": "loan-underwriting-agent",
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
         "tool_parameters": {"loan_amount": 300000, "loan_term_years": 35},
         "sequence_number": 5,
@@ -150,8 +150,8 @@ async def test_compound_all_of_deny_both_match(client, agent_token, admin_token)
     })
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": "00000000-0000-0000-0000-000000000099",
-        "agent_id": "00000000-0000-0000-0000-000000000010",
-        "agent_name": "loan-underwriting-agent",
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
         "tool_parameters": {"loan_amount": 750000, "applicant_type": "subprime"},
         "sequence_number": 1,
@@ -168,8 +168,8 @@ async def test_compound_all_of_allow_partial_match(client, agent_token):
     """
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": "00000000-0000-0000-0000-000000000099",
-        "agent_id": "00000000-0000-0000-0000-000000000010",
-        "agent_name": "loan-underwriting-agent",
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
         "tool_parameters": {"loan_amount": 300000, "applicant_type": "prime"},
         "sequence_number": 2,
