@@ -31,6 +31,9 @@ jinja2
 # Auth
 python-jose[cryptography]
 
+# AI-native features
+litellm
+
 # Utilities
 python-dotenv
 python-multipart
