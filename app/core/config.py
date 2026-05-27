@@ -18,5 +18,12 @@ class Settings(BaseSettings):
     slack_review_channel: str = "#aicontrol-reviews"
     AICONTROL_LICENSE_KEY: str = ""
 
+    # AI-native features — customer's own LLM account. AIControl never bills tokens.
+    LLM_PROVIDER: str = "anthropic"
+    LLM_MODEL: str = "claude-haiku-4-5-20251001"
+    LLM_API_KEY: str = ""
+    LLM_MOCK_ENABLED: bool = False
+    LLM_MAX_LATENCY_MS: int = 3000
+
 
 settings = Settings()
