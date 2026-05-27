@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -11,6 +13,8 @@ class Settings(BaseSettings):
 
     database_url: str
     opa_url: str = "http://localhost:8181"
+    opa_failure_mode: Literal["deny", "allow"] = "deny"
+    opa_poll_interval_seconds: int = 30
     app_env: str = "development"
     secret_key: str = "changeme"
     slack_bot_token: str = ""

@@ -7,7 +7,6 @@ import httpx
 from app.core.config import settings
 from app.core.logging import get_logger
 
-OPA_ENDPOINT = f"{settings.opa_url}/v1/data/aicontrol"
 logger = get_logger("opa_client")
 
 
@@ -24,11 +23,16 @@ async def evaluate(
     tool_name: str,
     tool_parameters: dict[str, Any],
     policies: list[dict],
+    agent_id: str = "",
 ) -> dict[str, str]:
     """
     Send tool call context to OPA and return the decision.
 
     Returns dict with keys: decision (allow|deny|review), reason (str)
+
+    If OPA is unreachable, behavior is governed by settings.opa_failure_mode:
+      "deny"  — fail-closed: deny the tool call (default, safe)
+      "allow" — fail-open: allow the tool call (use only in dev/low-risk)
     """
     payload = {
         "input": {
@@ -38,14 +42,27 @@ async def evaluate(
             "current_time": _current_time_context(),
         }
     }
-    async with httpx.AsyncClient() as client:
-        response = await client.post(OPA_ENDPOINT, json=payload)
-        response.raise_for_status()
-
-    result = response.json().get("result", {})
-    decision = result.get("decision", "allow")
-    logger.info("opa_evaluated", tool_name=tool_name, decision=decision)
-    return {
-        "decision": decision,
-        "reason": result.get("reason", "default_allow"),
-    }
+    try:
+        opa_endpoint = f"{settings.opa_url}/v1/data/aicontrol"
+        async with httpx.AsyncClient() as client:
+            response = await client.post(opa_endpoint, json=payload)
+            response.raise_for_status()
+        result = response.json().get("result", {})
+        decision = result.get("decision", "allow")
+        logger.info("opa_evaluated", tool_name=tool_name, decision=decision)
+        return {
+            "decision": decision,
+            "reason": result.get("reason", "default_allow"),
+        }
+    except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError) as exc:
+        logger.error(
+            "opa_evaluation_failed",
+            error=str(exc),
+            failure_mode=settings.opa_failure_mode,
+            tool_name=tool_name,
+            agent_id=agent_id,
+        )
+        if settings.opa_failure_mode == "deny":
+            return {"decision": "deny", "reason": "opa_unavailable"}
+        else:
+            return {"decision": "allow", "reason": "opa_unavailable_fail_open"}
