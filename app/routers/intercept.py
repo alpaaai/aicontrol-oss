@@ -16,6 +16,7 @@ from app.models.schemas import Agent, Policy, Session
 from app.services.audit_writer import write_event
 from app.services.hitl_service import create_hitl_review, post_slack_review
 from app.services.opa_client import evaluate
+from app.services.rate_limit_service import build_call_counts
 
 router = APIRouter()
 logger = get_logger("intercept")
@@ -41,6 +42,8 @@ class InterceptResponse(BaseModel):
     reason: str
     audit_event_id: uuid.UUID
     review_id: Optional[uuid.UUID] = None
+    policy_id: Optional[str] = None
+    policy_name: Optional[str] = None
 
 
 def enrich_parameters(tool_name: str, tool_parameters: dict[str, Any]) -> dict[str, Any]:
@@ -112,6 +115,11 @@ def find_fired_policy(
                 and cond.get("parameter_match")
             ):
                 return p.get("id"), p["name"]
+        elif reason.startswith("rate_limit_exceeded:"):
+            if p["rule_type"] == "rate_limit":
+                cond = p.get("condition", {})
+                if tool_name in cond.get("tools", []):
+                    return p.get("id"), p["name"]
         elif reason == "requires_human_review":
             if p["rule_type"] == "tool_pattern" and p["action"] == "review":
                 return p.get("id"), p["name"]
@@ -174,11 +182,21 @@ async def intercept(
     # Load active policies from DB
     policies = await get_active_policies(db)
 
+    # Step 3b: build call_counts for rate-limit policy evaluation
+    call_counts = await build_call_counts(
+        db=db,
+        agent_id=str(request.agent_id),
+        session_id=str(request.session_id),
+        tool_name=request.tool_name,
+        active_policies=policies,
+    )
+
     # Evaluate via OPA
     opa_result = await evaluate(
         tool_name=request.tool_name,
         tool_parameters=request.tool_parameters,
         policies=policies,
+        call_counts=call_counts,
     )
 
     duration_ms = int((time.monotonic() - start) * 1000)
@@ -248,4 +266,6 @@ async def intercept(
         reason=opa_result["reason"],
         audit_event_id=event_id,
         review_id=review_id if opa_result["decision"] == "review" else None,
+        policy_id=fired_policy_id,
+        policy_name=fired_policy_name,
     )
