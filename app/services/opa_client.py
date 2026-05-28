@@ -24,6 +24,7 @@ async def evaluate(
     tool_parameters: dict[str, Any],
     policies: list[dict],
     agent_id: str = "",
+    call_counts: dict[str, int] | None = None,
 ) -> dict[str, str]:
     """
     Send tool call context to OPA and return the decision.
@@ -40,6 +41,7 @@ async def evaluate(
             "tool_parameters": tool_parameters,
             "policies": policies,
             "current_time": _current_time_context(),
+            "call_counts": call_counts if call_counts is not None else {},
         }
     }
     try:
