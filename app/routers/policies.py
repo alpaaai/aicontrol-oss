@@ -14,6 +14,34 @@ from app.services.policy_loader import push_rego_to_opa
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
+VALID_WINDOWS = {"session", "5m", "60m", "24h", "7d"}
+VALID_ON_EXCEED = {"deny", "review"}
+
+
+def validate_rate_limit_condition(condition: dict) -> list[str]:
+    errors = []
+    rl = condition.get("rate_limit", {})
+    tools = condition.get("tools", [])
+
+    if not tools or not isinstance(tools, list):
+        errors.append("rate_limit condition requires non-empty 'tools' array")
+
+    max_calls = rl.get("max_calls")
+    if not isinstance(max_calls, int) or max_calls < 1:
+        errors.append("rate_limit.max_calls must be a positive integer")
+
+    window = rl.get("window")
+    if window not in VALID_WINDOWS:
+        errors.append(
+            f"rate_limit.window must be one of: {', '.join(sorted(VALID_WINDOWS))}"
+        )
+
+    on_exceed = rl.get("on_exceed", "deny")
+    if on_exceed not in VALID_ON_EXCEED:
+        errors.append("rate_limit.on_exceed must be 'deny' or 'review'")
+
+    return errors
+
 
 class PolicyCreate(BaseModel):
     name: str
@@ -78,6 +106,10 @@ async def create_policy(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_admin),
 ) -> PolicyResponse:
+    if body.rule_type == "rate_limit":
+        errors = validate_rate_limit_condition(body.condition)
+        if errors:
+            raise HTTPException(status_code=422, detail="; ".join(errors))
     policy = Policy(
         name=body.name,
         description=body.description,
@@ -105,7 +137,14 @@ async def update_policy(
     policy = result.scalar_one_or_none()
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
-    for field, value in body.model_dump(exclude_none=True).items():
+    updated = body.model_dump(exclude_none=True)
+    effective_rule_type = updated.get("rule_type", policy.rule_type)
+    effective_condition = updated.get("condition", policy.condition)
+    if effective_rule_type == "rate_limit":
+        errors = validate_rate_limit_condition(effective_condition)
+        if errors:
+            raise HTTPException(status_code=422, detail="; ".join(errors))
+    for field, value in updated.items():
         setattr(policy, field, value)
     await db.flush()
     await push_rego_to_opa()
