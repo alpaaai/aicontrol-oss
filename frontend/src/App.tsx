@@ -7,6 +7,7 @@ import { OverviewPage } from "./pages/overview/OverviewPage";
 import { AuditLogPage } from "./pages/audit/AuditLogPage";
 import { MetricsPage } from "./pages/metrics/MetricsPage";
 import { SessionsPage } from "./pages/sessions/SessionsPage";
+import { SessionDetailPage } from "./pages/sessions/SessionDetailPage";
 import { PoliciesPage } from "./pages/policies/PoliciesPage";
 import { AgentsPage } from "./pages/agents/AgentsPage";
 import { TokensPage } from "./pages/tokens/TokensPage";
@@ -38,7 +39,7 @@ export default function App() {
           <Route path="audit-log"     element={<AuditLogPage />} />
           <Route path="metrics"       element={<MetricsPage />} />
           <Route path="sessions"      element={<SessionsPage />} />
-          <Route path="sessions/:id"  element={<SessionsPage />} />
+          <Route path="sessions/:id"  element={<SessionDetailPage />} />
           <Route path="policies"      element={<PoliciesPage />} />
           <Route path="agents"        element={<AgentsPage />} />
           <Route path="tokens"        element={<TokensPage />} />
