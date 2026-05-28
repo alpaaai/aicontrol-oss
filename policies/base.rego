@@ -282,38 +282,92 @@ needs_review_numeric if {
     numeric_conditions_match(policy)
 }
 
+# ── Rate-limit helpers ─────────────────────────────────────────────────────────
+
+# Helper: true if a rate_limit policy's threshold is met for the current tool
+rate_limit_policy(policy) if {
+    policy.rule_type == "rate_limit"
+    input.tool_name in policy.condition.tools
+    call_count := input.call_counts[input.tool_name]
+    call_count >= policy.condition.rate_limit.max_calls
+}
+
+# Helper: true if any rate_limit policy fires a deny
+is_rate_exceeded_deny if {
+    some policy in input.policies
+    rate_limit_policy(policy)
+    on_exceed := object.get(policy.condition.rate_limit, "on_exceed", "deny")
+    on_exceed == "deny"
+}
+
+# Helper: true if any rate_limit policy fires a review
+is_rate_exceeded_review if {
+    some policy in input.policies
+    rate_limit_policy(policy)
+    on_exceed := object.get(policy.condition.rate_limit, "on_exceed", "deny")
+    on_exceed == "review"
+}
+
+# Reason string for rate-limit denial or review
+rate_limit_reason := reason if {
+    some policy in input.policies
+    rate_limit_policy(policy)
+    max_calls := policy.condition.rate_limit.max_calls
+    window := policy.condition.rate_limit.window
+    reason := sprintf(
+        "rate_limit_exceeded:%s:%d:%s",
+        [input.tool_name, max_calls, window]
+    )
+}
+
 # Deny: global tool blacklist (highest priority)
 decision := "deny" if is_blacklisted
 
 reason := "tool_denylisted" if is_blacklisted
 
-# Deny: parameter-level violation (second priority)
+# Deny: rate limit exceeded (second priority)
 decision := "deny" if {
     not is_blacklisted
+    is_rate_exceeded_deny
+}
+
+reason := rate_limit_reason if {
+    not is_blacklisted
+    is_rate_exceeded_deny
+}
+
+# Deny: parameter-level violation (third priority)
+decision := "deny" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
     is_parameter_violation
 }
 
 reason := violation_detail if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     is_parameter_violation
 }
 
-# Deny: numeric condition violation (third priority)
+# Deny: numeric condition violation (fourth priority)
 decision := "deny" if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     is_numeric_violation
 }
 
 reason := numeric_violation_detail if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     is_numeric_violation
 }
 
-# Deny: compound AND/OR violation (fourth priority)
+# Deny: compound AND/OR violation (fifth priority)
 decision := "deny" if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     is_compound_violation
@@ -321,14 +375,16 @@ decision := "deny" if {
 
 reason := compound_violation_detail if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     is_compound_violation
 }
 
-# Deny: temporal condition violation (fifth priority)
+# Deny: temporal condition violation (sixth priority)
 decision := "deny" if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -337,46 +393,76 @@ decision := "deny" if {
 
 reason := time_violation_detail if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
     is_time_violation
 }
 
-# Review if tool matches a pattern and is not denied
+# Review: rate limit exceeded (before pattern review)
 decision := "review" if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    is_rate_exceeded_review
+}
+
+reason := rate_limit_reason if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    is_rate_exceeded_review
+}
+
+# Review if tool matches a pattern and is not denied
+decision := "review" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_rate_exceeded_review
     needs_review
 }
 
 reason := "requires_human_review" if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_rate_exceeded_review
     needs_review
 }
 
 # Review if tool matches a tool_denylist policy with numeric conditions and is not denied
 decision := "review" if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_rate_exceeded_review
     needs_review_numeric
 }
 
 reason := "requires_human_review" if {
     not is_blacklisted
+    not is_rate_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_rate_exceeded_review
     needs_review_numeric
 }
