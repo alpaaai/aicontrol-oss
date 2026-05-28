@@ -6,11 +6,15 @@ from fastapi import FastAPI, Request
 from app.core.config import settings as _settings
 from app.core.logging import configure_logging, get_logger
 from app.models.database import async_session_factory
+from app.routers.auth import router as auth_router
+from app.routers.audit_events import router as audit_events_router
+from app.routers.dashboard import router as dashboard_router
 from app.routers.debug import router as debug_router
 from app.routers.intercept import router as intercept_router
 from app.routers.policies import router as policies_router
 from app.routers.agents import router as agents_router
 from app.routers.reviews import router as reviews_router
+from app.routers.sessions import router as sessions_router
 from app.routers.slack_actions import router as slack_router
 from app.routers.tokens import router as tokens_router
 from app.routers.warnings import router as warnings_router
@@ -67,11 +71,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(auth_router)
+app.include_router(audit_events_router)
+app.include_router(dashboard_router)
 app.include_router(debug_router)
 app.include_router(intercept_router)
 app.include_router(policies_router)
 app.include_router(agents_router)
 app.include_router(reviews_router)
+app.include_router(sessions_router)
 app.include_router(slack_router)
 app.include_router(tokens_router)
 app.include_router(warnings_router)
