@@ -11,6 +11,7 @@ from app.models.database import Base
 import app.models.schemas
 import app.models.policy_warning
 import app.models.compliance_report
+import app.models.user
 
 config = context.config
 
