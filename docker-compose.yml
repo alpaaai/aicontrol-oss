@@ -31,6 +31,7 @@ services:
 
 volumes:
   pgdata:
+  reports_data:
 
 networks:
   aicontrol:

@@ -10,6 +10,8 @@ services:
         condition: service_healthy
       opa:
         condition: service_healthy
+    volumes:
+      - reports_data:/app/reports
     healthcheck:
       test: ["CMD-SHELL",
              "python3 -c \"import httpx; httpx.get('http://localhost:8001/health').raise_for_status()\""]
@@ -30,6 +32,10 @@ services:
         condition: service_healthy
     networks:
       - aicontrol
+
+volumes:
+  reports_data:
+    external: true
 
 networks:
   aicontrol:
