@@ -13,6 +13,7 @@ from app.routers.agents import router as agents_router
 from app.routers.reviews import router as reviews_router
 from app.routers.slack_actions import router as slack_router
 from app.routers.tokens import router as tokens_router
+from app.services.drift_detector import DriftDetector
 from app.services.opa_health_watcher import OpaHealthWatcher
 from app.services.policy_loader import load_all, push_rego_to_opa
 
@@ -22,7 +23,7 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run policy loader on startup, start OPA health watcher."""
+    """Run policy loader on startup, start OPA health watcher and drift detector."""
     logger.info("aicontrol_starting")
     async with async_session_factory() as session:
         await load_all(session)
@@ -34,10 +35,19 @@ async def lifespan(app: FastAPI):
     )
     opa_watcher.start()
     app.state.opa_watcher = opa_watcher
+
+    drift_detector = DriftDetector(
+        session_factory=async_session_factory,
+        interval_hours=_settings.drift_scan_interval_hours,
+    )
+    drift_detector.start()
+    app.state.drift_detector = drift_detector
+
     logger.info("aicontrol_ready")
 
     yield
 
+    await drift_detector.stop()
     await opa_watcher.stop()  # task fully cancelled before client closes
     await _http_client.aclose()
     logger.info("aicontrol_stopping")
@@ -64,4 +74,11 @@ async def health(request: Request) -> dict:
     """Liveness check — returns ok when the app process is running."""
     watcher = getattr(request.app.state, "opa_watcher", None)
     opa_status = watcher.opa_status if watcher else "unknown"
-    return {"status": "ok", "service": "aicontrol", "opa_status": opa_status}
+    drift_detector = getattr(request.app.state, "drift_detector", None)
+    drift_status = drift_detector.status if drift_detector else "unknown"
+    return {
+        "status": "ok",
+        "service": "aicontrol",
+        "opa_status": opa_status,
+        "drift_detector_status": drift_status,
+    }

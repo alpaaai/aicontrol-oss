@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     opa_url: str = "http://localhost:8181"
     opa_failure_mode: Literal["deny", "allow"] = "deny"
     opa_poll_interval_seconds: int = 30
+    drift_scan_interval_hours: int = 6
     app_env: str = "development"
     secret_key: str = "changeme"
     slack_bot_token: str = ""
