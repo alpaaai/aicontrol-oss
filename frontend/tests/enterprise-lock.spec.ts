@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 
 test("locked nav items are visible in sidebar", async ({ page }) => {
   await page.goto("/overview");
-  await expect(page.getByText("Sessions")).toBeVisible();
+  await expect(page.getByText("Sessions", { exact: true })).toBeVisible();
   await expect(page.getByText("Review Queue")).toBeVisible();
   await expect(page.getByText("Health")).toBeVisible();
   await expect(page.getByText("Compliance")).toBeVisible();
@@ -24,7 +24,7 @@ test("locked nav items are visible in sidebar", async ({ page }) => {
 
 test("sessions page shows enterprise lock overlay", async ({ page }) => {
   await page.goto("/sessions");
-  await expect(page.getByText("Requires Enterprise License")).toBeVisible();
+  await expect(page.getByText("Sessions — Enterprise Feature")).toBeVisible();
 });
 
 test("review queue page shows enterprise lock overlay", async ({ page }) => {
@@ -34,7 +34,7 @@ test("review queue page shows enterprise lock overlay", async ({ page }) => {
 
 test("enterprise locked pages are not hidden from DOM", async ({ page }) => {
   await page.goto("/sessions");
-  const lockText = page.getByText("Requires Enterprise License");
+  const lockText = page.getByText("Sessions — Enterprise Feature");
   await expect(lockText).toBeVisible();
   // Verify it's in the DOM (not hidden via display:none)
   const isHidden = await lockText.evaluate((el) =>
