@@ -121,6 +121,33 @@ def test_multiple_blocked_tools_per_policy_each_gets_warning():
 
 # ── Combined rename scenario ──────────────────────────────────────────────────
 
+def test_seeded_data_rename_scenario():
+    """
+    Validates the exact rename scenario from the P1-5 spec using loan-underwriting-agent
+    tool names. Agent declares fetch_credit_data (renamed), policy still targets
+    query_credit_bureau (old name, no alias added).
+    """
+    loan_agent = _agent(
+        "loan-underwriting-agent",
+        ["fetch_credit_data", "run_risk_model"],
+    )
+    deny_credit = _policy("deny_bulk_credit_query", ["query_credit_bureau"])
+    deny_risk = _policy("deny_risk_model_abuse", ["run_risk_model"])
+
+    warnings = detect_drift([loan_agent], [deny_credit, deny_risk])
+    ungoverned = [w for w in warnings if w.warning_type == "UNGOVERNED_TOOL"]
+    orphaned = [w for w in warnings if w.warning_type == "ORPHANED_POLICY"]
+
+    assert any(w.tool_name == "fetch_credit_data" for w in ungoverned)
+    assert not any(w.tool_name == "run_risk_model" for w in ungoverned)
+    assert any(w.tool_name == "query_credit_bureau" for w in orphaned)
+
+    ug = next(w for w in ungoverned if w.tool_name == "fetch_credit_data")
+    assert "loan-underwriting-agent" in ug.message
+    assert "fetch_credit_data" in ug.message
+    assert "ungoverned" in ug.message
+
+
 def test_rename_scenario_both_warning_types():
     """
     query_credit_bureau renamed to fetch_credit_data in agent.
