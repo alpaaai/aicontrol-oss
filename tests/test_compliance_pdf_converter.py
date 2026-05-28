@@ -8,11 +8,8 @@ import pytest
 
 
 def _weasyprint_available() -> bool:
-    try:
-        import weasyprint.text.ffi  # noqa: F401
-        return True
-    except (OSError, ImportError):
-        return False
+    import ctypes.util
+    return ctypes.util.find_library("pangoft2-1.0-0") is not None
 
 
 if not _weasyprint_available():
