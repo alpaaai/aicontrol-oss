@@ -10,6 +10,7 @@ from alembic import context
 from app.models.database import Base
 import app.models.schemas
 import app.models.policy_warning
+import app.models.compliance_report
 
 config = context.config
 
