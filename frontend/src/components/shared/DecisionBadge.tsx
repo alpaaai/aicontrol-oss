@@ -8,21 +8,28 @@ interface DecisionBadgeProps {
 }
 
 const styles: Record<Decision, string> = {
-  allow: "bg-decision-allow/10 text-decision-allow border-decision-allow/20",
-  deny: "bg-decision-deny/10 text-decision-deny border-decision-deny/20",
-  review: "bg-decision-review/10 text-decision-review border-decision-review/20",
+  allow:  "bg-ac-allow-bg text-ac-allow border border-green-200",
+  deny:   "bg-ac-deny-bg text-ac-deny border border-red-200",
+  review: "bg-ac-review-bg text-ac-review border border-amber-200",
+};
+
+const dots: Record<Decision, string> = {
+  allow:  "bg-ac-allow",
+  deny:   "bg-ac-deny",
+  review: "bg-ac-review",
 };
 
 export function DecisionBadge({ decision, className }: DecisionBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center px-2 py-0.5 rounded text-xs font-medium border uppercase tracking-wide",
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium",
         styles[decision],
         className
       )}
     >
-      {decision}
+      <span className={cn("w-1.5 h-1.5 rounded-full", dots[decision])} />
+      {decision.charAt(0).toUpperCase() + decision.slice(1)}
     </span>
   );
 }

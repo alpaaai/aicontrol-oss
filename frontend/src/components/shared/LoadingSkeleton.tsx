@@ -1,41 +1,18 @@
-import { cn } from "@/lib/utils";
-
-interface SkeletonProps {
-  className?: string;
-}
-
-export function Skeleton({ className }: SkeletonProps) {
+export function SkeletonRow() {
   return (
-    <div
-      className={cn(
-        "animate-pulse rounded bg-surface-overlay",
-        className
-      )}
-    />
-  );
-}
-
-export function TableSkeleton({ rows = 5 }: { rows?: number }) {
-  return (
-    <div className="space-y-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex gap-4 p-3 rounded border border-border">
-          <Skeleton className="h-4 w-24" />
-          <Skeleton className="h-4 flex-1" />
-          <Skeleton className="h-4 w-16" />
-          <Skeleton className="h-4 w-20" />
-        </div>
-      ))}
+    <div className="flex gap-3 py-3 border-b border-ac-border last:border-0 animate-pulse">
+      <div className="h-4 bg-gray-100 rounded flex-1" />
+      <div className="h-4 bg-gray-100 rounded w-24" />
+      <div className="h-4 bg-gray-100 rounded w-16" />
     </div>
   );
 }
 
-export function CardSkeleton() {
+export function SkeletonCard() {
   return (
-    <div className="p-4 rounded-lg border border-border bg-surface-raised space-y-3">
-      <Skeleton className="h-4 w-1/3" />
-      <Skeleton className="h-8 w-2/3" />
-      <Skeleton className="h-3 w-1/4" />
+    <div className="rounded-[10px] border border-ac-border bg-ac-card p-5 animate-pulse">
+      <div className="h-3 bg-gray-100 rounded w-24 mb-3" />
+      <div className="h-7 bg-gray-200 rounded w-16" />
     </div>
   );
 }
