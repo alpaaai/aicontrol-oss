@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.auth import require_admin
 from app.models.database import get_db
 from app.models.schemas import Policy
+from app.services.activity_log_service import write_activity_log
 from app.services.policy_loader import push_rego_to_opa
 
 router = APIRouter(prefix="/policies", tags=["policies"])
@@ -144,10 +145,18 @@ async def update_policy(
         errors = validate_rate_limit_condition(effective_condition)
         if errors:
             raise HTTPException(status_code=422, detail="; ".join(errors))
+    before = {k: getattr(policy, k) for k in updated}
     for field, value in updated.items():
         setattr(policy, field, value)
     await db.flush()
     await push_rego_to_opa()
+    await write_activity_log(
+        action="policy.update",
+        resource_type="policy",
+        resource_id=str(policy_id),
+        before_state=before,
+        after_state=updated,
+    )
     return policy
 
 

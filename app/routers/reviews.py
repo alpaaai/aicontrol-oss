@@ -1,5 +1,5 @@
 """GET /reviews and GET /reviews/{review_id} — human-in-the-loop review status endpoints."""
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 from datetime import datetime
 
@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import _get_verified_token, require_admin
-from app.models.database import get_db
+from app.core.auth import _get_verified_token, require_admin, require_human
+from app.models.database import async_session_factory, get_db
 from app.models.schemas import HITLReview
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
@@ -75,3 +75,34 @@ async def list_reviews(
 
     result = await db.execute(query)
     return result.scalars().all()
+
+
+class ReviewActionBody(BaseModel):
+    action: Literal["approve", "deny"]
+    note: Optional[str] = None
+
+
+@router.patch("/{review_id}")
+async def action_review(
+    review_id: UUID,
+    body: ReviewActionBody,
+    _=Depends(require_human),
+):
+    async with async_session_factory() as session:
+        review = (await session.execute(
+            select(HITLReview).where(HITLReview.id == review_id)
+        )).scalar_one_or_none()
+        if not review:
+            raise HTTPException(status_code=404, detail="Review not found")
+        review.status = "approved" if body.action == "approve" else "denied"
+        review.review_note = body.note
+        review.reviewed_at = datetime.utcnow()
+        review.reviewer = "dashboard"
+        await session.commit()
+        await session.refresh(review)
+    return {
+        "id": str(review.id),
+        "status": review.status,
+        "review_note": review.review_note,
+        "reviewed_at": review.reviewed_at.isoformat(),
+    }
