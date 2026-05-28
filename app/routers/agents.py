@@ -140,6 +140,29 @@ async def delete_agent(
     logger.info("agent_deleted", agent_id=str(agent_id))
 
 
+@router.patch("/{agent_id}/approved-tools", response_model=ApprovedToolsResponse)
+async def update_approved_tools(
+    agent_id: uuid.UUID,
+    body: ApprovedToolsUpdate,
+    db: AsyncSession = Depends(get_db),
+    _token: dict = Depends(require_admin),
+) -> ApprovedToolsResponse:
+    """Replace an agent's approved_tools list. Full replace semantics — send complete new list."""
+    agent = await db.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    agent.approved_tools = body.approved_tools
+    await db.commit()
+    await db.refresh(agent)
+
+    logger.info("approved_tools_updated", agent_id=str(agent_id), count=len(body.approved_tools))
+    return ApprovedToolsResponse(
+        agent_id=agent.id,
+        approved_tools=agent.approved_tools or [],
+    )
+
+
 @router.delete("/{agent_id}/token", status_code=200)
 async def revoke_agent_token(
     agent_id: uuid.UUID,
