@@ -5,36 +5,23 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          DEFAULT: "#2563EB",
-          dark: "#1D4ED8",
-          light: "#3B82F6",
-        },
-        surface: {
-          DEFAULT: "#0F172A",
-          raised: "#1E293B",
-          overlay: "#334155",
-        },
-        border: {
-          DEFAULT: "#1E293B",
-          strong: "#334155",
-        },
-        text: {
-          primary: "#F8FAFC",
-          secondary: "#94A3B8",
-          muted: "#64748B",
-        },
-        decision: {
-          allow: "#22C55E",
-          deny: "#EF4444",
-          review: "#F59E0B",
-        },
-        status: {
-          success: "#22C55E",
-          error: "#EF4444",
-          warning: "#F59E0B",
-          info: "#3B82F6",
-        },
+        "ac-night":          "#0F1117",
+        "ac-primary":        "#3B5BDB",
+        "ac-primary-lt":     "#4F8EF7",
+        "ac-primary-bg":     "#EEF2FF",
+        "ac-allow":          "#1D9E75",
+        "ac-allow-bg":       "#EDFAF3",
+        "ac-deny":           "#E24B4A",
+        "ac-deny-bg":        "#FCEBEB",
+        "ac-review":         "#BA7517",
+        "ac-review-bg":      "#FAEEDA",
+        "ac-enterprise":     "#534AB7",
+        "ac-enterprise-bg":  "#EEEDFE",
+        "ac-surface":        "#F8F9FA",
+        "ac-card":           "#FFFFFF",
+        "ac-border":         "#E5E7EB",
+        "ac-text-primary":   "#111827",
+        "ac-text-muted":     "#6B7280",
       },
       fontFamily: {
         sans: ["Geist Sans", "system-ui", "sans-serif"],
@@ -50,6 +37,6 @@ const config: Config = {
     },
   },
   plugins: [],
-};
+} satisfies Config;
 
 export default config;
