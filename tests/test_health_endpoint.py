@@ -1,47 +1,61 @@
-"""Tests: GET /health includes opa_status and drift_detector_status fields."""
+"""Tests: GET /health enterprise gating for opa_status and drift_detector_status."""
 import pytest
-from unittest.mock import MagicMock
+import app.main as _main
+from unittest.mock import MagicMock, patch
 from httpx import AsyncClient, ASGITransport
-from app.main import app
 
 
 @pytest.mark.asyncio
-async def test_health_returns_opa_status():
-    """GET /health response must include opa_status field."""
+async def test_health_opa_status_enterprise():
+    """Enterprise license key → real opa_status returned (healthy/degraded/unreachable)."""
     mock_watcher = MagicMock()
     mock_watcher.opa_status = "healthy"
-    app.state.opa_watcher = mock_watcher
+    _main.app.state.opa_watcher = mock_watcher
 
     try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
-            response = await client.get("/health")
-
+        with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", "test-key"):
+            async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
+                response = await client.get("/health")
         assert response.status_code == 200
-        data = response.json()
-        assert "opa_status" in data
-        assert data["opa_status"] == "healthy"
+        assert response.json()["opa_status"] in ("healthy", "degraded", "unreachable")
     finally:
-        del app.state.opa_watcher
+        del _main.app.state._state["opa_watcher"]
 
 
 @pytest.mark.asyncio
-async def test_health_includes_drift_detector_status():
-    """GET /health response must include drift_detector_status field."""
-    mock_detector = MagicMock()
-    mock_detector.status = "healthy"
-    app.state.drift_detector = mock_detector
-
-    try:
-        async with AsyncClient(
-            transport=ASGITransport(app=app), base_url="http://test"
-        ) as client:
+async def test_health_opa_status_community():
+    """No license key → opa_status returns enterprise_only."""
+    with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", ""):
+        async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
             response = await client.get("/health")
 
+    assert response.status_code == 200
+    assert response.json()["opa_status"] == "enterprise_only"
+
+
+@pytest.mark.asyncio
+async def test_health_drift_detector_status_enterprise():
+    """Enterprise license key → real drift_detector_status returned."""
+    mock_detector = MagicMock()
+    mock_detector.status = "healthy"
+    _main.app.state.drift_detector = mock_detector
+
+    try:
+        with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", "test-key"):
+            async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
+                response = await client.get("/health")
         assert response.status_code == 200
-        data = response.json()
-        assert "drift_detector_status" in data
-        assert data["drift_detector_status"] in ("healthy", "degraded", "unknown")
+        assert response.json()["drift_detector_status"] in ("healthy", "degraded")
     finally:
-        del app.state.drift_detector
+        del _main.app.state._state["drift_detector"]
+
+
+@pytest.mark.asyncio
+async def test_health_drift_detector_status_community():
+    """No license key → drift_detector_status returns enterprise_only."""
+    with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", ""):
+        async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
+            response = await client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json()["drift_detector_status"] == "enterprise_only"

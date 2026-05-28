@@ -38,18 +38,23 @@ async def lifespan(app: FastAPI):
     opa_watcher.start()
     app.state.opa_watcher = opa_watcher
 
-    drift_detector = DriftDetector(
-        session_factory=async_session_factory,
-        interval_hours=_settings.drift_scan_interval_hours,
-    )
-    drift_detector.start()
-    app.state.drift_detector = drift_detector
+    # DriftDetector — enterprise only
+    if _settings.AICONTROL_LICENSE_KEY:
+        drift_detector = DriftDetector(
+            session_factory=async_session_factory,
+            interval_hours=_settings.drift_scan_interval_hours,
+        )
+        drift_detector.start()
+        app.state.drift_detector = drift_detector
+    else:
+        app.state.drift_detector = None
 
     logger.info("aicontrol_ready")
 
     yield
 
-    await drift_detector.stop()
+    if app.state.drift_detector is not None:
+        await app.state.drift_detector.stop()
     await opa_watcher.stop()  # task fully cancelled before client closes
     await _http_client.aclose()
     logger.info("aicontrol_stopping")
@@ -77,12 +82,19 @@ app.include_router(compliance_router)
 async def health(request: Request) -> dict:
     """Liveness check — returns ok when the app process is running."""
     watcher = getattr(request.app.state, "opa_watcher", None)
-    opa_status = watcher.opa_status if watcher else "unknown"
     drift_detector = getattr(request.app.state, "drift_detector", None)
-    drift_status = drift_detector.status if drift_detector else "unknown"
+    has_license = bool(_settings.AICONTROL_LICENSE_KEY)
     return {
         "status": "ok",
         "service": "aicontrol",
-        "opa_status": opa_status,
-        "drift_detector_status": drift_status,
+        "opa_status": (
+            (watcher.opa_status if watcher else "unknown")
+            if has_license
+            else "enterprise_only"
+        ),
+        "drift_detector_status": (
+            (drift_detector.status if drift_detector else "unknown")
+            if has_license
+            else "enterprise_only"
+        ),
     }

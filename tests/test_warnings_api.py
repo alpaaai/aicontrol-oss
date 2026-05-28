@@ -1,9 +1,11 @@
 """Tests for P1-5: GET /warnings and PATCH /warnings/{id}/resolve endpoints."""
 import uuid
 from contextlib import contextmanager
+from unittest.mock import patch
 
 import pytest
 import pytest_asyncio
+import app.core.license_gate as _lg
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
 
@@ -21,6 +23,13 @@ def _mock_admin():
         yield
     finally:
         app.dependency_overrides.pop(require_admin, None)
+
+
+@contextmanager
+def _with_license():
+    """Set enterprise license key so the gate passes for functional/auth tests."""
+    with patch.object(_lg.settings, "AICONTROL_LICENSE_KEY", "test-key"):
+        yield
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -87,7 +96,7 @@ async def test_get_warnings_returns_list(p1_5_seed):
     """GET /warnings returns a list (may be empty)."""
     from app.main import app
 
-    with _mock_admin():
+    with _with_license(), _mock_admin():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/warnings")
 
@@ -100,7 +109,7 @@ async def test_get_warnings_filter_by_active(p1_5_seed, seed_warning):
     """GET /warnings?is_active=true returns only active warnings."""
     from app.main import app
 
-    with _mock_admin():
+    with _with_license(), _mock_admin():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/warnings?is_active=true")
 
@@ -111,11 +120,12 @@ async def test_get_warnings_filter_by_active(p1_5_seed, seed_warning):
 
 @pytest.mark.asyncio
 async def test_get_warnings_requires_auth(p1_5_seed):
-    """GET /warnings without auth returns 401."""
+    """GET /warnings without auth returns 401 (enterprise license present)."""
     from app.main import app
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/warnings")
+    with _with_license():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/warnings")
 
     assert response.status_code == 401
 
@@ -125,7 +135,7 @@ async def test_patch_warning_resolve(p1_5_seed, seed_warning):
     """PATCH /warnings/{id}/resolve marks warning as resolved."""
     from app.main import app
 
-    with _mock_admin():
+    with _with_license(), _mock_admin():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.patch(f"/warnings/{seed_warning}/resolve")
 
@@ -140,7 +150,7 @@ async def test_patch_warning_resolve_not_found(p1_5_seed):
     """PATCH /warnings/{non-existent-id}/resolve returns 404."""
     from app.main import app
 
-    with _mock_admin():
+    with _with_license(), _mock_admin():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.patch(f"/warnings/{uuid.uuid4()}/resolve")
 
@@ -149,10 +159,37 @@ async def test_patch_warning_resolve_not_found(p1_5_seed):
 
 @pytest.mark.asyncio
 async def test_patch_warning_resolve_requires_auth(p1_5_seed, seed_warning):
-    """PATCH /warnings/{id}/resolve without auth returns 401."""
+    """PATCH /warnings/{id}/resolve without auth returns 401 (enterprise license present)."""
     from app.main import app
 
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.patch(f"/warnings/{seed_warning}/resolve")
+    with _with_license():
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.patch(f"/warnings/{seed_warning}/resolve")
 
     assert response.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_warnings_requires_enterprise_license():
+    """GET /warnings returns 402 without enterprise license."""
+    from app.main import app
+
+    with patch.object(_lg.settings, "AICONTROL_LICENSE_KEY", ""):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.get("/warnings")
+
+    assert response.status_code == 402
+    assert response.json()["detail"]["error"] == "enterprise_license_required"
+
+
+@pytest.mark.asyncio
+async def test_warnings_resolve_requires_enterprise_license():
+    """PATCH /warnings/{id}/resolve returns 402 without enterprise license."""
+    from app.main import app
+
+    with patch.object(_lg.settings, "AICONTROL_LICENSE_KEY", ""):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.patch(f"/warnings/{uuid.uuid4()}/resolve")
+
+    assert response.status_code == 402
+    assert response.json()["detail"]["error"] == "enterprise_license_required"
