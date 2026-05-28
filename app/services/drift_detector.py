@@ -4,9 +4,12 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 
-import structlog
+from sqlalchemy import select, and_, Text
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.logging import get_logger
+from app.models.policy_warning import PolicyWarning
+from app.models.schemas import Agent, Policy
 
 logger = get_logger("drift_detector")
 
@@ -102,3 +105,127 @@ def detect_drift(
                 ))
 
     return warnings
+
+
+# ── DB helpers ────────────────────────────────────────────────────────────────
+
+async def _load_agents(session: AsyncSession) -> list[AgentSnapshot]:
+    """Load agents with non-empty approved_tools."""
+    result = await session.execute(
+        select(Agent).where(Agent.approved_tools.cast(Text) != "[]")
+    )
+    return [
+        AgentSnapshot(id=a.id, name=a.name, approved_tools=a.approved_tools or [])
+        for a in result.scalars().all()
+        if a.approved_tools  # double-guard
+    ]
+
+
+async def _load_policies(session: AsyncSession) -> list[PolicySnapshot]:
+    """Load active tool_denylist policies and extract tool lists from condition JSONB."""
+    result = await session.execute(
+        select(Policy).where(
+            and_(Policy.active == True, Policy.rule_type == "tool_denylist")
+        )
+    )
+    snapshots = []
+    for p in result.scalars().all():
+        condition = p.condition or {}
+        blocked = condition.get("blocked_tools", [])
+        aliases = condition.get("tool_aliases", [])
+        if blocked:
+            snapshots.append(PolicySnapshot(
+                id=p.id,
+                name=p.name,
+                blocked_tools=blocked,
+                tool_aliases=aliases,
+            ))
+    return snapshots
+
+
+async def _reconcile(session: AsyncSession, computed: list[WarningRecord]) -> None:
+    """
+    Reconcile computed warnings against DB state.
+    New → insert. Gone (active) → auto-resolve. Resolved reappear → reactivate.
+    """
+    now = datetime.now(timezone.utc)
+
+    result = await session.execute(select(PolicyWarning))
+    db_warnings = result.scalars().all()
+
+    def _dedup_key(w):
+        return (w.warning_type, w.agent_id, w.policy_id, w.tool_name)
+
+    db_index: dict = {_dedup_key(w): w for w in db_warnings}
+
+    computed_keys: set = set()
+    for rec in computed:
+        key = (rec.warning_type, rec.agent_id, rec.policy_id, rec.tool_name)
+        computed_keys.add(key)
+
+        existing = db_index.get(key)
+        if existing is None:
+            session.add(PolicyWarning(
+                warning_type=rec.warning_type,
+                agent_id=rec.agent_id,
+                policy_id=rec.policy_id,
+                tool_name=rec.tool_name,
+                message=rec.message,
+                is_active=True,
+            ))
+            logger.info("drift_warning_inserted",
+                        warning_type=rec.warning_type, tool_name=rec.tool_name)
+        elif not existing.is_active:
+            existing.is_active = True
+            existing.resolved_at = None
+            logger.info("drift_warning_reactivated",
+                        warning_type=rec.warning_type, tool_name=rec.tool_name)
+
+    for key, db_w in db_index.items():
+        if db_w.is_active and key not in computed_keys:
+            db_w.is_active = False
+            db_w.resolved_at = now
+            logger.info("drift_warning_auto_resolved",
+                        warning_type=db_w.warning_type, tool_name=db_w.tool_name)
+
+    await session.commit()
+
+
+# ── Scheduler ─────────────────────────────────────────────────────────────────
+
+class DriftDetector:
+    def __init__(self, session_factory, interval_hours: int = 6):
+        self._session_factory = session_factory
+        self._interval = interval_hours * 3600
+        self._task: asyncio.Task | None = None
+        self.status: str = "healthy"
+
+    def start(self) -> None:
+        """Create background task (non-blocking, like OpaHealthWatcher)."""
+        self._task = asyncio.create_task(self._run(), name="drift_detector")
+
+    async def _run(self) -> None:
+        await asyncio.sleep(5)   # stabilization delay
+        await self.run_once()
+        while True:
+            await asyncio.sleep(self._interval)
+            await self.run_once()
+
+    async def run_once(self) -> None:
+        try:
+            async with self._session_factory() as session:
+                agents = await _load_agents(session)
+                policies = await _load_policies(session)
+                warnings = detect_drift(agents, policies)
+                await _reconcile(session, warnings)
+            self.status = "healthy"
+            logger.info("drift_scan_complete", warning_count=len(warnings))
+        except Exception as e:
+            self.status = "degraded"
+            logger.error("drift_scan_failed", error=str(e))
+
+    async def stop(self) -> None:
+        if self._task:
+            self._task.cancel()
+            await asyncio.gather(self._task, return_exceptions=True)
+            self._task = None
