@@ -119,3 +119,145 @@ def admin_token(_seed_and_token_setup):
 @pytest.fixture
 def agent_token(_seed_and_token_setup):
     return {"Authorization": f"Bearer {_seed_and_token_setup['agent']}"}
+
+
+# ── P1-8a: human JWT + dashboard fixtures ────────────────────────────────────
+
+@pytest.fixture
+def human_admin_token():
+    """Human JWT signed with the app secret — no DB lookup (require_human is signature-only)."""
+    from datetime import datetime, timedelta
+    from jose import jwt
+    from app.core.config import settings
+    payload = {
+        "sub": "00000000-0000-0000-0000-000000000001",
+        "email": "test_human@aicontrol.dev",
+        "role": "admin",
+        "type": "human",
+        "exp": datetime.utcnow() + timedelta(hours=8),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+@pytest_asyncio.fixture(scope="session")
+async def seed_admin_user():
+    """Ensure admin@aicontrol.dev exists in users table for OTP auth tests."""
+    from app.models.database import async_session_factory
+    from app.models.user import User, UserRole
+    from sqlalchemy import select
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(User).where(User.email == "admin@aicontrol.dev")
+        )
+        if not result.scalar_one_or_none():
+            session.add(User(email="admin@aicontrol.dev", role=UserRole.admin, name="Admin"))
+            await session.commit()
+
+
+@pytest_asyncio.fixture(scope="session")
+async def seed_audit_events():
+    """Seed audit events with mixed decisions for filter tests."""
+    import uuid
+    from app.models.database import async_session_factory
+    from sqlalchemy import text
+
+    session_id = uuid.uuid4()
+    event_ids = []
+    async with async_session_factory() as db:
+        await db.execute(text("""
+            INSERT INTO sessions (id, agent_id, started_at)
+            VALUES (:sid, (SELECT id FROM agents LIMIT 1), NOW())
+        """), {"sid": str(session_id)})
+        for seq, decision in enumerate(["allow", "allow", "deny", "deny", "review"], 1):
+            eid = uuid.uuid4()
+            event_ids.append(eid)
+            await db.execute(text("""
+                INSERT INTO audit_events (id, session_id, sequence_number, tool_name, decision, created_at)
+                VALUES (:id, :sid, :seq, 'test_filter_tool', :decision, NOW())
+            """), {"id": str(eid), "sid": str(session_id), "seq": seq, "decision": decision})
+        await db.commit()
+
+    yield event_ids
+
+    async with async_session_factory() as db:
+        for eid in event_ids:
+            await db.execute(text("DELETE FROM audit_events WHERE id = :id"), {"id": str(eid)})
+        await db.execute(text("DELETE FROM sessions WHERE id = :id"), {"id": str(session_id)})
+        await db.commit()
+
+
+@pytest_asyncio.fixture(scope="session")
+async def seed_sessions():
+    """Seed two sessions with events. Returns list of session UUIDs."""
+    import uuid
+    from app.models.database import async_session_factory
+    from sqlalchemy import text
+
+    session_ids = [uuid.uuid4(), uuid.uuid4()]
+    event_ids = []
+    async with async_session_factory() as db:
+        for sid in session_ids:
+            await db.execute(text("""
+                INSERT INTO sessions (id, agent_id, started_at)
+                VALUES (:sid, (SELECT id FROM agents LIMIT 1), NOW())
+            """), {"sid": str(sid)})
+            eid = uuid.uuid4()
+            event_ids.append(eid)
+            await db.execute(text("""
+                INSERT INTO audit_events (id, session_id, sequence_number, tool_name, decision, created_at)
+                VALUES (:id, :sid, 1, 'test_tool', 'allow', NOW())
+            """), {"id": str(eid), "sid": str(sid)})
+        await db.commit()
+
+    yield session_ids
+
+    async with async_session_factory() as db:
+        for eid in event_ids:
+            await db.execute(text("DELETE FROM audit_events WHERE id = :id"), {"id": str(eid)})
+        for sid in session_ids:
+            await db.execute(text("DELETE FROM sessions WHERE id = :id"), {"id": str(sid)})
+        await db.commit()
+
+
+@pytest_asyncio.fixture(scope="session")
+async def seed_pending_review():
+    """Seed a pending HITLReview and return its UUID."""
+    import uuid
+    from app.models.database import async_session_factory
+    from sqlalchemy import text
+
+    review_id = uuid.uuid4()
+    async with async_session_factory() as db:
+        await db.execute(text("""
+            INSERT INTO hitl_reviews (id, status, created_at)
+            VALUES (:id, 'pending', NOW())
+        """), {"id": str(review_id)})
+        await db.commit()
+
+    yield review_id
+
+    async with async_session_factory() as db:
+        await db.execute(text("DELETE FROM hitl_reviews WHERE id = :id"), {"id": str(review_id)})
+        await db.commit()
+
+
+@pytest_asyncio.fixture(scope="session")
+async def seed_policy():
+    """Seed a test policy and return its UUID."""
+    import uuid
+    from app.models.database import async_session_factory
+    from sqlalchemy import text
+
+    policy_id = uuid.uuid4()
+    async with async_session_factory() as db:
+        await db.execute(text("""
+            INSERT INTO policies (id, name, rule_type, condition, action, active)
+            VALUES (:id, 'test_p1_8a_policy', 'tool_call', '{"tool": "any"}'::jsonb, 'allow', true)
+        """), {"id": str(policy_id)})
+        await db.commit()
+
+    yield policy_id
+
+    async with async_session_factory() as db:
+        await db.execute(text("DELETE FROM policies WHERE id = :id"), {"id": str(policy_id)})
+        await db.commit()

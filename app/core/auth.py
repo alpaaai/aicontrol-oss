@@ -87,3 +87,25 @@ async def require_admin(payload: dict = Depends(_get_verified_token)) -> dict:
             detail="Admin role required",
         )
     return payload
+
+
+async def require_human(
+    credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
+) -> dict:
+    """Dependency: validates human JWTs issued by /auth/verify-code.
+
+    Checks signature and type=='human' only — no DB lookup against api_tokens.
+    """
+    try:
+        payload = jwt.decode(credentials.credentials, settings.secret_key, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+        )
+    if payload.get("type") != "human":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Human token required",
+        )
+    return payload
