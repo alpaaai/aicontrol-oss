@@ -13,6 +13,7 @@ from app.routers.agents import router as agents_router
 from app.routers.reviews import router as reviews_router
 from app.routers.slack_actions import router as slack_router
 from app.routers.tokens import router as tokens_router
+from app.routers.warnings import router as warnings_router
 from app.services.drift_detector import DriftDetector
 from app.services.opa_health_watcher import OpaHealthWatcher
 from app.services.policy_loader import load_all, push_rego_to_opa
@@ -67,6 +68,7 @@ app.include_router(agents_router)
 app.include_router(reviews_router)
 app.include_router(slack_router)
 app.include_router(tokens_router)
+app.include_router(warnings_router)
 
 
 @app.get("/health")
