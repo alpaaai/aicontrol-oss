@@ -2,6 +2,7 @@
 import asyncio
 import uuid
 from unittest.mock import AsyncMock, MagicMock, patch
+from httpx import AsyncClient, ASGITransport
 
 import pytest
 
@@ -79,3 +80,13 @@ async def test_stop_cancels_task(db_session_factory_mock):
         await asyncio.sleep(0)   # yield to let _task be created
         await detector.stop()
         assert detector._task is None or detector._task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_drift_detector_not_started_without_license():
+    """Community install: app.state.drift_detector is None when no license key."""
+    import app.main as _main
+
+    with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", ""):
+        async with _main.lifespan(_main.app):
+            assert _main.app.state.drift_detector is None

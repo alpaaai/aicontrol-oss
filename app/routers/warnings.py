@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
+from app.core.license_gate import require_enterprise_license
 from app.core.logging import get_logger
 from app.models.database import get_db
 from app.models.policy_warning import PolicyWarning
@@ -69,7 +70,7 @@ async def _enrich(
     ]
 
 
-@router.get("", response_model=list[WarningResponse])
+@router.get("", response_model=list[WarningResponse], dependencies=[Depends(require_enterprise_license)])
 async def list_warnings(
     is_active: Optional[bool] = Query(default=True),
     warning_type: Optional[str] = Query(default=None),
@@ -90,7 +91,7 @@ async def list_warnings(
     return await _enrich(db, warnings)
 
 
-@router.patch("/{warning_id}/resolve", response_model=WarningResponse)
+@router.patch("/{warning_id}/resolve", response_model=WarningResponse, dependencies=[Depends(require_enterprise_license)])
 async def resolve_warning(
     warning_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
