@@ -56,6 +56,17 @@ class AgentResponse(BaseModel):
     approved_by: Optional[str]
 
 
+class ApprovedToolsUpdate(BaseModel):
+    approved_tools: list[str]
+
+
+class ApprovedToolsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    agent_id: uuid.UUID
+    approved_tools: list[str]
+
+
 @router.get("", response_model=list[AgentResponse])
 async def list_agents(
     db: AsyncSession = Depends(get_db),
