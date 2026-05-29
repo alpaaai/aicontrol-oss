@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { listActivityLog, ActivityLogEntry } from '../../api/activityLog'
+import { listActivityLog } from '../../api/activityLog'
+import type { ActivityLogEntry } from '../../api/activityLog'
 
 export function ActivityLogPage() {
   const [data, setData] = useState<ActivityLogEntry[]>([])

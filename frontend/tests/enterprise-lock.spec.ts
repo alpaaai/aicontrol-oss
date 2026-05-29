@@ -29,7 +29,7 @@ test("sessions page shows enterprise lock overlay", async ({ page }) => {
 
 test("review queue page shows enterprise lock overlay", async ({ page }) => {
   await page.goto("/reviews");
-  await expect(page.getByText("Requires Enterprise License")).toBeVisible();
+  await expect(page.getByText("Review Queue — Enterprise Feature")).toBeVisible();
 });
 
 test("enterprise locked pages are not hidden from DOM", async ({ page }) => {

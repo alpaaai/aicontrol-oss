@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { listReports, downloadReport, ComplianceReport } from '../../api/reports'
+import { listReports, downloadReport } from '../../api/reports'
+import type { ComplianceReport } from '../../api/reports'
 import { Download } from 'lucide-react'
 
 interface Props { refreshKey: number }

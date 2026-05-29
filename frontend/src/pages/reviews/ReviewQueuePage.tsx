@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { listReviews, Review } from '../../api/reviews'
+import { listReviews } from '../../api/reviews'
+import type { Review } from '../../api/reviews'
 import { ReviewRow } from './ReviewRow'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
 import { usePoll } from '../../hooks/usePoll'
