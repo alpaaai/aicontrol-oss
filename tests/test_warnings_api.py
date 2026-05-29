@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 import app.core.license_gate as _lg
+from app.core.license import LicenseInfo
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
 
@@ -27,8 +28,9 @@ def _mock_admin():
 
 @contextmanager
 def _with_license():
-    """Set enterprise license key so the gate passes for functional/auth tests."""
-    with patch.object(_lg.settings, "AICONTROL_LICENSE_KEY", "test-key"):
+    """Patch get_license_info to return enterprise plan for functional/auth tests."""
+    _enterprise = LicenseInfo(plan="enterprise", company="Test", email="t@t.com", expires_at=None)
+    with patch.object(_lg, "get_license_info", return_value=_enterprise):
         yield
 
 
@@ -171,25 +173,27 @@ async def test_patch_warning_resolve_requires_auth(p1_5_seed, seed_warning):
 
 @pytest.mark.asyncio
 async def test_warnings_requires_enterprise_license():
-    """GET /warnings returns 402 without enterprise license."""
+    """GET /warnings returns 402 without enterprise license (community plan)."""
     from app.main import app
+    _community = LicenseInfo(plan="community", company=None, email=None, expires_at=None)
 
-    with patch.object(_lg.settings, "AICONTROL_LICENSE_KEY", ""):
+    with patch.object(_lg, "get_license_info", return_value=_community):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/warnings")
 
     assert response.status_code == 402
-    assert response.json()["detail"]["error"] == "enterprise_license_required"
+    assert response.json()["detail"]["error"] == "enterprise_required"
 
 
 @pytest.mark.asyncio
 async def test_warnings_resolve_requires_enterprise_license():
-    """PATCH /warnings/{id}/resolve returns 402 without enterprise license."""
+    """PATCH /warnings/{id}/resolve returns 402 without enterprise license (community plan)."""
     from app.main import app
+    _community = LicenseInfo(plan="community", company=None, email=None, expires_at=None)
 
-    with patch.object(_lg.settings, "AICONTROL_LICENSE_KEY", ""):
+    with patch.object(_lg, "get_license_info", return_value=_community):
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.patch(f"/warnings/{uuid.uuid4()}/resolve")
 
     assert response.status_code == 402
-    assert response.json()["detail"]["error"] == "enterprise_license_required"
+    assert response.json()["detail"]["error"] == "enterprise_required"
