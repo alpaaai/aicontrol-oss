@@ -53,9 +53,9 @@ docker compose $COMPOSE logs --tail=50 api 2>&1 \
   || echo "ERROR: could not fetch api logs"
 
 echo ""
-echo "--- Dashboard Logs (last 20 lines) ---"
-docker compose $COMPOSE logs --tail=20 dashboard 2>&1 \
-  || echo "ERROR: could not fetch dashboard logs"
+echo "--- Frontend Logs (last 20 lines) ---"
+docker compose $COMPOSE logs --tail=20 frontend 2>&1 \
+  || echo "ERROR: could not fetch frontend logs"
 
 echo ""
 echo "--- OPA Logs (last 20 lines) ---"
