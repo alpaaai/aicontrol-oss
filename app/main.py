@@ -17,6 +17,7 @@ from app.routers.reviews import router as reviews_router
 from app.routers.sessions import router as sessions_router
 from app.routers.slack_actions import router as slack_router
 from app.routers.tokens import router as tokens_router
+from app.routers.license import router as license_router
 from app.routers.warnings import router as warnings_router
 from enterprise.compliance.router import router as compliance_router
 from app.services.drift_detector import DriftDetector
@@ -71,6 +72,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+app.include_router(license_router)
 app.include_router(auth_router)
 app.include_router(audit_events_router)
 app.include_router(dashboard_router)
