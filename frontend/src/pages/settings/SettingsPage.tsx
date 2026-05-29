@@ -16,8 +16,8 @@ export function SettingsPage() {
 
   return (
     <div className="p-6 max-w-2xl">
-      <div className="mb-6">
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-gray-900">Settings</h2>
+      <div className="mb-6 animate-fade-up">
+        <h2 className="text-[18px] font-semibold text-ac-text-primary">Settings</h2>
         <p className="text-sm text-gray-400 mt-0.5">AIControl platform configuration</p>
       </div>
 

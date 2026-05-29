@@ -8,9 +8,9 @@ export function TokensPage() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 animate-fade-up">
         <div>
-          <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary">
+          <h2 className="text-[18px] font-semibold text-ac-text-primary">
             API Tokens
           </h2>
           <p className="text-sm text-ac-text-muted mt-0.5">

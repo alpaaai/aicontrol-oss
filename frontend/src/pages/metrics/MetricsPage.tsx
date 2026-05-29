@@ -11,8 +11,8 @@ export function MetricsPage() {
 
   return (
     <div className="p-6 space-y-5">
-      <div>
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary">
+      <div className="animate-fade-up">
+        <h2 className="text-[18px] font-semibold text-ac-text-primary">
           Decision Metrics
         </h2>
         <p className="text-sm text-ac-text-muted mt-0.5">Updates every 30s</p>
@@ -20,18 +20,26 @@ export function MetricsPage() {
 
       <div className="flex gap-4 flex-wrap">
         <StatCard
+          index={0}
+          accentColor="#3B5BDB"
           label="Intercepts (7 days)"
           value={loading ? "—" : (data?.intercepts_7d.toLocaleString() ?? "—")}
         />
         <StatCard
+          index={1}
+          accentColor="#534AB7"
           label="Intercepts (30 days)"
           value={loading ? "—" : (data?.intercepts_30d.toLocaleString() ?? "—")}
         />
         <StatCard
+          index={2}
+          accentColor="#1D9E75"
           label="Active agents"
           value={loading ? "—" : (data?.active_agents ?? "—")}
         />
         <StatCard
+          index={3}
+          accentColor="#BA7517"
           label="Active policies"
           value={loading ? "—" : (data?.active_policies ?? "—")}
         />

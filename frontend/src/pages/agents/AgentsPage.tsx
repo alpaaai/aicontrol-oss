@@ -32,8 +32,8 @@ export function AgentsPage() {
   return (
     <div className="flex h-full">
       <div className="flex-1 flex flex-col min-w-0 p-6">
-        <div className="mb-5">
-          <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary">
+        <div className="mb-5 animate-fade-up">
+          <h2 className="text-[18px] font-semibold text-ac-text-primary">
             Agents
           </h2>
           <p className="text-sm text-ac-text-muted mt-0.5">

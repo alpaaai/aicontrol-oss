@@ -56,7 +56,7 @@ export function HealthPage() {
   if (!IS_ENTERPRISE) {
     return (
       <div className="p-6">
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-gray-900 mb-4">System Health</h2>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">System Health</h2>
         <EnterpriseLock
           title="OPA Health Monitor — Enterprise"
           description="Detailed OPA status, fail-closed state, and drift detector health require an Enterprise license."
@@ -73,7 +73,7 @@ export function HealthPage() {
 
   return (
     <div className="p-6">
-      <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-gray-900 mb-5">System Health</h2>
+      <h2 className="text-[18px] font-semibold text-ac-text-primary mb-5">System Health</h2>
       <HealthContent />
     </div>
   )

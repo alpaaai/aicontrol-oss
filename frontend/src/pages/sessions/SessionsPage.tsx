@@ -68,7 +68,7 @@ export function SessionsPage() {
   if (!IS_ENTERPRISE) {
     return (
       <div className="p-6">
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary mb-4">
+        <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">
           Sessions
         </h2>
         <EnterpriseLock
@@ -94,7 +94,7 @@ export function SessionsPage() {
 
   return (
     <div className="p-6 space-y-4">
-      <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary">
+      <h2 className="text-[18px] font-semibold text-ac-text-primary">
         Sessions
       </h2>
       <SessionsTable />

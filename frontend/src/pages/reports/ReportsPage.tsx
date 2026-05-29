@@ -11,7 +11,7 @@ export function ReportsPage() {
   if (!IS_ENTERPRISE) {
     return (
       <div className="p-6">
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-gray-900 mb-4">Compliance Reports</h2>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">Compliance Reports</h2>
         <EnterpriseLock
           title="Compliance Reports — Enterprise"
           description="AI-native compliance report generation (EU AI Act, NIST AI RMF, SOC 2, ISO 42001) requires an Enterprise license."
@@ -32,7 +32,7 @@ export function ReportsPage() {
   return (
     <div className="p-6">
       <div className="mb-5">
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-gray-900">Compliance Reports</h2>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary">Compliance Reports</h2>
         <p className="text-sm text-gray-400 mt-0.5">AI-native compliance reporting · EU AI Act · NIST AI RMF · SOC 2 · ISO 42001</p>
       </div>
       <ReportForm onGenerated={() => setRefreshKey(k => k + 1)} />
