@@ -23,7 +23,7 @@ function IntelligenceCard({ icon, title, description, badge, children }: Intelli
       <div className="blur-sm pointer-events-none select-none opacity-40">
         <div className="flex items-center gap-2 mb-3">
           <span className="text-purple-600">{icon}</span>
-          <h3 className="text-[14px] font-semibold text-gray-900">{title}</h3>
+          <h3 className="text-[14px] font-semibold text-ac-text-primary">{title}</h3>
           {badge && (
             <span className="ml-auto text-[11px] bg-purple-50 text-purple-600 px-2 py-0.5 rounded-full font-medium">
               {badge}
@@ -46,7 +46,7 @@ export function IntelligencePage() {
   return (
     <div className="p-6 space-y-5">
       <div>
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-gray-900">Intelligence</h2>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary">Intelligence</h2>
         <p className="text-sm text-gray-400 mt-0.5">AI-native governance features — Enterprise</p>
       </div>
 

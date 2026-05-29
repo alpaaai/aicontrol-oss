@@ -34,7 +34,7 @@ export function ReportHistory({ refreshKey }: Props) {
 
   return (
     <div className="mt-5">
-      <h3 className="text-[14px] font-semibold text-gray-900 mb-3">Report History</h3>
+      <h3 className="text-[14px] font-semibold text-ac-text-primary mb-3">Report History</h3>
       <div className="bg-white border border-gray-200 rounded-[10px] overflow-hidden">
         {loading && <div className="h-10 bg-gray-50 animate-pulse m-4 rounded" />}
         {!loading && reports.length === 0 && (

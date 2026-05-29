@@ -27,8 +27,12 @@ export function LiveFeedTable() {
         </div>
       ) : (
         <div className="divide-y divide-gray-50">
-          {data?.events.map((event: AuditEvent) => (
-            <div key={event.id} className="flex items-center gap-3 py-2 text-[12px]">
+          {data?.events.map((event: AuditEvent, i: number) => (
+            <div
+              key={event.id}
+              className="flex items-center gap-3 py-2 text-[12px] animate-row-in"
+              style={{ animationDelay: `${i * 25}ms` }}
+            >
               <span className="text-ac-text-muted w-[52px] shrink-0 tabular-nums font-mono">
                 {new Date(event.created_at).toLocaleTimeString("en-US", {
                   hour: "2-digit",

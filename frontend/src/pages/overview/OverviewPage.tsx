@@ -13,8 +13,8 @@ export function OverviewPage() {
 
   return (
     <div className="p-6 space-y-5">
-      <div>
-        <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary">
+      <div className="animate-fade-up" style={{ animationDelay: "0ms" }}>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary">
           Overview
         </h2>
         <p className="text-sm text-ac-text-muted mt-0.5">
@@ -33,11 +33,15 @@ export function OverviewPage() {
         ) : (
           <>
             <StatCard
+              index={0}
+              accentColor="#3B5BDB"
               label="Intercepts today"
               value={data?.intercepts_today.toLocaleString() ?? "—"}
               live
             />
             <StatCard
+              index={1}
+              accentColor={data && data.deny_rate_today < 5 ? "#1D9E75" : "#E24B4A"}
               label="Deny rate"
               value={`${data?.deny_rate_today ?? 0}%`}
               deltaPositive={data ? data.deny_rate_today < 5 : undefined}
@@ -50,11 +54,15 @@ export function OverviewPage() {
               }
             />
             <StatCard
+              index={2}
+              accentColor="#6B7280"
               label="Active sessions"
               value={data?.active_sessions ?? "—"}
               delta="last hour"
             />
             <StatCard
+              index={3}
+              accentColor={data?.pending_reviews === 0 ? "#1D9E75" : "#BA7517"}
               label="Pending reviews"
               value={data?.pending_reviews ?? "—"}
               deltaPositive={data ? data.pending_reviews === 0 : undefined}
@@ -68,7 +76,7 @@ export function OverviewPage() {
 
       {/* Charts */}
       {data && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-4 animate-fade-up" style={{ animationDelay: "240ms" }}>
           <div className="col-span-2">
             <InterceptSparkline data={data.decisions_by_hour} />
           </div>
@@ -81,7 +89,9 @@ export function OverviewPage() {
       )}
 
       {/* Live feed */}
-      <LiveFeedTable />
+      <div className="animate-fade-up" style={{ animationDelay: "320ms" }}>
+        <LiveFeedTable />
+      </div>
     </div>
   );
 }

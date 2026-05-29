@@ -13,22 +13,23 @@ const styles: Record<Decision, string> = {
   review: "bg-ac-review-bg text-ac-review border border-amber-200",
 };
 
-const dots: Record<Decision, string> = {
-  allow:  "bg-ac-allow",
-  deny:   "bg-ac-deny",
-  review: "bg-ac-review",
-};
-
 export function DecisionBadge({ decision, className }: DecisionBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium",
+        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium animate-badge-in",
         styles[decision],
         className
       )}
     >
-      <span className={cn("w-1.5 h-1.5 rounded-full", dots[decision])} />
+      {decision === "deny" ? (
+        <span className="w-1.5 h-1.5 rounded-full bg-ac-deny animate-pulse-dot" />
+      ) : (
+        <span className={cn(
+          "w-1.5 h-1.5 rounded-full",
+          decision === "allow" ? "bg-ac-allow" : "bg-ac-review"
+        )} />
+      )}
       {decision.charAt(0).toUpperCase() + decision.slice(1)}
     </span>
   );

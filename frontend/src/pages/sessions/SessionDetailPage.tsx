@@ -35,7 +35,7 @@ export function SessionDetailPage() {
       >
         <ChevronLeft size={14} /> Back to sessions
       </Link>
-      <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary">
+      <h2 className="text-[18px] font-semibold text-ac-text-primary">
         Session{" "}
         <span className="font-mono text-[15px] text-ac-text-muted">
           {id?.slice(0, 8)}…

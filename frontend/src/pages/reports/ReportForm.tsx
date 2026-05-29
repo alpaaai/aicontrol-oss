@@ -56,7 +56,7 @@ export function ReportForm({ onGenerated }: Props) {
 
   return (
     <div className="bg-white border border-gray-200 rounded-[10px] p-5">
-      <h3 className="text-[14px] font-semibold text-gray-900 mb-4">Generate Compliance Report</h3>
+      <h3 className="text-[14px] font-semibold text-ac-text-primary mb-4">Generate Compliance Report</h3>
       <form onSubmit={handleGenerate} className="space-y-4">
 
         <div className="grid grid-cols-2 gap-3">
