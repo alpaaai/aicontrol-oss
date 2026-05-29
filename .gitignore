@@ -22,3 +22,4 @@ docs/demo-scenarios-v2.md
 .claude/
 scripts/prospecting/.env
 scripts/prospecting/state.json
+docs/state/
