@@ -42,6 +42,6 @@ test.beforeEach(async ({ page }) => {
 test("overview renders stat cards", async ({ page }) => {
   await page.goto("/overview");
   await expect(page.getByText("Intercepts today")).toBeVisible();
-  await expect(page.getByText("Deny rate")).toBeVisible();
+  await expect(page.getByText("Deny rate", { exact: true })).toBeVisible();
   await expect(page.getByText("Live intercepts")).toBeVisible();
 });
