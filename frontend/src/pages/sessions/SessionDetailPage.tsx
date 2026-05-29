@@ -5,10 +5,10 @@ import type { SessionDetailResponse } from "@/api/sessions";
 import { DecisionBadge } from "@/components/shared/DecisionBadge";
 import { EnterpriseLock } from "@/components/shared/EnterpriseLock";
 import { ChevronLeft } from "lucide-react";
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === "true";
+import { useLicense } from "@/hooks/useLicense";
 
 export function SessionDetailPage() {
+  const { isEnterprise } = useLicense();
   const { id } = useParams<{ id: string }>();
   const [data, setData] = useState<SessionDetailResponse | null>(null);
 
@@ -16,7 +16,7 @@ export function SessionDetailPage() {
     if (id) getSessionEvents(id).then(setData);
   }, [id]);
 
-  if (!IS_ENTERPRISE) {
+  if (!isEnterprise) {
     return (
       <div className="p-6">
         <EnterpriseLock

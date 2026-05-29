@@ -4,8 +4,7 @@ import type { Review } from '../../api/reviews'
 import { ReviewRow } from './ReviewRow'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
 import { usePoll } from '../../hooks/usePoll'
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === 'true'
+import { useLicense } from '../../hooks/useLicense'
 
 function ReviewQueueContent() {
   const fetcher = useCallback(() => listReviews('pending'), [])
@@ -81,7 +80,8 @@ function ResolvedReviews() {
 }
 
 export function ReviewQueuePage() {
-  if (!IS_ENTERPRISE) {
+  const { isEnterprise } = useLicense()
+  if (!isEnterprise) {
     return (
       <div className="p-6">
         <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">Review Queue</h2>

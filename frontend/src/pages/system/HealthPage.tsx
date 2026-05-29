@@ -3,8 +3,7 @@ import { usePoll } from '../../hooks/usePoll'
 import { getHealth } from '../../api/health'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
 import { CheckCircle, AlertTriangle, XCircle } from 'lucide-react'
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === 'true'
+import { useLicense } from '../../hooks/useLicense'
 
 type StatusLevel = 'healthy' | 'degraded' | 'unreachable' | 'unknown'
 
@@ -53,7 +52,8 @@ function HealthContent() {
 }
 
 export function HealthPage() {
-  if (!IS_ENTERPRISE) {
+  const { isEnterprise } = useLicense()
+  if (!isEnterprise) {
     return (
       <div className="p-6">
         <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">System Health</h2>

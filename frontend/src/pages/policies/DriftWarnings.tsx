@@ -3,10 +3,10 @@ import { listWarnings, resolveWarning } from "@/api/warnings";
 import type { PolicyWarning } from "@/api/warnings";
 import { EnterpriseLock } from "@/components/shared/EnterpriseLock";
 import { AlertTriangle, CheckCircle } from "lucide-react";
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === "true";
+import { useLicense } from "@/hooks/useLicense";
 
 export function DriftWarnings() {
+  const { isEnterprise } = useLicense();
   const [warnings, setWarnings] = useState<PolicyWarning[]>([]);
   const [loading, setLoading] = useState(true);
   const [notLicensed, setNotLicensed] = useState(false);
@@ -30,9 +30,9 @@ export function DriftWarnings() {
   };
 
   useEffect(() => {
-    if (IS_ENTERPRISE) load();
+    if (isEnterprise) load();
     else setLoading(false);
-  }, []);
+  }, [isEnterprise]);
 
   const handleResolve = async (id: string) => {
     setResolving(id);
@@ -41,7 +41,7 @@ export function DriftWarnings() {
     setResolving(null);
   };
 
-  if (!IS_ENTERPRISE || notLicensed) {
+  if (!isEnterprise || notLicensed) {
     return (
       <div className="mt-6">
         <h3 className="text-[14px] font-semibold text-ac-text-primary mb-3">
