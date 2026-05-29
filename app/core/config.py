@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     opa_failure_mode: Literal["deny", "allow"] = "deny"
     opa_poll_interval_seconds: int = 30
     drift_scan_interval_hours: int = 6
+    REVIEW_TIMEOUT_MINUTES: int = 60
     app_env: str = "development"
     secret_key: str = "changeme"
     slack_bot_token: str = ""

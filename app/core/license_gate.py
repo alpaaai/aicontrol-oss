@@ -1,32 +1,81 @@
 """
-License gate for enterprise features.
-Simple: any non-empty AICONTROL_LICENSE_KEY = enterprise unlocked.
+FastAPI dependencies for plan-gating.
 
 Usage in routers:
-    from fastapi import Depends
-    from app.core.license_gate import require_enterprise_license
+    @router.get("/endpoint", dependencies=[Depends(require_enterprise_license)])
+    async def endpoint(): ...
 
-    @router.get("/enterprise/feature", dependencies=[Depends(require_enterprise_license)])
-    async def enterprise_feature():
+    @router.get("/endpoint", dependencies=[Depends(require_business_license)])
+    async def endpoint(): ...
+
+Correct test patching:
+    from app.core import license_gate
+    with patch.object(license_gate, "get_license_info", return_value=mock_info):
         ...
+    # OR:
+    app.dependency_overrides[require_enterprise_license] = lambda: None
 """
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException
+
+from app.core.license import LicenseError, LicenseInfo, decode_license_key
 from app.core.config import settings
 
 
-def require_enterprise_license() -> None:
-    if not settings.AICONTROL_LICENSE_KEY:
+def get_license_info() -> LicenseInfo:
+    """
+    Decode and return the current license.
+
+    Returns LicenseInfo(plan="community") when no key is set.
+    Raises HTTPException(402) when the key is set but invalid/expired.
+
+    Plain function (not async, not a FastAPI dependency itself) so it can be
+    called from startup code and patched in tests without dependency_overrides.
+    """
+    try:
+        return decode_license_key(settings.AICONTROL_LICENSE_KEY)
+    except LicenseError as e:
         raise HTTPException(
-            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            status_code=402,
             detail={
-                "error": "enterprise_license_required",
-                "message": "This feature requires an AIControl Enterprise license.",
-                "info": "https://aictl.io/pricing"
-            }
+                "error": "license_error",
+                "message": str(e),
+                "action": "Contact enterprise@aictl.io to resolve your license.",
+            },
         )
 
 
-def generate_license_key(customer_id: str, tier: str) -> str:
-    """Stub: simple key generation for onboarding. No-touch provisioning."""
-    import secrets
-    return f"aictl_{tier}_{customer_id}_{secrets.token_urlsafe(16)}"
+def require_enterprise_license() -> None:
+    """
+    FastAPI dependency. Raises HTTP 402 if plan is not 'enterprise'.
+    Use as: dependencies=[Depends(require_enterprise_license)]
+    """
+    info = get_license_info()
+    if not info.is_enterprise:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "enterprise_required",
+                "message": "This feature requires an Enterprise license.",
+                "current_plan": info.plan,
+                "action": "Contact enterprise@aictl.io to upgrade.",
+            },
+        )
+
+
+def require_business_license() -> None:
+    """
+    FastAPI dependency. Raises HTTP 402 if plan is 'community'.
+    Business and Enterprise plans both pass.
+    Use as: dependencies=[Depends(require_business_license)]
+    """
+    info = get_license_info()
+    if not info.is_business:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "error": "business_required",
+                "message": "This feature requires a Business or Enterprise license.",
+                "current_plan": info.plan,
+                "action": "Contact enterprise@aictl.io to upgrade.",
+            },
+        )
