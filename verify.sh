@@ -55,14 +55,16 @@ check "8 seed agents registered" \
    python3 -c \"import sys,json; print(len(json.load(sys.stdin)))\"" \
   "8"
 
-check "Dashboard reachable" \
-  "curl -s --max-time 10 http://localhost:8501/_stcore/health" \
-  "ok"
+check "React dashboard reachable" \
+  "curl -s --max-time 10 -o /dev/null -w '%{http_code}' http://localhost:3000" \
+  "200"
 
-check "Lending demo runs (allow→allow→deny)" \
-  "docker compose -f docker-compose.yml -f docker-compose.app.yml \
-   exec -T api python3 scripts/demos/run_demo.py \
-   --scenario lending --token \"${DEMO_TOKEN_LENDING:-}\" --mode fast" \
+check "Lending demo runs (allow→deny)" \
+  "docker compose $COMPOSE exec -T api \
+   python3 scripts/demos/run_demo.py \
+   --scenario lending \
+   --token \"${DEMO_TOKEN_LENDING:-}\" \
+   --mode fast" \
   "DECISION: DENY"
 
 echo ""
@@ -76,7 +78,7 @@ if [ "$FAIL" -gt 0 ]; then
 else
   echo "All checks passed. AIControl is ready."
   echo ""
-  echo "  Dashboard: http://localhost:8501"
+  echo "  Dashboard: http://localhost:3000"
   echo "  API docs:  http://localhost:8001/docs"
   echo ""
 fi
