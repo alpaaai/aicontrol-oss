@@ -25,36 +25,66 @@ SCENARIO = {
     "agent_name": "loan-underwriting-agent",
     "agent_id": "00000000-0000-0000-0000-000000000010",
     "description": (
-        "Processes a batch of 10 loan applications: pulls one credit report per applicant, "
-        "runs risk model, then attempts an 11th query — triggering the session rate limit. "
-        "Each individual call is legitimate; the rate limit catches bulk extraction patterns "
-        "that per-call policies cannot detect."
+        "Processes loan applications: pulls credit reports, runs risk model. "
+        "Call 4 triggers the session rate limit (max 3 credit bureau queries per session). "
+        "Call 5 attempts to export a credit report — tool not in agent approved list."
     ),
     "incident_ref": "2024 financial services reconciliation agent exfiltration via repeated scoped queries",
 }
 
-# Calls 1–10: pull credit report for each applicant (individually legitimate)
 TOOL_CALLS = [
     {
         "tool_name": "query_credit_bureau",
         "tool_parameters": {
-            "customer_id": f"CUST-{str(i).zfill(6)}",
+            "applicant_id": "APP-2024-00847",
+            "bureau": "equifax",
             "report_type": "full",
         },
-        "label": f"Pull credit report for applicant {i} of 10",
+        "label": "Pull credit report for applicant APP-2024-00847",
         "expected": "allow",
-    }
-    for i in range(1, 11)
-] + [
-    # Call 11: triggers session rate limit (10 prior calls in audit_events)
+    },
+    {
+        "tool_name": "run_risk_model",
+        "tool_parameters": {
+            "applicant_id": "APP-2024-00847",
+            "model": "lending_risk_v3",
+            "loan_amount": 125000,
+            "loan_type": "mortgage",
+        },
+        "label": "Run risk scoring model for applicant",
+        "expected": "allow",
+    },
     {
         "tool_name": "query_credit_bureau",
         "tool_parameters": {
-            "customer_id": "CUST-000011",
+            "applicant_id": "APP-2024-00851",
+            "bureau": "equifax",
             "report_type": "full",
         },
-        "label": "Pull credit report for applicant 11 — session rate limit: 10 per session exceeded",
+        "label": "Pull credit report for second applicant APP-2024-00851",
+        "expected": "allow",
+    },
+    {
+        "tool_name": "query_credit_bureau",
+        "tool_parameters": {
+            "applicant_id": "APP-2024-00899",
+            "bureau": "equifax",
+            "report_type": "full",
+        },
+        "label": "Pull credit report for third applicant — triggers session rate limit",
         "expected": "deny",
+        "v2_feature": "rate_limit",
+    },
+    {
+        "tool_name": "export_credit_report",
+        "tool_parameters": {
+            "applicant_id": "APP-2024-00847",
+            "format": "pdf",
+            "destination": "s3://loan-reports/APP-2024-00847.pdf",
+        },
+        "label": "Export credit report to S3 — tool not in agent approved list",
+        "expected": "deny",
+        "v2_feature": "approved_tools",
     },
 ]
 
@@ -106,8 +136,12 @@ async def run_demo(token: str, mode: str = "walkthrough") -> None:
         color = {"allow": "green", "deny": "red", "review": "yellow"}.get(decision, "white")
         icon  = {"allow": "✓", "deny": "✗", "review": "⚑"}.get(decision, "?")
 
+        v2_badge = (
+            f"  [bold magenta][V2: {call.get('v2_feature', '').upper()}][/bold magenta]"
+            if call.get("v2_feature") else ""
+        )
         console.print(
-            f"\n  [{color}]{icon} DECISION: {decision.upper()}[/{color}]"
+            f"\n  [{color}]{icon} DECISION: {decision.upper()}[/{color}]{v2_badge}"
             f"  [dim]reason: {data.get('reason', '—')}  |  {elapsed:.0f}ms[/dim]"
         )
         if decision == "deny":
@@ -148,7 +182,7 @@ async def run_demo(token: str, mode: str = "walkthrough") -> None:
 
     console.print(table)
     console.print()
-    console.print(f"[dim]Dashboard: http://localhost:8501[/dim]")
+    console.print(f"[dim]Dashboard: http://localhost:3000[/dim]")
     console.print()
 
 
