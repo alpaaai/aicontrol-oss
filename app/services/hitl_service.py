@@ -8,6 +8,7 @@ from slack_sdk.errors import SlackApiError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.license_gate import get_license_info
 from app.core.logging import get_logger
 from app.models.schemas import HITLReview
 
@@ -50,6 +51,11 @@ async def post_slack_review(
     """Post interactive Slack message with approve/deny buttons.
     Returns Slack message ts or None on failure.
     """
+    license_info = get_license_info()
+    if not license_info.is_business:
+        logger.info("slack_skipped", reason="Slack HITL requires Business or Enterprise license")
+        return None
+
     if not settings.slack_bot_token or \
        settings.slack_bot_token == "xoxb-placeholder":
         logger.warning("slack_skipped", reason="SLACK_BOT_TOKEN not configured")
