@@ -33,18 +33,24 @@ export function NotificationBar() {
           message: `Deny rate today is ${data.deny_rate_today}% — above normal threshold`,
         })
       }
-      setNotifications(prev => [...prev, ...items])
+      setNotifications(prev => {
+        const ids = new Set(prev.map(n => n.id))
+        return [...prev, ...items.filter(n => !ids.has(n.id))]
+      })
     }).catch(() => {})
 
     if (IS_ENTERPRISE) {
       // listWarnings returns PolicyWarning[] directly
       listWarnings(true).then(warnings => {
         if (warnings.length > 0) {
-          setNotifications(prev => [...prev, {
-            id: 'drift_warnings',
-            type: 'warning',
-            message: `${warnings.length} active policy drift warning${warnings.length > 1 ? 's' : ''}`,
-          }])
+          setNotifications(prev => {
+            if (prev.some(n => n.id === 'drift_warnings')) return prev
+            return [...prev, {
+              id: 'drift_warnings',
+              type: 'warning',
+              message: `${warnings.length} active policy drift warning${warnings.length > 1 ? 's' : ''}`,
+            }]
+          })
         }
       }).catch(() => {})
     }
