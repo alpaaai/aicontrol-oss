@@ -1,8 +1,80 @@
+import { useState, useEffect } from "react";
+import { listPolicies, deletePolicy } from "@/api/policies";
+import type { Policy } from "@/api/policies";
+import { PolicyTable } from "./PolicyTable";
+import { PolicyFormDialog } from "./PolicyFormDialog";
+import { DriftWarnings } from "./DriftWarnings";
+import { Plus } from "lucide-react";
+
 export function PoliciesPage() {
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Policy | null>(null);
+
+  const load = () => {
+    setLoading(true);
+    listPolicies()
+      .then((data) => setPolicies(data))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const handleDelete = async (p: Policy) => {
+    if (!confirm(`Delete policy "${p.name}"? This cannot be undone.`)) return;
+    await deletePolicy(p.id);
+    load();
+  };
+
   return (
     <div className="p-6">
-      <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary mb-4">Policies</h2>
-      <p className="text-sm text-ac-text-muted">Loading...</p>
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h2 className="text-[18px] font-semibold tracking-[-0.02em] text-ac-text-primary">
+            Policies
+          </h2>
+          <p className="text-sm text-ac-text-muted mt-0.5">
+            {loading ? "—" : `${policies.length} policies`}
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditTarget(null);
+            setDialogOpen(true);
+          }}
+          className="flex items-center gap-1.5 bg-ac-primary text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-ac-primary/90"
+        >
+          <Plus size={14} /> New policy
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="h-40 bg-gray-50 rounded animate-pulse" />
+      ) : (
+        <PolicyTable
+          policies={policies}
+          onEdit={(p) => {
+            setEditTarget(p);
+            setDialogOpen(true);
+          }}
+          onDelete={handleDelete}
+        />
+      )}
+
+      <DriftWarnings />
+
+      <PolicyFormDialog
+        open={dialogOpen}
+        policy={editTarget}
+        onClose={() => setDialogOpen(false)}
+        onSaved={() => {
+          setDialogOpen(false);
+          load();
+        }}
+      />
     </div>
   );
 }
