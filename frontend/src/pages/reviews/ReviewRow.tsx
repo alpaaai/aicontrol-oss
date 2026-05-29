@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Review, actionReview } from '../../api/reviews'
+import { actionReview } from '../../api/reviews'
+import type { Review } from '../../api/reviews'
 import { CheckCircle, XCircle, Clock } from 'lucide-react'
 
 interface Props {

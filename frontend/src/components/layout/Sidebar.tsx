@@ -1,10 +1,14 @@
 import { NavLink } from "react-router-dom";
+import { useEffect, useState } from "react";
 import {
   Lock, LayoutDashboard, List, BarChart2, GitBranch,
   Shield, Bot, Key, CheckSquare, Activity, HeartPulse,
   Brain, Lightbulb, FileCheck, LogOut,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { getSummary } from "../../api/dashboard";
+
+const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === 'true';
 
 interface NavItemProps {
   to: string;
@@ -56,6 +60,15 @@ function SectionLabel({ label }: { label: string }) {
 export function Sidebar() {
   const { user, logout } = useAuth();
   const iconProps = { size: 14, strokeWidth: 1.75 };
+  const [pendingReviews, setPendingReviews] = useState(0);
+
+  useEffect(() => {
+    if (!IS_ENTERPRISE) return;
+    const load = () => getSummary().then(d => setPendingReviews(d.pending_reviews)).catch(() => {});
+    load();
+    const timer = setInterval(load, 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <div className="w-[224px] shrink-0 bg-ac-night flex flex-col h-screen sticky top-0">
@@ -82,18 +95,19 @@ export function Sidebar() {
         <NavItem to="/tokens"     icon={<Key {...iconProps} />}              label="API Tokens" />
 
         <SectionLabel label="Reviews" />
-        <NavItem to="/reviews"    icon={<CheckSquare {...iconProps} />}      label="Review Queue" locked />
+        <NavItem to="/reviews" icon={<CheckSquare {...iconProps} />} label="Review Queue"
+          locked={!IS_ENTERPRISE} badge={IS_ENTERPRISE ? pendingReviews : undefined} />
 
         <SectionLabel label="System" />
-        <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health" locked />
+        <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health" locked={!IS_ENTERPRISE} />
         <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity Log" />
 
         <SectionLabel label="Intelligence" />
-        <NavItem to="/intelligence"      icon={<Brain {...iconProps} />}      label="Threat Summaries" locked />
-        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />} label="Policy Suggestions" locked />
+        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat Summaries"   locked={!IS_ENTERPRISE} />
+        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy Suggestions" locked={!IS_ENTERPRISE} />
 
         <SectionLabel label="Reports" />
-        <NavItem to="/reports"    icon={<FileCheck {...iconProps} />}        label="Compliance" locked />
+        <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!IS_ENTERPRISE} />
       </nav>
 
       {/* User row */}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { generateReport, Framework, ReportFormat } from '../../api/reports'
+import { generateReport } from '../../api/reports'
+import type { Framework, ReportFormat } from '../../api/reports'
 import { FileCheck } from 'lucide-react'
 
 const FRAMEWORKS: { value: Framework; label: string }[] = [
