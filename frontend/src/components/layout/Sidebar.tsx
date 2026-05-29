@@ -6,9 +6,8 @@ import {
   Brain, Lightbulb, FileCheck, LogOut, Settings,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { useLicense } from "../../hooks/useLicense";
 import { getSummary } from "../../api/dashboard";
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === 'true';
 
 interface NavItemProps {
   to: string;
@@ -64,11 +63,12 @@ function SectionLabel({ label }: { label: string }) {
 
 export function Sidebar() {
   const { user, logout } = useAuth();
+  const { isEnterprise } = useLicense();
   const iconProps = { size: 14, strokeWidth: 1.75 };
   const [pendingReviews, setPendingReviews] = useState(0);
 
   useEffect(() => {
-    if (!IS_ENTERPRISE) return;
+    if (!isEnterprise) return;
     const load = () => getSummary().then(d => setPendingReviews(d.pending_reviews)).catch(() => {});
     load();
     const timer = setInterval(load, 30000);
@@ -111,18 +111,18 @@ export function Sidebar() {
 
         <SectionLabel label="Reviews" />
         <NavItem to="/reviews" icon={<CheckSquare {...iconProps} />} label="Review Queue"
-          locked={!IS_ENTERPRISE} badge={IS_ENTERPRISE ? pendingReviews : undefined} delay={180} />
+          locked={!isEnterprise} badge={isEnterprise ? pendingReviews : undefined} delay={180} />
 
         <SectionLabel label="System" />
-        <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!IS_ENTERPRISE} delay={200} />
+        <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!isEnterprise} delay={200} />
         <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity Log" delay={220} />
 
         <SectionLabel label="Intelligence" />
-        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat Summaries"   locked={!IS_ENTERPRISE} delay={240} />
-        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy Suggestions" locked={!IS_ENTERPRISE} delay={260} />
+        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat Summaries"   locked={!isEnterprise} delay={240} />
+        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy Suggestions" locked={!isEnterprise} delay={260} />
 
         <SectionLabel label="Reports" />
-        <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!IS_ENTERPRISE} delay={280} />
+        <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!isEnterprise} delay={280} />
       </nav>
 
       {/* Settings */}

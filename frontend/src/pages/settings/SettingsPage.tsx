@@ -1,6 +1,5 @@
 import { useAuth } from '../../hooks/useAuth'
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === 'true'
+import { useLicense } from '../../hooks/useLicense'
 
 function SettingRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -13,6 +12,7 @@ function SettingRow({ label, value, mono = false }: { label: string; value: stri
 
 export function SettingsPage() {
   const { user } = useAuth()
+  const { isEnterprise } = useLicense()
 
   return (
     <div className="p-6 max-w-2xl">
@@ -26,10 +26,10 @@ export function SettingsPage() {
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           License
         </p>
-        <SettingRow label="Plan" value={IS_ENTERPRISE ? 'Enterprise' : 'Community'} />
+        <SettingRow label="Plan" value={isEnterprise ? 'Enterprise' : 'Community'} />
         <SettingRow
           label="Enterprise features"
-          value={IS_ENTERPRISE ? 'Active' : 'Locked — contact hello@aicontrol.io'}
+          value={isEnterprise ? 'Active' : 'Locked — contact hello@aicontrol.io'}
         />
       </div>
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { getSummary } from '../../api/dashboard'
 import { listWarnings } from '../../api/warnings'
 import { AlertTriangle, Clock, CheckCircle, X } from 'lucide-react'
+import { useLicense } from '../../hooks/useLicense'
 
 interface Notification {
   id: string
@@ -9,9 +10,8 @@ interface Notification {
   message: string
 }
 
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === 'true'
-
 export function NotificationBar() {
+  const { isEnterprise } = useLicense()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
@@ -39,7 +39,7 @@ export function NotificationBar() {
       })
     }).catch(() => {})
 
-    if (IS_ENTERPRISE) {
+    if (isEnterprise) {
       // listWarnings returns PolicyWarning[] directly
       listWarnings(true).then(warnings => {
         if (warnings.length > 0) {
@@ -54,7 +54,7 @@ export function NotificationBar() {
         }
       }).catch(() => {})
     }
-  }, [])
+  }, [isEnterprise])
 
   const visible = notifications.filter(n => !dismissed.has(n.id))
   if (visible.length === 0) return null

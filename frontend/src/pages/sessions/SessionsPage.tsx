@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { listSessions } from "@/api/sessions";
 import type { Session } from "@/api/sessions";
 import { EnterpriseLock } from "@/components/shared/EnterpriseLock";
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === "true";
+import { useLicense } from "@/hooks/useLicense";
 
 function SessionsTable() {
   const [data, setData] = useState<Session[]>([]);
@@ -65,7 +64,8 @@ function SessionsTable() {
 }
 
 export function SessionsPage() {
-  if (!IS_ENTERPRISE) {
+  const { isEnterprise } = useLicense()
+  if (!isEnterprise) {
     return (
       <div className="p-6">
         <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">

@@ -2,13 +2,13 @@ import { useState } from 'react'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
 import { ReportForm } from './ReportForm'
 import { ReportHistory } from './ReportHistory'
-
-const IS_ENTERPRISE = import.meta.env.VITE_ENTERPRISE === 'true'
+import { useLicense } from '../../hooks/useLicense'
 
 export function ReportsPage() {
   const [refreshKey, setRefreshKey] = useState(0)
+  const { isEnterprise } = useLicense()
 
-  if (!IS_ENTERPRISE) {
+  if (!isEnterprise) {
     return (
       <div className="p-6">
         <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">Compliance Reports</h2>
