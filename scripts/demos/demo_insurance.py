@@ -194,7 +194,7 @@ async def run_demo(token: str, mode: str = "walkthrough") -> None:
 
     console.print(table)
     console.print()
-    console.print(f"[dim]Dashboard: http://localhost:8501[/dim]")
+    console.print(f"[dim]Dashboard: http://localhost:3000[/dim]")
     console.print()
 
 
