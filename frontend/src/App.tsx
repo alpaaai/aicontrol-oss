@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { LicenseProvider } from "./context/LicenseContext";
 import { Layout } from "./components/layout/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { getStoredAuth } from "./store/auth";
@@ -24,6 +25,7 @@ function RequireAuth({ children }: { children: React.ReactElement }) {
 
 export default function App() {
   return (
+    <LicenseProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -53,5 +55,6 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </LicenseProvider>
   );
 }
