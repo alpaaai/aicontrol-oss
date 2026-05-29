@@ -21,18 +21,6 @@ services:
     networks:
       - aicontrol
 
-  dashboard:
-    image: ghcr.io/alpaaai/aicontrol-dashboard:latest
-    restart: unless-stopped
-    env_file: .env
-    ports:
-      - "8501:8501"
-    depends_on:
-      api:
-        condition: service_healthy
-    networks:
-      - aicontrol
-
   frontend:
     build:
       context: ./frontend
