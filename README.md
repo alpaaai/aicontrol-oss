@@ -1,151 +1,132 @@
-# AIControl — Getting Started
+# AIControl — The Control Plane for AI Agents
 
-## Prerequisites
+[![CI](https://github.com/alpaaai/aicontrol/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/alpaaai/aicontrol/actions)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-- Docker Engine 24+ and Docker Compose v2
-  - Linux: `curl -fsSL https://get.docker.com | sh`
-  - macOS / Windows: Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) — Compose v2 included
-  - macOS only: if `git clone` prompts for Xcode tools, run: `xcode-select --install` — click Install in the dialog, then re-run clone.
-- Ubuntu 22.04+ or macOS (Apple Silicon / arm64 supported)
-- 2 GB RAM minimum, 4 GB recommended
-- Ports 8001 (API) and 8501 (dashboard) available
+> Intercepts every AI agent tool call before execution. Evaluates against OPA policies.
+> Logs everything to an append-only audit trail. Self-hosted — your data never leaves
+> your environment.
 
-## Installation
+---
+
+## How It Works
+
+```
+  AI Agent
+     │
+     ▼
+POST /intercept ──► OPA Policy Evaluation ──► allow / deny / review
+     │                      │
+     │              audit_events (append-only)
+     │                      │
+     ▼                      ▼
+  Agent gets         React Dashboard
+  decision           (port 3000)
+```
+
+One API call in your agent's tool execution path.
+Policies evaluated in under 10ms. Every decision logged — no exceptions.
+
+---
+
+## Quick Start
 
 ```bash
-git clone https://github.com/alpaaai/aicontrol.git
+git clone https://github.com/alpaaai/aicontrol
 cd aicontrol
-bash install.sh
+cp .env.example .env          # set Postgres password + optional Slack token
+bash install.sh               # pull images, run migrations, seed agents, issue tokens
+bash scripts/quickstart.sh    # seed V2 demo data, run lending scenario, open dashboard
 ```
 
-The installer will:
-1. Prompt for your database password and Slack credentials (optional)
-2. Pull the latest Docker images from ghcr.io
-3. Run database migrations
-4. Seed 7 demo agents
-5. Issue an admin token
-6. Issue 7 agent-scoped demo tokens (one per scenario)
-7. Save all tokens to `.env`
+**Dashboard:** http://localhost:3000
+**API docs:** http://localhost:8001/docs
+**Health:** http://localhost:8001/health
 
-**Save the admin token shown on screen — it is also written to `.env`.**
+---
 
-After install, run:
-```bash
-bash verify.sh
+## Community vs Enterprise
+
+| Feature | Community | Enterprise |
+|---------|-----------|------------|
+| OPA policy enforcement (deterministic) | ✅ | ✅ |
+| Per-agent approved_tools enforcement | ✅ | ✅ |
+| Rate-based policies (per-session + rolling window) | ✅ | ✅ |
+| Append-only audit log | ✅ | ✅ |
+| React dashboard | ✅ | ✅ |
+| HITL review queue (in-dashboard approve/deny) | ✅ | ✅ |
+| Slack HITL notifications | ✅ | ✅ |
+| OPA health-watch + observability dashboard | — | ✅ |
+| Policy drift detection + warning feed | — | ✅ |
+| Compliance report export (PDF — SOC 2, PCI, HIPAA, GLBA) | — | ✅ |
+
+**Enterprise:** set `AICONTROL_LICENSE_KEY=your-key` and `VITE_ENTERPRISE=true` in `.env`,
+then `docker compose -f docker-compose.yml -f docker-compose.app.yml build frontend && up -d`.
+Contact: enterprise@aictl.io
+
+---
+
+## Components
+
+| Component | Image | Port |
+|-----------|-------|------|
+| API (FastAPI) | `ghcr.io/alpaaai/aicontrol-api:latest` | 8001 |
+| React Dashboard | `ghcr.io/alpaaai/aicontrol-frontend:latest` | 3000 |
+| OPA (policy engine) | `openpolicyagent/opa:latest-debug` | 8181 |
+| PostgreSQL 15 | `postgres:15` | 5432 |
+
+Two Docker Compose files:
+- `docker-compose.yml` — infrastructure (Postgres + OPA)
+- `docker-compose.app.yml` — application (API + React dashboard)
+
+---
+
+## Integration
+
+```python
+import httpx
+
+response = httpx.post(
+    "http://aicontrol:8001/intercept",
+    headers={"Authorization": f"Bearer {AICONTROL_TOKEN}"},
+    json={
+        "session_id": session_id,
+        "agent_id": agent_id,
+        "agent_name": "my-agent",
+        "tool_name": tool_name,
+        "tool_parameters": tool_parameters,
+        "sequence_number": seq,
+    }
+)
+decision = response.json()["decision"]  # "allow" | "deny" | "review"
 ```
 
-Expected output: `8 passed, 0 failed`.
+Framework wrappers: LangChain, CrewAI, OpenAI Agents SDK, AutoGen, MCP.
+See [aictl.io/docs/integration](https://aictl.io/docs/integration).
 
-## Accessing AIControl
+---
 
-| Service   | URL                          |
-|-----------|------------------------------|
-| Dashboard | http://localhost:8501        |
-| API       | http://localhost:8001        |
-| API docs  | http://localhost:8001/docs   |
-| Health    | http://localhost:8001/health |
+## Scripts Reference
 
-## Running a demo
+| Script | Purpose |
+|--------|---------|
+| `bash install.sh` | First-time setup — images, migrations, seed agents, issue tokens |
+| `bash scripts/quickstart.sh` | Demo-ready — V2 seed data, run demo, open browser |
+| `bash verify.sh` | Health checks — all components |
+| `bash diagnose.sh` | Debug output for support |
+| `python scripts/seed.py` | Seed demo agents and policies (idempotent) |
+| `python scripts/demo_reset.py` | Reset audit log for clean demo run |
+| `python scripts/demos/run_demo.py --scenario lending` | Run industry demo |
 
-```bash
-source .env
-python scripts/demos/run_demo.py \
-  --scenario insurance --token $DEMO_TOKEN_INSURANCE --mode fast
-```
+---
 
-Expected output: `allow → allow → review → deny`
+## Documentation
 
-Available scenarios: `lending`, `healthcare`, `itsm`, `manufacturing`, `support`, `revops`, `insurance`
+**[aictl.io/docs](https://aictl.io/docs)**
 
-## Your first intercept call
+---
 
-Port 8001. Use any UUID for `session_id` and `agent_id`. Sessions are created automatically on the first intercept call — no pre-registration required.
+## License
 
-**Allow — `read_file`:**
-
-```bash
-curl -X POST http://localhost:8001/intercept \
-  -H "Authorization: Bearer <agent-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "session_id": "00000000-0000-0000-0000-000000000001",
-    "agent_id":   "00000000-0000-0000-0000-000000000002",
-    "agent_name": "my-agent",
-    "tool_name":  "read_file",
-    "tool_parameters": {"path": "/data/report.csv"},
-    "sequence_number": 1
-  }'
-```
-
-Response: `{"decision": "allow", ...}`
-
-**Deny — `shell_exec`:**
-
-```bash
-curl -X POST http://localhost:8001/intercept \
-  -H "Authorization: Bearer <agent-token>" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "session_id": "00000000-0000-0000-0000-000000000001",
-    "agent_id":   "00000000-0000-0000-0000-000000000002",
-    "agent_name": "my-agent",
-    "tool_name":  "shell_exec",
-    "tool_parameters": {"command": "ls /"},
-    "sequence_number": 2
-  }'
-```
-
-Response: `{"decision": "deny", "reason": "tool_denylisted", ...}`
-
-## Default policies
-
-11 policies are active after installation. See [aictl.io/docs/policies](https://aictl.io/docs/policies) for the full list with conditions and examples.
-
-## Managing tokens
-
-Issue a token:
-```bash
-docker compose -f docker-compose.yml -f docker-compose.app.yml \
-  exec api python scripts/issue_token.py --role agent --desc "Agent name"
-```
-
-Revoke a token:
-```bash
-docker compose -f docker-compose.yml -f docker-compose.app.yml \
-  exec api python scripts/revoke_token.py --id <TOKEN_UUID>
-```
-
-Or use the **Tokens** tab in the dashboard.
-
-Demo tokens are already in `.env` as `DEMO_TOKEN_<SCENARIO>` (e.g. `DEMO_TOKEN_LENDING`, `DEMO_TOKEN_INSURANCE`).
-
-## Updating AIControl
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.app.yml pull
-docker compose -f docker-compose.yml -f docker-compose.app.yml up -d
-docker compose -f docker-compose.yml -f docker-compose.app.yml \
-  exec api alembic upgrade head
-```
-
-## Troubleshooting
-
-Run the diagnostic collector and share the output with support:
-```bash
-bash diagnose.sh
-```
-
-| Symptom | Likely cause | Fix |
-|---|---|---|
-| `install.sh` fails at image pull | Not logged into ghcr.io | `docker login ghcr.io` |
-| API container exits immediately | Bad `DATABASE_URL` in `.env` | Check postgres hostname is `postgres` not `localhost` |
-| Dashboard can't reach API | Wrong network config | Verify both compose files use `aicontrol` network |
-| `verify.sh` dashboard check fails | Dashboard slow to start | Wait 15s then re-run |
-| GitHub Actions build fails | `GITHUB_TOKEN` permissions | Repo Settings → Actions → Allow write permissions |
-| Image not found on ghcr.io | Package visibility private | GitHub → Packages → Change visibility to public |
-| `alembic upgrade head` fails in container | Migrations not copied | Check `COPY migrations/` in Dockerfile |
-| Port 8001 in use | Another process on 8001 | `lsof -i :8001` then kill the process |
-| `ADMIN_TOKEN` not set | `.env` not sourced | `source .env` |
-| `DEMO_TOKEN_*` not set | `install.sh` not run | Re-run `bash install.sh` |
-| Dashboard `ModuleNotFoundError` | Old image cached | `docker compose pull` then restart |
-| `ERROR: Unsupported operating system 'macOS'` | Used Linux install script on macOS | Install Docker Desktop instead: docker.com/products/docker-desktop |
+Apache 2.0 — community edition.
+Enterprise features require a license key. Contact enterprise@aictl.io.
