@@ -48,6 +48,9 @@ else
   read -rp "Slack review channel (default: #aicontrol-reviews): " SLACK_CHANNEL
   SLACK_CHANNEL=${SLACK_CHANNEL:-#aicontrol-reviews}
 
+  read -rp "Enterprise license key (press Enter for community edition): " LICENSE_KEY
+  LICENSE_KEY=${LICENSE_KEY:-}
+
   cat > .env << ENVEOF
 # PostgreSQL
 POSTGRES_USER=aicontrol
@@ -71,8 +74,14 @@ SLACK_BOT_TOKEN=${SLACK_TOKEN}
 SLACK_SIGNING_SECRET=${SLACK_SECRET}
 SLACK_REVIEW_CHANNEL=${SLACK_CHANNEL}
 
-# Dashboard → API connection
-AICONTROL_API_URL=http://api:8001
+# React dashboard env vars (baked into frontend image at build time)
+VITE_API_URL=http://localhost:8001
+VITE_ENTERPRISE=false
+
+# Enterprise license (empty = community edition)
+# Set to your license key to unlock: OPA health-watch, drift detection, compliance reports
+# Contact: enterprise@aictl.io
+AICONTROL_LICENSE_KEY=${LICENSE_KEY}
 
 # Admin token (written below after first startup)
 ADMIN_TOKEN=
@@ -171,7 +180,7 @@ echo ""
 echo -e "${BOLD}${GREEN}=== Installation complete ===${NC}"
 echo ""
 echo "  API:       http://localhost:8001"
-echo "  Dashboard: http://localhost:8501"
+echo "  Dashboard: http://localhost:3000"
 echo "  Health:    http://localhost:8001/health"
 echo "  Debug:     http://localhost:8001/debug"
 echo ""
