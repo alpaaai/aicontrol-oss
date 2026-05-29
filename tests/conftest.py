@@ -1,8 +1,13 @@
 """Shared pytest fixtures."""
+import base64
 import importlib
+import json
 import os
+import time
+import uuid
 import pytest
 import pytest_asyncio
+from unittest.mock import patch
 import httpx
 from sqlalchemy import text
 
@@ -261,3 +266,70 @@ async def seed_policy():
     async with async_session_factory() as db:
         await db.execute(text("DELETE FROM policies WHERE id = :id"), {"id": str(policy_id)})
         await db.commit()
+
+
+# ── License test fixtures ─────────────────────────────────────────────────────
+
+def _b64url(data: bytes) -> str:
+    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
+
+
+def _make_test_jwt(private_key, plan: str, iss: str = "aictl.io",
+                   days: int = 365, company: str = "Test Corp") -> str:
+    from cryptography.hazmat.primitives.asymmetric import padding
+    from cryptography.hazmat.primitives import hashes
+
+    header = {"alg": "RS256", "typ": "JWT"}
+    payload = {
+        "iss": iss,
+        "jti": str(uuid.uuid4()),
+        "company": company,
+        "email": "admin@test.com",
+        "plan": plan,
+        "issued_at": int(time.time()),
+        "exp": int(time.time()) + days * 86400,
+    }
+    h = _b64url(json.dumps(header, separators=(",", ":")).encode())
+    p = _b64url(json.dumps(payload, separators=(",", ":")).encode())
+    sig_input = f"{h}.{p}".encode()
+    sig = private_key.sign(sig_input, padding.PKCS1v15(), hashes.SHA256())
+    return f"{h}.{p}.{_b64url(sig)}"
+
+
+@pytest.fixture(scope="session")
+def test_rsa_keypair():
+    """Generate a fresh RSA keypair for test use only."""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives import serialization
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    public_pem = private_key.public_key().public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    ).decode()
+    return private_key, public_pem
+
+
+@pytest.fixture(scope="session")
+def valid_enterprise_token(test_rsa_keypair):
+    private_key, _ = test_rsa_keypair
+    return _make_test_jwt(private_key, "enterprise")
+
+
+@pytest.fixture(scope="session")
+def valid_business_token(test_rsa_keypair):
+    private_key, _ = test_rsa_keypair
+    return _make_test_jwt(private_key, "business")
+
+
+@pytest.fixture(scope="session")
+def expired_enterprise_token(test_rsa_keypair):
+    private_key, _ = test_rsa_keypair
+    return _make_test_jwt(private_key, "enterprise", days=-1)
+
+
+@pytest.fixture
+def patch_license_public_key(test_rsa_keypair):
+    """Patch PUBLIC_KEY so decode_license_key uses the test keypair."""
+    _, public_pem = test_rsa_keypair
+    with patch("app.core.license.PUBLIC_KEY", public_pem):
+        yield
