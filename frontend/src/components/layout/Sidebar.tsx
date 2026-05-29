@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Lock, LayoutDashboard, List, BarChart2, GitBranch,
   Shield, Bot, Key, CheckSquare, Activity, HeartPulse,
-  Brain, Lightbulb, FileCheck, LogOut,
+  Brain, Lightbulb, FileCheck, LogOut, Settings,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { getSummary } from "../../api/dashboard";
@@ -110,6 +110,18 @@ export function Sidebar() {
         <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!IS_ENTERPRISE} />
       </nav>
 
+      {/* Settings */}
+      <NavLink
+        to="/settings"
+        className={({ isActive }) =>
+          `flex items-center gap-2.5 px-4 py-[7px] text-[13px] transition-colors border-t border-white/[0.07] ` +
+          (isActive ? 'text-[#7C9FFF]' : 'text-white/40 hover:text-white/60')
+        }
+      >
+        <Settings size={14} strokeWidth={1.75} />
+        Settings
+      </NavLink>
+
       {/* User row */}
       <div className="border-t border-white/[0.07] px-4 py-3">
         <div className="flex items-center gap-2">
@@ -121,6 +133,7 @@ export function Sidebar() {
             <p className="text-[10px] text-white/25">{user?.role}</p>
           </div>
           <button
+            data-testid="logout-btn"
             onClick={logout}
             className="ml-auto text-white/20 hover:text-white/50 transition-colors"
           >
