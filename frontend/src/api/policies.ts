@@ -1,0 +1,39 @@
+import { apiClient } from "./client";
+
+export interface Policy {
+  id: string;
+  name: string;
+  description: string | null;
+  rule_type: string;
+  condition: Record<string, unknown>;
+  action: string;
+  severity: string | null;
+  active: boolean | null;
+  compliance_frameworks: string[] | null;
+}
+
+export interface CreatePolicyBody {
+  name: string;
+  description?: string;
+  rule_type: string;
+  condition: Record<string, unknown>;
+  action: string;
+  severity?: string;
+  compliance_frameworks?: string[];
+}
+
+export interface UpdatePolicyBody extends Partial<CreatePolicyBody> {
+  active?: boolean;
+}
+
+export const listPolicies = () =>
+  apiClient.get<Policy[]>("/policies").then((r) => r.data);
+
+export const createPolicy = (body: CreatePolicyBody) =>
+  apiClient.post<Policy>("/policies", body).then((r) => r.data);
+
+export const updatePolicy = (id: string, body: UpdatePolicyBody) =>
+  apiClient.put<Policy>(`/policies/${id}`, body).then((r) => r.data);
+
+export const deletePolicy = (id: string) =>
+  apiClient.delete(`/policies/${id}`).then((r) => r.data);
