@@ -27,7 +27,6 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
-        VITE_ENTERPRISE: ${VITE_ENTERPRISE:-false}
     restart: unless-stopped
     ports:
       - "3000:3000"

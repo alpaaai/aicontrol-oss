@@ -76,11 +76,10 @@ SLACK_REVIEW_CHANNEL=${SLACK_CHANNEL}
 
 # React dashboard env vars (baked into frontend image at build time)
 VITE_API_URL=http://localhost:8001
-VITE_ENTERPRISE=false
 
-# Enterprise license (empty = community edition)
-# Set to your license key to unlock: OPA health-watch, drift detection, compliance reports
-# Contact: enterprise@aictl.io
+# Enterprise license (empty = Community plan, free)
+# Set to your signed JWT license key to unlock Business or Enterprise features.
+# Plan detection is runtime — no rebuild required after changing this.
 AICONTROL_LICENSE_KEY=${LICENSE_KEY}
 
 # Admin token (written below after first startup)
