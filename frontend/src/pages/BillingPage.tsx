@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { getBillingUsage, BillingUsage } from '../api/billing';
-import { useLicense } from '../hooks/useLicense';
+import { getBillingUsage } from '../api/billing';
+import type { BillingUsage } from '../api/billing';
 
 const PLAN_LABELS: Record<string, string> = {
   community: 'Community',
@@ -27,7 +27,6 @@ function formatCost(usd: number): string {
 }
 
 export default function BillingPage() {
-  const { plan } = useLicense();
   const [usage, setUsage] = useState<BillingUsage | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -174,7 +173,7 @@ export default function BillingPage() {
             <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" />
             <XAxis dataKey="name" tick={{ fontSize: 12 }} />
             <YAxis tickFormatter={(v) => formatNumber(v)} tick={{ fontSize: 12 }} />
-            <Tooltip formatter={(v: number) => [formatNumber(v), 'Intercepts']} />
+            <Tooltip formatter={(v) => [formatNumber(Number(v)), 'Intercepts']} />
             <Bar dataKey="intercepts" fill="#3B5BDB" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>

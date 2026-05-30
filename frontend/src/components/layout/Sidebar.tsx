@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Lock, LayoutDashboard, List, BarChart2, GitBranch,
   Shield, Bot, Key, CheckSquare, Activity, HeartPulse,
-  Brain, Lightbulb, FileCheck, LogOut, Settings,
+  Brain, Lightbulb, FileCheck, LogOut, Settings, CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
@@ -116,6 +116,7 @@ export function Sidebar() {
         <SectionLabel label="System" />
         <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!isEnterprise} delay={200} />
         <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity Log" delay={220} />
+        <NavItem to="/billing"      icon={<CreditCard {...iconProps} />}     label="Billing"    delay={235} />
 
         <SectionLabel label="Intelligence" />
         <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat Summaries"   locked={!isEnterprise} delay={240} />

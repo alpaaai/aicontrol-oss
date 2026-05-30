@@ -18,6 +18,7 @@ import { ActivityLogPage } from "./pages/system/ActivityLogPage";
 import { IntelligencePage } from "./pages/intelligence/IntelligencePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
+import BillingPage from "./pages/BillingPage";
 
 function RequireAuth({ children }: { children: React.ReactElement }) {
   return getStoredAuth() ? children : <Navigate to="/login" replace />;
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="intelligence"  element={<IntelligencePage />} />
           <Route path="reports"       element={<ReportsPage />} />
           <Route path="settings"      element={<SettingsPage />} />
+          <Route path="billing"       element={<BillingPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
