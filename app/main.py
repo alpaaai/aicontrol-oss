@@ -18,6 +18,7 @@ from app.routers.sessions import router as sessions_router
 from app.routers.slack_actions import router as slack_router
 from app.routers.tokens import router as tokens_router
 from app.routers.license import router as license_router
+from app.routers.billing import router as billing_router
 from app.routers.warnings import router as warnings_router
 from enterprise.compliance.router import router as compliance_router
 from app.services.drift_detector import DriftDetector
@@ -84,6 +85,7 @@ app.include_router(reviews_router)
 app.include_router(sessions_router)
 app.include_router(slack_router)
 app.include_router(tokens_router)
+app.include_router(billing_router)
 app.include_router(warnings_router)
 app.include_router(compliance_router)
 
