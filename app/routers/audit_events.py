@@ -1,10 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import and_, func, select
 
 from app.core.auth import require_human
+from app.core import license_gate as _lg
 from app.models.database import async_session_factory
 from app.models.schemas import AuditEvent
 
@@ -22,6 +23,13 @@ async def list_audit_events(
     offset: int = Query(0, ge=0),
     _=Depends(require_human),
 ):
+    # Community plan: enforce 7-day retention at query layer
+    license_info = _lg.get_license_info()
+    if license_info.plan == "community":
+        retention_cutoff = datetime.utcnow() - timedelta(days=7)
+        if date_from is None or date_from < retention_cutoff:
+            date_from = retention_cutoff
+
     filters = []
     if decision:
         filters.append(AuditEvent.decision == decision)
