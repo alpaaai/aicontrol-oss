@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 
 import httpx
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings as _settings
 from app.core.logging import configure_logging, get_logger
@@ -76,7 +77,7 @@ app = FastAPI(
 # ADD HERE — before any include_router calls
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",")],
+    allow_origins=[o.strip() for o in _settings.CORS_ORIGINS.split(",")],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
