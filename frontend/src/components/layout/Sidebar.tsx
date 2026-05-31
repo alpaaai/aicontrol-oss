@@ -113,17 +113,17 @@ export function Sidebar() {
         <NavItem to="/reviews" icon={<CheckSquare {...iconProps} />} label="Review queue"
           locked={!isEnterprise} badge={isEnterprise ? pendingReviews : undefined} delay={180} />
 
-        <SectionLabel label="System" />
-        <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!isEnterprise} delay={200} />
-        <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity audit" delay={220} />
-        <NavItem to="/billing"      icon={<CreditCard {...iconProps} />}     label="Subscription" delay={235} />
+        <SectionLabel label="Reports" />
+        <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!isEnterprise} delay={200} />
 
         <SectionLabel label="Intelligence" />
-        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat summaries"   locked={!isEnterprise} delay={240} />
-        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy suggestions" locked={!isEnterprise} delay={260} />
+        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat summaries"   locked={!isEnterprise} delay={220} />
+        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy suggestions" locked={!isEnterprise} delay={240} />
 
-        <SectionLabel label="Reports" />
-        <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!isEnterprise} delay={280} />
+        <SectionLabel label="System" />
+        <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!isEnterprise} delay={260} />
+        <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity audit" delay={275} />
+        <NavItem to="/billing"      icon={<CreditCard {...iconProps} />}     label="Subscription" delay={290} />
       </nav>
 
       {/* Settings */}
