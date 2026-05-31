@@ -41,7 +41,7 @@ async def _get_verified_token(
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
     db: AsyncSession = Depends(get_db),
 ) -> dict:
-    """Verify JWT signature and check revocation. Returns payload."""
+    """Verify JWT. Human JWTs (type='human') pass on signature alone. API tokens require a DB revocation check."""
     token = credentials.credentials
     try:
         payload = decode_token(token)
@@ -50,6 +50,10 @@ async def _get_verified_token(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or malformed token",
         )
+
+    # Human JWTs are not stored in api_tokens — signature check is sufficient.
+    if payload.get("type") == "human":
+        return payload
 
     token_hash = hash_token(token)
     result = await db.execute(

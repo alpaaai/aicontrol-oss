@@ -90,3 +90,27 @@ async def test_delete_policy_returns_404_for_missing():
         ) as client:
             response = await client.delete(f"/policies/{uuid.uuid4()}")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_policies_with_human_admin_jwt_returns_200():
+    """Human admin JWT must pass require_admin on the policies route."""
+    from datetime import datetime, timedelta
+    from jose import jwt as jose_jwt
+    from app.core.config import settings
+    from app.main import app
+
+    payload = {
+        "sub": "00000000-0000-0000-0000-000000000001",
+        "email": "test_human@aicontrol.dev",
+        "role": "admin",
+        "type": "human",
+        "exp": datetime.utcnow() + timedelta(hours=8),
+    }
+    token = jose_jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/policies", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200

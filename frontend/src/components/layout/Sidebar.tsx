@@ -97,7 +97,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-2 overflow-y-auto relative z-10">
+      <nav className="flex-1 py-2 overflow-y-auto scrollbar-hide relative z-10">
         <SectionLabel label="Activity" />
         <NavItem to="/overview"   icon={<LayoutDashboard {...iconProps} />} label="Overview"   delay={40} />
         <NavItem to="/audit-log"  icon={<List {...iconProps} />}            label="Audit Log"  delay={60} />
