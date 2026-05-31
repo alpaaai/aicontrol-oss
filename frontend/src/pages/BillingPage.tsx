@@ -3,19 +3,10 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { getBillingUsage } from '../api/billing';
 import type { BillingUsage } from '../api/billing';
 
-const PLAN_PILL: Record<string, { container: string; dot: string }> = {
-  community: {
-    container: 'bg-violet-50 text-violet-700 border border-violet-200',
-    dot: 'bg-violet-500',
-  },
-  business: {
-    container: 'bg-sky-50 text-sky-700 border border-sky-200',
-    dot: 'bg-sky-500',
-  },
-  enterprise: {
-    container: 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200',
-    dot: 'bg-fuchsia-500',
-  },
+const PLAN_PILL: Record<string, string> = {
+  community: 'bg-violet-50 text-violet-700 border border-violet-200',
+  business:  'bg-sky-50 text-sky-700 border border-sky-200',
+  enterprise: 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200',
 };
 
 function formatNumber(n: number): string {
@@ -25,12 +16,9 @@ function formatNumber(n: number): string {
 }
 
 function PlanPill({ plan }: { plan: string }) {
-  const styles = PLAN_PILL[plan] ?? PLAN_PILL.community;
+  const cls = PLAN_PILL[plan] ?? PLAN_PILL.community;
   return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${styles.container}`}
-    >
-      <span className={`w-1.5 h-1.5 rounded-full ${styles.dot}`} />
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${cls}`}>
       {plan.toUpperCase()}
     </span>
   );
@@ -82,7 +70,7 @@ export default function BillingPage() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-ac-text-primary">
-            Billing &amp; Subscription
+            Subscription and usage
           </h1>
           {usage.company && (
             <p className="text-ac-text-muted mt-1">{usage.company}</p>
@@ -95,7 +83,7 @@ export default function BillingPage() {
                        opacity-50 cursor-not-allowed"
             title="Upgrade coming soon"
           >
-            Upgrade to Business
+            Upgrade
           </button>
         )}
       </div>
