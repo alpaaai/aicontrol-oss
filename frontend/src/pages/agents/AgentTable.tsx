@@ -8,7 +8,7 @@ interface Props {
 
 export function AgentTable({ agents, selectedId, onSelect }: Props) {
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden flex-1">
+    <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-y-auto flex-1">
       <div
         className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted
                    uppercase tracking-wide border-b border-ac-border bg-gray-50"
