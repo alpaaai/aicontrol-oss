@@ -132,7 +132,7 @@ async def update_policy(
     policy_id: uuid.UUID,
     body: PolicyUpdate,
     db: AsyncSession = Depends(get_db),
-    _token: dict = Depends(require_admin),
+    token: dict = Depends(require_admin),
 ) -> PolicyResponse:
     result = await db.execute(select(Policy).where(Policy.id == policy_id))
     policy = result.scalar_one_or_none()
@@ -156,6 +156,7 @@ async def update_policy(
         resource_id=str(policy_id),
         before_state=before,
         after_state=updated,
+        user_email=token.get("email"),
     )
     return policy
 

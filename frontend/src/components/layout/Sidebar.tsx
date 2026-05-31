@@ -100,27 +100,27 @@ export function Sidebar() {
       <nav className="flex-1 py-2 overflow-y-auto scrollbar-hide relative z-10">
         <SectionLabel label="Activity" />
         <NavItem to="/overview"   icon={<LayoutDashboard {...iconProps} />} label="Overview"   delay={40} />
-        <NavItem to="/audit-log"  icon={<List {...iconProps} />}            label="Audit Log"  delay={60} />
+        <NavItem to="/audit-log"  icon={<List {...iconProps} />}            label="Agent activity" delay={60} />
         <NavItem to="/metrics"    icon={<BarChart2 {...iconProps} />}        label="Metrics"    delay={80} />
         <NavItem to="/sessions"   icon={<GitBranch {...iconProps} />}        label="Sessions"   locked delay={100} />
 
         <SectionLabel label="Governance" />
         <NavItem to="/policies"   icon={<Shield {...iconProps} />}           label="Policies"   delay={120} />
         <NavItem to="/agents"     icon={<Bot {...iconProps} />}              label="Agents"     delay={140} />
-        <NavItem to="/tokens"     icon={<Key {...iconProps} />}              label="API Tokens" delay={160} />
+        <NavItem to="/tokens"     icon={<Key {...iconProps} />}              label="API tokens" delay={160} />
 
         <SectionLabel label="Reviews" />
-        <NavItem to="/reviews" icon={<CheckSquare {...iconProps} />} label="Review Queue"
+        <NavItem to="/reviews" icon={<CheckSquare {...iconProps} />} label="Review queue"
           locked={!isEnterprise} badge={isEnterprise ? pendingReviews : undefined} delay={180} />
 
         <SectionLabel label="System" />
         <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!isEnterprise} delay={200} />
-        <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity Log" delay={220} />
+        <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity audit" delay={220} />
         <NavItem to="/billing"      icon={<CreditCard {...iconProps} />}     label="Subscription" delay={235} />
 
         <SectionLabel label="Intelligence" />
-        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat Summaries"   locked={!isEnterprise} delay={240} />
-        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy Suggestions" locked={!isEnterprise} delay={260} />
+        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat summaries"   locked={!isEnterprise} delay={240} />
+        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy suggestions" locked={!isEnterprise} delay={260} />
 
         <SectionLabel label="Reports" />
         <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!isEnterprise} delay={280} />
