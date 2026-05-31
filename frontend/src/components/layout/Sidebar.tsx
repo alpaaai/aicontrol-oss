@@ -116,7 +116,7 @@ export function Sidebar() {
         <SectionLabel label="System" />
         <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!isEnterprise} delay={200} />
         <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity Log" delay={220} />
-        <NavItem to="/billing"      icon={<CreditCard {...iconProps} />}     label="Billing"    delay={235} />
+        <NavItem to="/billing"      icon={<CreditCard {...iconProps} />}     label="Subscription" delay={235} />
 
         <SectionLabel label="Intelligence" />
         <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat Summaries"   locked={!isEnterprise} delay={240} />
