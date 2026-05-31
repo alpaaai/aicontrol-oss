@@ -22,11 +22,11 @@ PLAN_CONFIG = {
         "retention_days": 7,
         "features": [
             "OPA policy enforcement",
-            "Per-agent approved_tools enforcement",
+            "Per-agent approved tools enforcement",
             "Rate-based policies",
             "Audit log (7-day retention)",
             "React dashboard — basic views",
-            "HITL review queue — in-dashboard only",
+            "HITL review queue via API",
             "Unlimited agents",
             "Unlimited policies",
         ],
