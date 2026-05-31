@@ -18,7 +18,7 @@ export function SettingsPage() {
     <div className="p-6 max-w-2xl">
       <div className="mb-6 animate-fade-up">
         <h2 className="text-[18px] font-semibold text-ac-text-primary">Settings</h2>
-        <p className="text-sm text-gray-400 mt-0.5">AIControl platform configuration</p>
+        <p className="text-sm text-gray-400 mt-0.5">View and manage your account settings.</p>
       </div>
 
       {/* License */}
@@ -27,10 +27,21 @@ export function SettingsPage() {
           License
         </p>
         <SettingRow label="Plan" value={isEnterprise ? 'Enterprise' : 'Community'} />
-        <SettingRow
-          label="Enterprise features"
-          value={isEnterprise ? 'Active' : 'Locked — contact hello@aicontrol.io'}
-        />
+        <div className="flex items-center justify-between py-3 border-b border-gray-50">
+          <span className="text-[13px] text-gray-600">Enterprise features</span>
+          {isEnterprise ? (
+            <span className="text-[13px] text-gray-800 font-medium">Active</span>
+          ) : (
+            <button
+              disabled
+              className="px-3 py-1 bg-ac-primary text-white rounded-md text-xs font-medium
+                         opacity-50 cursor-not-allowed"
+              title="Upgrade coming soon"
+            >
+              Upgrade
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Auth */}
@@ -40,7 +51,6 @@ export function SettingsPage() {
         </p>
         <SettingRow label="Method" value="Email OTP (passwordless)" />
         <SettingRow label="Session duration" value="8 hours" />
-        <SettingRow label="Email delivery" value="Terminal (dev mode) — configure Resend for production" />
       </div>
 
       {/* Current user */}
@@ -48,7 +58,7 @@ export function SettingsPage() {
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           Current session
         </p>
-        <SettingRow label="Email" value={user?.email ?? '—'} />
+        <SettingRow label="User email" value={user?.email ?? '—'} />
         <SettingRow label="Role" value={user?.role ?? '—'} />
       </div>
     </div>
