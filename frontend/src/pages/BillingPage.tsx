@@ -132,8 +132,8 @@ export default function BillingPage() {
         )}
         <p className="text-xs text-ac-text-muted">
           Self-serve subscription management coming soon. Contact{' '}
-          <a href="mailto:enterprise@aictl.io" className="underline">
-            enterprise@aictl.io
+          <a href="mailto:hello@aictl.io" className="underline">
+            hello@aictl.io
           </a>{' '}
           to change your plan.
         </p>
