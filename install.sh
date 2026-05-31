@@ -77,6 +77,9 @@ SLACK_REVIEW_CHANNEL=${SLACK_CHANNEL}
 # React dashboard env vars (baked into frontend image at build time)
 VITE_API_URL=http://localhost:8001
 
+# CORS — comma-separated allowed origins for React dashboard. Change for remote deployments.
+CORS_ORIGINS=http://localhost:3000
+
 # Enterprise license (empty = Community plan, free)
 # Set to your signed JWT license key to unlock Business or Enterprise features.
 # Plan detection is runtime — no rebuild required after changing this.

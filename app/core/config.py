@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     slack_signing_secret: str = ""
     slack_review_channel: str = "#aicontrol-reviews"
     AICONTROL_LICENSE_KEY: str = ""
+    CORS_ORIGINS: str = "http://localhost:3000"
 
     # AI-native features — customer's own LLM account. AIControl never bills tokens.
     LLM_PROVIDER: str = "anthropic"

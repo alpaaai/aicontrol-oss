@@ -73,6 +73,16 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# ADD HERE — before any include_router calls
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in settings.CORS_ORIGINS.split(",")],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
 app.include_router(license_router)
 app.include_router(auth_router)
 app.include_router(audit_events_router)
