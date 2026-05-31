@@ -17,6 +17,25 @@ def _auth(role: str = "admin"):
 
 
 @pytest.mark.asyncio
+async def test_no_accumulated_test_agents():
+    """Zero test-agent-* rows should exist at session start.
+
+    Fails when the cleanup fixture is missing, proving that
+    test_create_agent_returns_201 leaks rows into the DB across pytest runs.
+    """
+    from sqlalchemy import text
+    from app.models.database import async_session_factory
+    async with async_session_factory() as db:
+        count = (await db.execute(
+            text("SELECT COUNT(*) FROM agents WHERE name LIKE 'test-agent-%'")
+        )).scalar()
+    assert count == 0, (
+        f"{count} test-agent-* pollution rows found. "
+        "Add _cleanup_test_agents fixture to conftest.py."
+    )
+
+
+@pytest.mark.asyncio
 async def test_list_agents_returns_200():
     with _auth() as app:
         async with AsyncClient(

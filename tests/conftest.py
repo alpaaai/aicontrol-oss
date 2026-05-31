@@ -75,6 +75,21 @@ async def _cleanup_test_policies():
         await session.commit()
 
 
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _cleanup_test_agents():
+    """Session setup + teardown: remove test-agent-* rows so they don't accumulate
+    across pytest runs. Runs cleanup both before (removes prior-run leaks) and
+    after (removes this-run creations)."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        await session.execute(text("DELETE FROM agents WHERE name LIKE 'test-agent-%'"))
+        await session.commit()
+    yield
+    async with async_session_factory() as session:
+        await session.execute(text("DELETE FROM agents WHERE name LIKE 'test-agent-%'"))
+        await session.commit()
+
+
 @pytest_asyncio.fixture(scope="session")
 async def _seed_and_token_setup():
     """Session-scoped: seed demo agents + issue admin and agent tokens once."""
