@@ -34,7 +34,7 @@ export function AuditLogPage() {
       <div className="flex items-center justify-between mb-5 animate-fade-up">
         <div>
           <h2 className="text-[18px] font-semibold text-ac-text-primary">
-            Audit Log
+            Agent activity
           </h2>
           <p className="text-sm text-ac-text-muted mt-0.5">
             {data ? `${data.total.toLocaleString()} total events` : "Loading…"}

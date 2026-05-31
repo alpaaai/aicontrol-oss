@@ -117,6 +117,9 @@ async def list_activity_log(
                 "action": r.action,
                 "resource_type": r.resource_type,
                 "resource_id": r.resource_id,
+                "before_state": r.before_state,
+                "after_state": r.after_state,
+                "ip_address": r.ip_address,
                 "created_at": r.created_at.isoformat(),
             }
             for r in rows

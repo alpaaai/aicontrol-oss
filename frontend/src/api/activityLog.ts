@@ -6,6 +6,9 @@ export interface ActivityLogEntry {
   action: string
   resource_type: string | null
   resource_id: string | null
+  before_state: Record<string, unknown> | null
+  after_state: Record<string, unknown> | null
+  ip_address: string | null
   created_at: string
 }
 
