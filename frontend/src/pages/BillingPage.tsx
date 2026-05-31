@@ -3,16 +3,19 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import { getBillingUsage } from '../api/billing';
 import type { BillingUsage } from '../api/billing';
 
-const PLAN_LABELS: Record<string, string> = {
-  community: 'Community',
-  business: 'Business',
-  enterprise: 'Enterprise',
-};
-
-const PLAN_COLORS: Record<string, string> = {
-  community: 'bg-gray-100 text-gray-700',
-  business: 'bg-blue-100 text-blue-700',
-  enterprise: 'bg-purple-100 text-purple-700',
+const PLAN_PILL: Record<string, { container: string; dot: string }> = {
+  community: {
+    container: 'bg-violet-50 text-violet-700 border border-violet-200',
+    dot: 'bg-violet-500',
+  },
+  business: {
+    container: 'bg-sky-50 text-sky-700 border border-sky-200',
+    dot: 'bg-sky-500',
+  },
+  enterprise: {
+    container: 'bg-fuchsia-50 text-fuchsia-700 border border-fuchsia-200',
+    dot: 'bg-fuchsia-500',
+  },
 };
 
 function formatNumber(n: number): string {
@@ -21,9 +24,16 @@ function formatNumber(n: number): string {
   return n.toString();
 }
 
-function formatCost(usd: number): string {
-  if (usd === 0) return 'Free';
-  return `$${usd.toFixed(2)}`;
+function PlanPill({ plan }: { plan: string }) {
+  const styles = PLAN_PILL[plan] ?? PLAN_PILL.community;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium ${styles.container}`}
+    >
+      <span className={`w-1.5 h-1.5 rounded-full ${styles.dot}`} />
+      {plan.toUpperCase()}
+    </span>
+  );
 }
 
 export default function BillingPage() {
@@ -68,7 +78,7 @@ export default function BillingPage() {
   return (
     <div className="p-8 max-w-3xl space-y-8">
 
-      {/* Plan header */}
+      {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-ac-text-primary">
@@ -78,23 +88,21 @@ export default function BillingPage() {
             <p className="text-ac-text-muted mt-1">{usage.company}</p>
           )}
         </div>
-        <span className={`px-3 py-1 rounded-full text-sm font-medium ${PLAN_COLORS[usage.plan]}`}>
-          {PLAN_LABELS[usage.plan]}
-        </span>
+        {isCommunity && (
+          <button
+            disabled
+            className="px-4 py-2 bg-ac-primary text-white rounded-md text-sm
+                       opacity-50 cursor-not-allowed"
+            title="Upgrade coming soon"
+          >
+            Upgrade to Business
+          </button>
+        )}
       </div>
 
       {/* Plan details */}
       <div className="bg-ac-card border border-ac-border rounded-lg p-6 space-y-4">
-        <div className="flex items-baseline gap-2">
-          <span className="text-3xl font-bold text-ac-text-primary">
-            {isCommunity ? 'Free' : `$${usage.monthly_base_usd}/mo`}
-          </span>
-          {!isCommunity && (
-            <span className="text-ac-text-muted text-sm">
-              + ${usage.rate_per_million}/million intercepts
-            </span>
-          )}
-        </div>
+        <PlanPill plan={usage.plan} />
 
         {usage.retention_days !== null && (
           <p className="text-sm text-amber-600">
@@ -111,16 +119,7 @@ export default function BillingPage() {
           ))}
         </ul>
 
-        {isCommunity ? (
-          <button
-            disabled
-            className="mt-2 px-4 py-2 bg-ac-primary text-white rounded-md text-sm
-                       opacity-50 cursor-not-allowed"
-            title="Upgrade coming soon"
-          >
-            Upgrade to Business — $49/mo
-          </button>
-        ) : (
+        {!isCommunity && (
           <button
             disabled
             className="mt-2 px-4 py-2 border border-ac-border rounded-md text-sm
@@ -149,21 +148,11 @@ export default function BillingPage() {
             <p className="text-2xl font-bold text-ac-text-primary">
               {formatNumber(usage.this_month.intercepts)}
             </p>
-            <p className="text-sm text-ac-text-muted">
-              {isCommunity
-                ? 'Free'
-                : `Est. ${formatCost(usage.this_month.estimated_cost_usd)}`}
-            </p>
           </div>
           <div>
             <p className="text-xs text-ac-text-muted uppercase tracking-wide">Last month</p>
             <p className="text-2xl font-bold text-ac-text-primary">
               {formatNumber(usage.last_month.intercepts)}
-            </p>
-            <p className="text-sm text-ac-text-muted">
-              {isCommunity
-                ? 'Free'
-                : `Est. ${formatCost(usage.last_month.estimated_cost_usd)}`}
             </p>
           </div>
         </div>
@@ -178,11 +167,11 @@ export default function BillingPage() {
           </BarChart>
         </ResponsiveContainer>
 
-        <p className="text-xs text-ac-text-muted">
-          {isCommunity
-            ? 'Community: all intercepts are free. Upgrade for Slack HITL, longer retention, and compliance features.'
-            : `Estimated cost = intercepts × $${usage.rate_per_million} per million. Final billing handled via Stripe (coming soon).`}
-        </p>
+        {isCommunity && (
+          <p className="text-xs text-ac-text-muted">
+            Upgrade for Slack HITL, longer retention, and compliance features.
+          </p>
+        )}
       </div>
 
     </div>
