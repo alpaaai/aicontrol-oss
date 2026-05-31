@@ -82,3 +82,51 @@ async def test_delete_agent_returns_404_for_missing():
         ) as client:
             response = await client.delete(f"/agents/{uuid.uuid4()}")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_agents_with_human_admin_jwt_returns_200():
+    """Human admin JWT must pass require_admin without a DB lookup."""
+    from datetime import datetime, timedelta
+    from jose import jwt as jose_jwt
+    from app.core.config import settings
+    from app.main import app
+
+    payload = {
+        "sub": "00000000-0000-0000-0000-000000000001",
+        "email": "test_human@aicontrol.dev",
+        "role": "admin",
+        "type": "human",
+        "exp": datetime.utcnow() + timedelta(hours=8),
+    }
+    token = jose_jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/agents", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_list_agents_with_human_non_admin_jwt_returns_403():
+    """Human JWT with non-admin role must be rejected with 403 on admin-only routes."""
+    from datetime import datetime, timedelta
+    from jose import jwt as jose_jwt
+    from app.core.config import settings
+    from app.main import app
+
+    payload = {
+        "sub": "00000000-0000-0000-0000-000000000002",
+        "email": "analyst@aicontrol.dev",
+        "role": "analyst",
+        "type": "human",
+        "exp": datetime.utcnow() + timedelta(hours=8),
+    }
+    token = jose_jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get("/agents", headers={"Authorization": f"Bearer {token}"})
+    assert response.status_code == 403

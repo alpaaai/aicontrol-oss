@@ -27,6 +27,13 @@
 }
 
 @layer utilities {
+  .scrollbar-hide {
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Noise grain texture — subtle atmosphere over solid backgrounds */
   .noise {
     position: relative;
