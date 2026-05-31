@@ -55,6 +55,7 @@ export function AgentsPage() {
 
       {selected && (
         <AgentDetailPanel
+          key={selected.id}
           agent={selected}
           policies={policies}
           onUpdated={handleUpdated}
