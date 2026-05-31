@@ -6,12 +6,21 @@ Fixtures are session-scoped; policies created in one test persist to later tests
 in the same group by design. Allow-path tests use parameters that do not trigger
 any earlier-created policy.
 """
+import uuid
 import pytest
 import pytest_asyncio
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from unittest.mock import patch
 from httpx import AsyncClient, ASGITransport
+
+_TEST_SESSION_ID = str(uuid.uuid4())
+_FORBIDDEN_SESSION_ID = "00000000-0000-0000-0000-000000000099"
+
+
+def test_no_hardcoded_session_id():
+    """Guard: _TEST_SESSION_ID must not be the well-known fake UUID that pollutes audit_events."""
+    assert _TEST_SESSION_ID != _FORBIDDEN_SESSION_ID
 
 
 # ── Numeric comparison tests ──────────────────────────────────────────────────
@@ -32,7 +41,7 @@ async def test_numeric_gt_deny(client, agent_token, admin_token):
         "action": "deny", "severity": "high", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000001",
         "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
@@ -48,7 +57,7 @@ async def test_numeric_gt_deny(client, agent_token, admin_token):
 async def test_numeric_gt_allow_below_threshold(client, agent_token):
     """Allow when loan_amount is below threshold."""
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000001",
         "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
@@ -74,7 +83,7 @@ async def test_numeric_lt_deny(client, agent_token, admin_token):
         "action": "deny", "severity": "high", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000001",
         "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
@@ -101,7 +110,7 @@ async def test_numeric_multi_condition_deny_both_match(client, agent_token, admi
         "action": "deny", "severity": "critical", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000001",
         "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
@@ -120,7 +129,7 @@ async def test_numeric_multi_condition_allow_one_fails(client, agent_token):
     loan_amount > 500k) fires.
     """
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000001",
         "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
@@ -149,7 +158,7 @@ async def test_compound_all_of_deny_both_match(client, agent_token, admin_token)
         "action": "deny", "severity": "critical", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000001",
         "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
@@ -167,7 +176,7 @@ async def test_compound_all_of_allow_partial_match(client, agent_token):
     test_compound_and — so neither fires.
     """
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000001",
         "agent_name": "claims-processing-agent",
         "tool_name": "approve_loan",
@@ -199,7 +208,7 @@ async def test_compound_any_of_deny_first_matches(client, agent_token, admin_tok
         "action": "deny", "severity": "high", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000050",
         "agent_name": "support-resolution-agent",
         "tool_name": "fetch_account_detail",
@@ -213,7 +222,7 @@ async def test_compound_any_of_deny_first_matches(client, agent_token, admin_tok
 async def test_compound_any_of_deny_second_matches(client, agent_token):
     """Deny when second condition in any_of matches."""
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000050",
         "agent_name": "support-resolution-agent",
         "tool_name": "fetch_account_detail",
@@ -227,7 +236,7 @@ async def test_compound_any_of_deny_second_matches(client, agent_token):
 async def test_compound_any_of_allow_neither_matches(client, agent_token):
     """Allow when no conditions in any_of match."""
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000050",
         "agent_name": "support-resolution-agent",
         "tool_name": "fetch_account_detail",
@@ -274,7 +283,7 @@ async def test_temporal_deny_on_weekend(client, agent_token, admin_token):
         mock_dt.timezone = timezone
         async with _asgi_client(agent_token) as asgi:
             resp = await asgi.post("/intercept", json={
-                "session_id": "00000000-0000-0000-0000-000000000099",
+                "session_id": _TEST_SESSION_ID,
                 "agent_id": "00000000-0000-0000-0000-000000000030",
                 "agent_name": "incident-response-agent",
                 "tool_name": "deploy_to_production",
@@ -295,7 +304,7 @@ async def test_temporal_allow_on_weekday(client, agent_token):
         mock_dt.timezone = timezone
         async with _asgi_client(agent_token) as asgi:
             resp = await asgi.post("/intercept", json={
-                "session_id": "00000000-0000-0000-0000-000000000099",
+                "session_id": _TEST_SESSION_ID,
                 "agent_id": "00000000-0000-0000-0000-000000000030",
                 "agent_name": "incident-response-agent",
                 "tool_name": "deploy_to_production",
@@ -324,7 +333,7 @@ async def test_temporal_deny_during_business_hours(client, agent_token, admin_to
         mock_dt.timezone = timezone
         async with _asgi_client(agent_token) as asgi:
             resp = await asgi.post("/intercept", json={
-                "session_id": "00000000-0000-0000-0000-000000000099",
+                "session_id": _TEST_SESSION_ID,
                 "agent_id": "00000000-0000-0000-0000-000000000030",
                 "agent_name": "incident-response-agent",
                 "tool_name": "restart_service",
@@ -343,7 +352,7 @@ async def test_temporal_allow_outside_business_hours(client, agent_token):
         mock_dt.timezone = timezone
         async with _asgi_client(agent_token) as asgi:
             resp = await asgi.post("/intercept", json={
-                "session_id": "00000000-0000-0000-0000-000000000099",
+                "session_id": _TEST_SESSION_ID,
                 "agent_id": "00000000-0000-0000-0000-000000000030",
                 "agent_name": "incident-response-agent",
                 "tool_name": "restart_service",
@@ -370,7 +379,7 @@ async def test_alias_deny_on_aliased_name(client, agent_token, admin_token):
         "action": "deny", "severity": "critical", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000020",
         "agent_name": "clinical-documentation-agent",
         "tool_name": "queryPatientRecord",
@@ -384,7 +393,7 @@ async def test_alias_deny_on_aliased_name(client, agent_token, admin_token):
 async def test_alias_deny_on_primary_name(client, agent_token):
     """Primary tool name still denied when aliases defined."""
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000020",
         "agent_name": "clinical-documentation-agent",
         "tool_name": "read_patient_record",
@@ -398,7 +407,7 @@ async def test_alias_deny_on_primary_name(client, agent_token):
 async def test_alias_allow_unrelated_tool(client, agent_token):
     """Tool not in blocked_tools or aliases is allowed."""
     resp = await client.post("/intercept", headers=agent_token, json={
-        "session_id": "00000000-0000-0000-0000-000000000099",
+        "session_id": _TEST_SESSION_ID,
         "agent_id": "00000000-0000-0000-0000-000000000020",
         "agent_name": "clinical-documentation-agent",
         "tool_name": "query_lab_results",
@@ -423,7 +432,7 @@ async def test_alias_global_deny_all_http_variants(client, agent_token, admin_to
     })
     for tool in ["http_post", "http_get", "http_request", "webhook", "webhook_call"]:
         resp = await client.post("/intercept", headers=agent_token, json={
-            "session_id": "00000000-0000-0000-0000-000000000099",
+            "session_id": _TEST_SESSION_ID,
             "agent_id": "00000000-0000-0000-0000-000000000030",
             "agent_name": "incident-response-agent",
             "tool_name": tool,
