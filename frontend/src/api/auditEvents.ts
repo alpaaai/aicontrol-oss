@@ -4,10 +4,12 @@ export interface AuditEvent {
   id: string;
   session_id: string;
   agent_id: string;
+  agent_name: string;
   tool_name: string;
   tool_parameters: string | null;
   decision: "allow" | "deny" | "review";
   decision_reason: string | null;
+  policy_id: string | null;
   policy_name: string | null;
   duration_ms: number | null;
   created_at: string;
