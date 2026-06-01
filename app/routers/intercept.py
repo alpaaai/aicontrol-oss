@@ -120,6 +120,22 @@ def find_fired_policy(
                 cond = p.get("condition", {})
                 if tool_name in cond.get("tools", []):
                     return p.get("id"), p["name"]
+        elif reason.startswith("numeric_policy_violation:"):
+            if (
+                p["rule_type"] == "tool_denylist"
+                and p["action"] == "deny"
+                and tool_name in (p.get("condition") or {}).get("blocked_tools", [])
+                and (p.get("condition") or {}).get("numeric_conditions")
+            ):
+                return p.get("id"), p["name"]
+        elif reason.startswith("time_policy_violation: "):
+            policy_name_in_reason = reason[len("time_policy_violation: "):]
+            if p["name"] == policy_name_in_reason:
+                return p.get("id"), p["name"]
+        elif reason.startswith("compound_policy_violation: "):
+            policy_name_in_reason = reason[len("compound_policy_violation: "):]
+            if p["name"] == policy_name_in_reason:
+                return p.get("id"), p["name"]
         elif reason == "requires_human_review":
             if p["rule_type"] == "tool_pattern" and p["action"] == "review":
                 return p.get("id"), p["name"]
