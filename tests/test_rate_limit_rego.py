@@ -77,6 +77,8 @@ def test_rate_limit_deny_below_threshold():
     inp = make_input("query_credit_bureau", 9, [RATE_LIMIT_POLICY])
     result = evaluate_rego(inp)
     assert result["decision"] == "allow"
+    assert result["fired_policy_id"] == ""
+    assert result["fired_policy_name"] == ""
 
 
 def test_rate_limit_deny_at_threshold():
@@ -84,12 +86,15 @@ def test_rate_limit_deny_at_threshold():
     result = evaluate_rego(inp)
     assert result["decision"] == "deny"
     assert result["reason"] == "rate_limit_exceeded:query_credit_bureau:10:session"
+    assert result["fired_policy_id"] == "pol-rate-001"
+    assert result["fired_policy_name"] == "deny_bulk_credit_query_rate"
 
 
 def test_rate_limit_deny_above_threshold():
     inp = make_input("query_credit_bureau", 15, [RATE_LIMIT_POLICY])
     result = evaluate_rego(inp)
     assert result["decision"] == "deny"
+    assert result["fired_policy_id"] == "pol-rate-001"
 
 
 def test_rate_limit_review_on_exceed():
@@ -97,6 +102,8 @@ def test_rate_limit_review_on_exceed():
     result = evaluate_rego(inp)
     assert result["decision"] == "review"
     assert result["reason"] == "rate_limit_exceeded:approve_claim_payment:3:5m"
+    assert result["fired_policy_id"] == "pol-rate-002"
+    assert result["fired_policy_name"] == "review_high_frequency_payments"
 
 
 def test_rate_limit_default_on_exceed_is_deny():
@@ -110,12 +117,14 @@ def test_rate_limit_default_on_exceed_is_deny():
     inp = make_input("query_credit_bureau", 10, [policy_no_on_exceed])
     result = evaluate_rego(inp)
     assert result["decision"] == "deny"
+    assert result["fired_policy_id"] == "pol-rate-001"
 
 
 def test_rate_limit_does_not_fire_for_unrelated_tool():
     inp = make_input("delete_file", 99, [RATE_LIMIT_POLICY])
     result = evaluate_rego(inp)
     assert result["decision"] == "allow"
+    assert result["fired_policy_id"] == ""
 
 
 def test_rate_limit_priority_below_blacklist():
@@ -130,6 +139,8 @@ def test_rate_limit_priority_below_blacklist():
     result = evaluate_rego(inp)
     assert result["decision"] == "deny"
     assert result["reason"] == "tool_denylisted"
+    assert result["fired_policy_id"] == "pol-bl-001"
+    assert result["fired_policy_name"] == "block_dangerous"
 
 
 def test_empty_call_counts_does_not_fire():
@@ -137,3 +148,4 @@ def test_empty_call_counts_does_not_fire():
     inp["call_counts"] = {}
     result = evaluate_rego(inp)
     assert result["decision"] == "allow"
+    assert result["fired_policy_id"] == ""

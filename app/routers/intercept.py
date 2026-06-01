@@ -87,60 +87,6 @@ async def ensure_session(
         await db.flush()
 
 
-def find_fired_policy(
-    tool_name: str,
-    tool_parameters: dict[str, Any],
-    policies: list[dict],
-    decision: str,
-    reason: str,
-) -> tuple[Optional[str], Optional[str]]:
-    """Return (policy_id, policy_name) for the policy that fired, or (None, None)."""
-    if decision == "allow":
-        return None, None
-    for p in policies:
-        cond = p.get("condition") or {}
-        if reason == "tool_denylisted":
-            if (
-                p["rule_type"] == "tool_denylist"
-                and p["action"] == "deny"
-                and tool_name in cond.get("blocked_tools", [])
-                and not cond.get("parameter_match")
-            ):
-                return p.get("id"), p["name"]
-        elif reason.startswith("parameter_policy_violation:"):
-            if (
-                p["rule_type"] == "tool_denylist"
-                and p["action"] == "deny"
-                and tool_name in cond.get("blocked_tools", [])
-                and cond.get("parameter_match")
-            ):
-                return p.get("id"), p["name"]
-        elif reason.startswith("rate_limit_exceeded:"):
-            if p["rule_type"] == "rate_limit":
-                cond = p.get("condition", {})
-                if tool_name in cond.get("tools", []):
-                    return p.get("id"), p["name"]
-        elif reason.startswith("numeric_policy_violation:"):
-            if (
-                p["rule_type"] == "tool_denylist"
-                and p["action"] == "deny"
-                and tool_name in (p.get("condition") or {}).get("blocked_tools", [])
-                and (p.get("condition") or {}).get("numeric_conditions")
-            ):
-                return p.get("id"), p["name"]
-        elif reason.startswith("time_policy_violation: "):
-            policy_name_in_reason = reason[len("time_policy_violation: "):]
-            if p["name"] == policy_name_in_reason:
-                return p.get("id"), p["name"]
-        elif reason.startswith("compound_policy_violation: "):
-            policy_name_in_reason = reason[len("compound_policy_violation: "):]
-            if p["name"] == policy_name_in_reason:
-                return p.get("id"), p["name"]
-        elif reason == "requires_human_review":
-            if p["rule_type"] == "tool_pattern" and p["action"] == "review":
-                return p.get("id"), p["name"]
-    return None, None
-
 
 @router.post("/intercept", response_model=InterceptResponse)
 async def intercept(
@@ -220,14 +166,9 @@ async def intercept(
     # Enrich parameters (e.g. extract domain from HTTP tool URLs)
     enriched_parameters = enrich_parameters(request.tool_name, request.tool_parameters)
 
-    # Identify which policy fired
-    fired_policy_id, fired_policy_name = find_fired_policy(
-        tool_name=request.tool_name,
-        tool_parameters=request.tool_parameters,
-        policies=policies,
-        decision=opa_result["decision"],
-        reason=opa_result["reason"],
-    )
+    # OPA returns which policy fired directly — no reverse-engineering needed
+    fired_policy_id: Optional[str] = opa_result.get("fired_policy_id") or None
+    fired_policy_name: Optional[str] = opa_result.get("fired_policy_name") or None
 
     # Ensure session row exists (auto-create if agent didn't pre-register)
     await ensure_session(db, request.session_id, request.agent_id)
