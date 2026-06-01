@@ -17,9 +17,6 @@ export function OverviewPage() {
         <h2 className="text-[18px] font-semibold text-ac-text-primary">
           Dashboard
         </h2>
-        <p className="text-sm text-ac-text-muted mt-0.5">
-          Live activity · refreshes every 30s
-        </p>
       </div>
 
       {/* Stat cards */}
