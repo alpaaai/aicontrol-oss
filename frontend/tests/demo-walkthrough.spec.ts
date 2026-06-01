@@ -40,7 +40,7 @@ test.describe('P1-8 Demo Walkthrough', () => {
     await page.click('button[type="submit"]')
     await expect(page.getByText('Check your email')).toBeVisible({ timeout: 10000 })
     await page.goto('/overview')
-    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
   })
 
   test('2. Overview — stat cards visible, live feed running', async ({ page }) => {

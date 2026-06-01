@@ -100,14 +100,28 @@ async def get_summary(_=Depends(require_human)):
 async def list_activity_log(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
+    action: str | None = Query(None),
+    date_from: str | None = Query(None),
+    date_to: str | None = Query(None),
     _=Depends(require_human),
 ):
     async with async_session_factory() as db:
-        total = (await db.execute(select(func.count()).select_from(UserActivityLog))).scalar()
+        q = select(UserActivityLog)
+        cq = select(func.count()).select_from(UserActivityLog)
+        if action:
+            q = q.where(UserActivityLog.action == action)
+            cq = cq.where(UserActivityLog.action == action)
+        if date_from:
+            dt = datetime.fromisoformat(date_from)
+            q = q.where(UserActivityLog.created_at >= dt)
+            cq = cq.where(UserActivityLog.created_at >= dt)
+        if date_to:
+            dt = datetime.fromisoformat(date_to)
+            q = q.where(UserActivityLog.created_at < dt + timedelta(days=1))
+            cq = cq.where(UserActivityLog.created_at < dt + timedelta(days=1))
+        total = (await db.execute(cq)).scalar()
         rows = (await db.execute(
-            select(UserActivityLog)
-            .order_by(UserActivityLog.created_at.desc())
-            .limit(limit).offset(offset)
+            q.order_by(UserActivityLog.created_at.desc()).limit(limit).offset(offset)
         )).scalars().all()
     return {
         "logs": [
