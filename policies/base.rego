@@ -466,3 +466,117 @@ reason := "requires_human_review" if {
     not is_rate_exceeded_review
     needs_review_numeric
 }
+
+# ── Fired policy attribution ───────────────────────────────────────────────────
+# OPA returns which policy fired so Python never reverse-engineers it from the
+# reason string. fired_policy_id="" on allow or when no policy matches.
+
+default fired_policy_id := ""
+default fired_policy_name := ""
+
+# Helper: matches either review path (tool_pattern or tool_denylist+numeric)
+_review_policy_fires(p) if {
+    p.rule_type == "tool_pattern"
+    p.action == "review"
+    some pat in p.condition.tool_name_contains
+    contains(input.tool_name, pat)
+}
+
+_review_policy_fires(p) if {
+    p.rule_type == "tool_denylist"
+    p.action == "review"
+    tool_matches(p)
+    p.condition.numeric_conditions
+    numeric_conditions_match(p)
+}
+
+# 1. Blacklist deny
+fired_policy_id := min(ids) if {
+    is_blacklisted
+    ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); not p.condition.parameter_match; not p.condition.numeric_conditions; not p.condition.all_of; not p.condition.any_of; not p.condition.time_conditions}
+    count(ids) > 0
+}
+
+# 2. Rate-limit deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    is_rate_exceeded_deny
+    ids := {p.id | some p in input.policies; rate_limit_policy(p); object.get(p.condition.rate_limit, "on_exceed", "deny") == "deny"}
+    count(ids) > 0
+}
+
+# 3. Parameter violation deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    is_parameter_violation
+    ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); p.condition.parameter_match; params_match(p)}
+    count(ids) > 0
+}
+
+# 4. Numeric violation deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    is_numeric_violation
+    ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); p.condition.numeric_conditions; numeric_conditions_match(p)}
+    count(ids) > 0
+}
+
+# 5. Compound violation deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    is_compound_violation
+    ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); policy_compound_violation(p)}
+    count(ids) > 0
+}
+
+# 6. Time violation deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    is_time_violation
+    ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); p.condition.time_conditions; policy_time_violation(p)}
+    count(ids) > 0
+}
+
+# 7. Rate-limit review
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    is_rate_exceeded_review
+    ids := {p.id | some p in input.policies; rate_limit_policy(p); object.get(p.condition.rate_limit, "on_exceed", "deny") == "review"}
+    count(ids) > 0
+}
+
+# 8. Pattern review or numeric-condition review
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_rate_exceeded_review
+    ids := {p.id | some p in input.policies; _review_policy_fires(p)}
+    count(ids) > 0
+}
+
+# Derive name from id — the firing policy is always present in input.policies
+fired_policy_name := name if {
+    fired_policy_id != ""
+    some p in input.policies
+    p.id == fired_policy_id
+    name := p.name
+}

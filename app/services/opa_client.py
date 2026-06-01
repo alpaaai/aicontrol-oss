@@ -29,7 +29,7 @@ async def evaluate(
     """
     Send tool call context to OPA and return the decision.
 
-    Returns dict with keys: decision (allow|deny|review), reason (str)
+    Returns dict with keys: decision, reason, fired_policy_id, fired_policy_name
 
     If OPA is unreachable, behavior is governed by settings.opa_failure_mode:
       "deny"  — fail-closed: deny the tool call (default, safe)
@@ -55,6 +55,8 @@ async def evaluate(
         return {
             "decision": decision,
             "reason": result.get("reason", "default_allow"),
+            "fired_policy_id": result.get("fired_policy_id", ""),
+            "fired_policy_name": result.get("fired_policy_name", ""),
         }
     except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError) as exc:
         logger.error(
@@ -65,6 +67,6 @@ async def evaluate(
             agent_id=agent_id,
         )
         if settings.opa_failure_mode == "deny":
-            return {"decision": "deny", "reason": "opa_unavailable"}
+            return {"decision": "deny", "reason": "opa_unavailable", "fired_policy_id": "", "fired_policy_name": ""}
         else:
-            return {"decision": "allow", "reason": "opa_unavailable_fail_open"}
+            return {"decision": "allow", "reason": "opa_unavailable_fail_open", "fired_policy_id": "", "fired_policy_name": ""}

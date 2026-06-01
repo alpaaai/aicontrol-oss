@@ -233,7 +233,7 @@ async def test_deny_writes_policy_name():
     ]
 
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
-        return_value={"decision": "deny", "reason": "tool_denylisted"}
+        return_value={"decision": "deny", "reason": "tool_denylisted", "fired_policy_id": str(policy_id), "fired_policy_name": "block_dangerous_tool"}
     )), patch(
         "app.routers.intercept.write_event", new=AsyncMock(side_effect=capture_write_event)
     ), patch("app.routers.intercept.get_active_policies", new=AsyncMock(
@@ -330,43 +330,3 @@ async def test_ensure_session_noop_when_exists():
     mock_db.flush.assert_not_called()
 
 
-def make_policy(rule_type="tool_denylist", action="deny", name="test_policy", condition=None):
-    return {
-        "id": str(uuid.uuid4()),
-        "name": name,
-        "rule_type": rule_type,
-        "action": action,
-        "condition": condition or {},
-    }
-
-
-def test_find_fired_policy_numeric_violation():
-    from app.routers.intercept import find_fired_policy
-
-    p = make_policy(condition={"blocked_tools": ["my_tool"], "numeric_conditions": [{"parameter": "amount", "operator": "gt", "value": 1000}]})
-    result = find_fired_policy("my_tool", {}, [p], "deny", "numeric_policy_violation: amount gt 1000")
-    assert result == (p["id"], p["name"])
-
-
-def test_find_fired_policy_time_violation():
-    from app.routers.intercept import find_fired_policy
-
-    p = make_policy(name="deny_after_hours", condition={"blocked_tools": ["my_tool"], "time_conditions": {"deny_hours": {"from": 18, "to": 8}}})
-    result = find_fired_policy("my_tool", {}, [p], "deny", "time_policy_violation: deny_after_hours")
-    assert result == (p["id"], p["name"])
-
-
-def test_find_fired_policy_compound_violation():
-    from app.routers.intercept import find_fired_policy
-
-    p = make_policy(name="deny_compound_rule", condition={"blocked_tools": ["my_tool"]})
-    result = find_fired_policy("my_tool", {}, [p], "deny", "compound_policy_violation: deny_compound_rule")
-    assert result == (p["id"], p["name"])
-
-
-def test_find_fired_policy_unmatched_reason_returns_none():
-    from app.routers.intercept import find_fired_policy
-
-    p = make_policy(condition={"blocked_tools": ["my_tool"]})
-    result = find_fired_policy("my_tool", {}, [p], "deny", "unknown_reason")
-    assert result == (None, None)
