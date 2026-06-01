@@ -15,7 +15,7 @@ export function OverviewPage() {
     <div className="p-6 space-y-5">
       <div className="animate-fade-up" style={{ animationDelay: "0ms" }}>
         <h2 className="text-[18px] font-semibold text-ac-text-primary">
-          Overview
+          Dashboard
         </h2>
         <p className="text-sm text-ac-text-muted mt-0.5">
           Live activity · refreshes every 30s

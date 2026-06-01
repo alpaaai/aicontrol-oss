@@ -135,7 +135,7 @@ export function Sidebar() {
     "flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/55 hover:bg-white/5 hover:text-white/80 transition-all duration-150 w-full text-left";
 
   return (
-    <div className="w-[224px] shrink-0 bg-ac-night flex flex-col h-screen sticky top-0 noise overflow-hidden">
+    <div className="w-[224px] shrink-0 bg-ac-night flex flex-col h-screen sticky top-0 noise">
       {/* Subtle radial glow behind logo area */}
       <div
         className="pointer-events-none absolute top-0 left-0 w-[200px] h-[120px] opacity-20"
@@ -156,7 +156,7 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-2 overflow-y-auto scrollbar-hide relative z-10">
+      <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden scrollbar-hide relative z-10">
         {/* ACTIVITY */}
         <SectionHeader
           icon={<Layers {...iconProps} />}
@@ -169,8 +169,8 @@ export function Sidebar() {
             <NavItem to="/overview"     icon={<LayoutDashboard {...iconProps} />} label="Dashboard" />
             <NavItem to="/audit-log"    icon={<List {...iconProps} />}            label="Agent activity" />
             <NavItem to="/metrics"      icon={<BarChart2 {...iconProps} />}       label="Decision metrics" />
-            <NavItem to="/sessions"     icon={<GitBranch {...iconProps} />}       label="Sessions" locked />
             <NavItem to="/activity-log" icon={<Activity {...iconProps} />}        label="Activity audit" />
+            <NavItem to="/sessions"     icon={<GitBranch {...iconProps} />}       label="Sessions" locked />
           </div>
         )}
 
@@ -264,7 +264,7 @@ export function Sidebar() {
       {userPanelOpen && (
         <div
           ref={userPanelRef}
-          className="fixed left-[224px] bottom-0 w-[160px] bg-ac-night border border-white/[0.07] rounded-tr-lg noise z-50 py-1"
+          className="absolute left-full bottom-0 w-[160px] bg-ac-night border border-white/[0.07] rounded-tr-lg noise z-50 py-1"
           style={{ boxShadow: "4px -4px 24px rgba(0,0,0,0.5)" }}
         >
           <NavLink

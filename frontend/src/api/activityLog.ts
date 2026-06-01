@@ -17,5 +17,15 @@ export interface ActivityLogResponse {
   total: number
 }
 
-export const listActivityLog = (limit = 50, offset = 0) =>
-  apiClient.get<ActivityLogResponse>('/dashboard/activity-log', { params: { limit, offset } }).then(r => r.data)
+export interface ActivityLogFilters {
+  limit?: number
+  offset?: number
+  action?: string
+  date_from?: string
+  date_to?: string
+}
+
+export const listActivityLog = (filters: ActivityLogFilters = {}) =>
+  apiClient.get<ActivityLogResponse>('/dashboard/activity-log', {
+    params: { limit: 50, offset: 0, ...filters },
+  }).then(r => r.data)

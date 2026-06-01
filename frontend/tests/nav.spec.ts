@@ -63,7 +63,7 @@ test("user panel closes after selecting an item", async ({ page }) => {
 test("authenticated user sees overview page content", async ({ page }) => {
   await page.goto("/overview");
   await expect(page).not.toHaveURL(/\/login/);
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
 });
 
 test("navigating to policies shows policies page", async ({ page }) => {
