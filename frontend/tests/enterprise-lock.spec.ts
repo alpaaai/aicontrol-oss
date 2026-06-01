@@ -14,12 +14,18 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("locked nav items are visible in sidebar", async ({ page }) => {
+test("locked nav items are visible in their sections", async ({ page }) => {
   await page.goto("/overview");
+  // Activity section auto-opens — Sessions (locked) should be visible
   await expect(page.getByText("Sessions", { exact: true })).toBeVisible();
-  await expect(page.getByText("Review Queue")).toBeVisible();
-  await expect(page.getByText("Health")).toBeVisible();
-  await expect(page.getByText("Compliance")).toBeVisible();
+
+  // Open Manual Reviews — Review queue (locked) should appear
+  await page.getByText("Manual Reviews", { exact: true }).click();
+  await expect(page.getByText("Review queue", { exact: true })).toBeVisible();
+
+  // Open Reports — Compliance (locked) should appear
+  await page.getByText("Reports", { exact: true }).click();
+  await expect(page.getByText("Compliance", { exact: true })).toBeVisible();
 });
 
 test("sessions page shows enterprise lock overlay", async ({ page }) => {

@@ -24,6 +24,6 @@ test("activity log page is accessible (community)", async ({ page }) => {
     })
   );
   await page.goto("/activity-log");
-  await expect(page.getByRole("heading", { name: "Activity Log" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Activity audit" })).toBeVisible();
   await expect(page.getByText("who changed what")).toBeVisible();
 });
