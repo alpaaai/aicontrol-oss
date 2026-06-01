@@ -54,7 +54,7 @@ test.describe('P1-8 Demo Walkthrough', () => {
 
   test('3. Audit Log — filter by deny, see results', async ({ page }) => {
     await page.goto('/audit-log')
-    await expect(page.getByRole('heading', { name: 'Audit Log' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Agent activity' })).toBeVisible()
     await page.selectOption('select', 'deny')
     await page.getByRole('button', { name: 'Apply' }).click()
     await expect(page.locator('select')).toHaveValue('deny')
@@ -90,8 +90,7 @@ test.describe('P1-8 Demo Walkthrough', () => {
     await page.goto('/overview')
     await expect(page.getByText('Activity', { exact: true })).toBeVisible()
     await expect(page.getByText('Governance', { exact: true })).toBeVisible()
-    await expect(page.getByText('Reviews', { exact: true })).toBeVisible()
-    await expect(page.getByText('System', { exact: true })).toBeVisible()
+    await expect(page.getByText('Manual Reviews', { exact: true })).toBeVisible()
     await expect(page.getByText('Intelligence', { exact: true })).toBeVisible()
     await expect(page.getByText('Reports', { exact: true })).toBeVisible()
   })
@@ -105,6 +104,7 @@ test.describe('P1-8 Demo Walkthrough', () => {
 
   test('9. Logout redirects to login', async ({ page }) => {
     await page.goto('/overview')
+    await page.getByText('admin@aicontrol.dev').click()
     await page.locator('[data-testid="logout-btn"]').click()
     await expect(page).toHaveURL(/\/login/)
   })

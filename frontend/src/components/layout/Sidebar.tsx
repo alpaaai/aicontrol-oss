@@ -1,13 +1,23 @@
-import { NavLink } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { NavLink, useLocation } from "react-router-dom";
+import { useEffect, useState, useRef } from "react";
 import {
   Lock, LayoutDashboard, List, BarChart2, GitBranch,
-  Shield, Bot, Key, CheckSquare, Activity, HeartPulse,
+  Shield, Bot, Key, CheckSquare, Activity,
   Brain, Lightbulb, FileCheck, LogOut, Settings, CreditCard,
+  Layers, ShieldCheck, ClipboardList, BarChart3, Sparkles,
+  ChevronRight,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
 import { getSummary } from "../../api/dashboard";
+
+const SECTION_PATHS: Record<string, string[]> = {
+  activity:     ["/overview", "/audit-log", "/metrics", "/sessions", "/activity-log"],
+  governance:   ["/policies", "/agents", "/tokens"],
+  reviews:      ["/reviews"],
+  reports:      ["/reports"],
+  intelligence: ["/intelligence", "/policy-suggestions"],
+};
 
 interface NavItemProps {
   to: string;
@@ -15,16 +25,12 @@ interface NavItemProps {
   label: string;
   locked?: boolean;
   badge?: number;
-  delay?: number;
 }
 
-function NavItem({ to, icon, label, locked, badge, delay = 0 }: NavItemProps) {
+function NavItem({ to, icon, label, locked, badge }: NavItemProps) {
   if (locked) {
     return (
-      <div
-        className="flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/30 cursor-default opacity-50 animate-slide-in-left"
-        style={{ animationDelay: `${delay}ms` }}
-      >
+      <div className="flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/30 cursor-default opacity-50">
         <span className="text-white/25 w-[14px] shrink-0">{icon}</span>
         <span>{label}</span>
         <Lock className="w-2.5 h-2.5 ml-auto text-white/20" />
@@ -35,17 +41,16 @@ function NavItem({ to, icon, label, locked, badge, delay = 0 }: NavItemProps) {
     <NavLink
       to={to}
       className={({ isActive }) =>
-        "flex items-center gap-2.5 px-4 py-[7px] text-[13px] relative transition-all duration-150 animate-slide-in-left group " +
+        "flex items-center gap-2.5 px-4 py-[7px] text-[13px] relative transition-all duration-150 group " +
         (isActive
           ? "bg-[#3B5BDB1A] text-[#7C9FFF] font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:bg-ac-primary before:rounded-r"
           : "text-white/55 hover:bg-white/5 hover:text-white/80 hover:translate-x-0.5")
       }
-      style={{ animationDelay: `${delay}ms` }}
     >
       <span className="w-[14px] shrink-0 transition-transform duration-150 group-hover:scale-110">{icon}</span>
       <span>{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="ml-auto bg-ac-deny-bg text-ac-deny text-[10px] font-medium px-1.5 py-0.5 rounded-full animate-badge-in">
+        <span className="ml-auto bg-ac-deny-bg text-ac-deny text-[10px] font-medium px-1.5 py-0.5 rounded-full">
           {badge}
         </span>
       )}
@@ -53,19 +58,67 @@ function NavItem({ to, icon, label, locked, badge, delay = 0 }: NavItemProps) {
   );
 }
 
-function SectionLabel({ label }: { label: string }) {
+interface SectionHeaderProps {
+  icon: React.ReactNode;
+  label: string;
+  isOpen: boolean;
+  onClick: () => void;
+}
+
+function SectionHeader({ icon, label, isOpen, onClick }: SectionHeaderProps) {
   return (
-    <p className="px-4 pt-2.5 pb-1 text-[10px] font-medium uppercase tracking-[0.07em] text-white/30">
-      {label}
-    </p>
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-2.5 px-4 pt-2.5 pb-1 text-[10px] font-medium uppercase tracking-[0.07em] transition-colors duration-150 ${
+        isOpen ? "text-white" : "text-white/35 hover:text-white/60"
+      }`}
+    >
+      <span className={`w-[14px] shrink-0 transition-opacity duration-150 ${isOpen ? "opacity-100" : "opacity-35"}`}>
+        {icon}
+      </span>
+      <span>{label}</span>
+      <ChevronRight
+        size={10}
+        strokeWidth={2}
+        className={`ml-auto transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+      />
+    </button>
   );
 }
 
 export function Sidebar() {
   const { user, logout } = useAuth();
   const { isEnterprise } = useLicense();
+  const location = useLocation();
   const iconProps = { size: 14, strokeWidth: 1.75 };
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const [userPanelOpen, setUserPanelOpen] = useState(false);
   const [pendingReviews, setPendingReviews] = useState(0);
+  const userRowRef = useRef<HTMLButtonElement>(null);
+  const userPanelRef = useRef<HTMLDivElement>(null);
+
+  // Auto-open section containing the active route
+  useEffect(() => {
+    const match = Object.entries(SECTION_PATHS).find(([, paths]) =>
+      paths.some(p => location.pathname === p || location.pathname.startsWith(p + "/"))
+    );
+    if (match) setOpenSection(match[0]);
+  }, [location.pathname]);
+
+  // Close user panel on outside click
+  useEffect(() => {
+    if (!userPanelOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        !userPanelRef.current?.contains(e.target as Node) &&
+        !userRowRef.current?.contains(e.target as Node)
+      ) {
+        setUserPanelOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [userPanelOpen]);
 
   useEffect(() => {
     if (!isEnterprise) return;
@@ -74,6 +127,12 @@ export function Sidebar() {
     const timer = setInterval(load, 30000);
     return () => clearInterval(timer);
   }, []);
+
+  const toggleSection = (key: string) =>
+    setOpenSection(prev => (prev === key ? null : key));
+
+  const panelItemClass =
+    "flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/55 hover:bg-white/5 hover:text-white/80 transition-all duration-150 w-full text-left";
 
   return (
     <div className="w-[224px] shrink-0 bg-ac-night flex flex-col h-screen sticky top-0 noise overflow-hidden">
@@ -98,66 +157,146 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex-1 py-2 overflow-y-auto scrollbar-hide relative z-10">
-        <SectionLabel label="Activity" />
-        <NavItem to="/overview"   icon={<LayoutDashboard {...iconProps} />} label="Overview"   delay={40} />
-        <NavItem to="/audit-log"  icon={<List {...iconProps} />}            label="Agent activity" delay={60} />
-        <NavItem to="/metrics"    icon={<BarChart2 {...iconProps} />}        label="Metrics"    delay={80} />
-        <NavItem to="/sessions"   icon={<GitBranch {...iconProps} />}        label="Sessions"   locked delay={100} />
+        {/* ACTIVITY */}
+        <SectionHeader
+          icon={<Layers {...iconProps} />}
+          label="Activity"
+          isOpen={openSection === "activity"}
+          onClick={() => toggleSection("activity")}
+        />
+        {openSection === "activity" && (
+          <div className="animate-fade-up pb-1">
+            <NavItem to="/overview"     icon={<LayoutDashboard {...iconProps} />} label="Dashboard" />
+            <NavItem to="/audit-log"    icon={<List {...iconProps} />}            label="Agent activity" />
+            <NavItem to="/metrics"      icon={<BarChart2 {...iconProps} />}       label="Decision metrics" />
+            <NavItem to="/sessions"     icon={<GitBranch {...iconProps} />}       label="Sessions" locked />
+            <NavItem to="/activity-log" icon={<Activity {...iconProps} />}        label="Activity audit" />
+          </div>
+        )}
 
-        <SectionLabel label="Governance" />
-        <NavItem to="/policies"   icon={<Shield {...iconProps} />}           label="Policies"   delay={120} />
-        <NavItem to="/agents"     icon={<Bot {...iconProps} />}              label="Agents"     delay={140} />
-        <NavItem to="/tokens"     icon={<Key {...iconProps} />}              label="API tokens" delay={160} />
+        {/* GOVERNANCE */}
+        <SectionHeader
+          icon={<ShieldCheck {...iconProps} />}
+          label="Governance"
+          isOpen={openSection === "governance"}
+          onClick={() => toggleSection("governance")}
+        />
+        {openSection === "governance" && (
+          <div className="animate-fade-up pb-1">
+            <NavItem to="/policies" icon={<Shield {...iconProps} />} label="Policies" />
+            <NavItem to="/agents"   icon={<Bot {...iconProps} />}    label="Agents" />
+            <NavItem to="/tokens"   icon={<Key {...iconProps} />}    label="API tokens" />
+          </div>
+        )}
 
-        <SectionLabel label="Reviews" />
-        <NavItem to="/reviews" icon={<CheckSquare {...iconProps} />} label="Review queue"
-          locked={!isEnterprise} badge={isEnterprise ? pendingReviews : undefined} delay={180} />
+        {/* MANUAL REVIEWS */}
+        <SectionHeader
+          icon={<ClipboardList {...iconProps} />}
+          label="Manual Reviews"
+          isOpen={openSection === "reviews"}
+          onClick={() => toggleSection("reviews")}
+        />
+        {openSection === "reviews" && (
+          <div className="animate-fade-up pb-1">
+            <NavItem
+              to="/reviews"
+              icon={<CheckSquare {...iconProps} />}
+              label="Review queue"
+              locked={!isEnterprise}
+              badge={isEnterprise ? pendingReviews : undefined}
+            />
+          </div>
+        )}
 
-        <SectionLabel label="Reports" />
-        <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!isEnterprise} delay={200} />
+        {/* REPORTS */}
+        <SectionHeader
+          icon={<BarChart3 {...iconProps} />}
+          label="Reports"
+          isOpen={openSection === "reports"}
+          onClick={() => toggleSection("reports")}
+        />
+        {openSection === "reports" && (
+          <div className="animate-fade-up pb-1">
+            <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!isEnterprise} />
+          </div>
+        )}
 
-        <SectionLabel label="Intelligence" />
-        <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}       label="Threat summaries"   locked={!isEnterprise} delay={220} />
-        <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />}   label="Policy suggestions" locked={!isEnterprise} delay={240} />
-
-        <SectionLabel label="System" />
-        <NavItem to="/health"       icon={<HeartPulse {...iconProps} />}     label="Health"     locked={!isEnterprise} delay={260} />
-        <NavItem to="/activity-log" icon={<Activity {...iconProps} />}       label="Activity audit" delay={275} />
-        <NavItem to="/billing"      icon={<CreditCard {...iconProps} />}     label="Subscription" delay={290} />
+        {/* INTELLIGENCE */}
+        <SectionHeader
+          icon={<Sparkles {...iconProps} />}
+          label="Intelligence"
+          isOpen={openSection === "intelligence"}
+          onClick={() => toggleSection("intelligence")}
+        />
+        {openSection === "intelligence" && (
+          <div className="animate-fade-up pb-1">
+            <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}     label="Threat summaries" locked={!isEnterprise} />
+            <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />} label="Policy insights"  locked={!isEnterprise} />
+          </div>
+        )}
       </nav>
 
-      {/* Settings */}
-      <NavLink
-        to="/settings"
-        className={({ isActive }) =>
-          `flex items-center gap-2.5 px-4 py-[7px] text-[13px] transition-all duration-150 border-t border-white/[0.07] relative z-10 group ` +
-          (isActive ? 'text-[#7C9FFF]' : 'text-white/40 hover:text-white/60 hover:translate-x-0.5')
-        }
+      {/* User row — clicking opens secondary panel */}
+      <button
+        ref={userRowRef}
+        onClick={() => setUserPanelOpen(v => !v)}
+        className="border-t border-white/[0.07] px-4 py-3 relative z-10 w-full text-left hover:bg-white/[0.03] transition-colors duration-150"
       >
-        <Settings size={14} strokeWidth={1.75} className="transition-transform duration-150 group-hover:rotate-45" />
-        Settings
-      </NavLink>
-
-      {/* User row */}
-      <div className="border-t border-white/[0.07] px-4 py-3 relative z-10">
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-            style={{ boxShadow: "0 0 8px rgba(59,91,219,0.4)" }}>
+          <div
+            className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
+            style={{ boxShadow: "0 0 8px rgba(59,91,219,0.4)" }}
+          >
             {user?.email?.[0]?.toUpperCase() ?? "A"}
           </div>
           <div className="min-w-0">
             <p className="text-[12px] text-white/50 truncate">{user?.email}</p>
             <p className="text-[10px] text-white/25">{user?.role}</p>
           </div>
+          <ChevronRight
+            size={12}
+            className={`ml-auto text-white/20 transition-transform duration-200 ${userPanelOpen ? "-rotate-90" : "rotate-90"}`}
+          />
+        </div>
+      </button>
+
+      {/* User secondary panel — fixed to right of sidebar */}
+      {userPanelOpen && (
+        <div
+          ref={userPanelRef}
+          className="fixed left-[224px] bottom-0 w-[160px] bg-ac-night border border-white/[0.07] rounded-tr-lg noise z-50 py-1"
+          style={{ boxShadow: "4px -4px 24px rgba(0,0,0,0.5)" }}
+        >
+          <NavLink
+            to="/settings"
+            onClick={() => setUserPanelOpen(false)}
+            className={({ isActive }) =>
+              panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
+            }
+          >
+            <Settings size={14} strokeWidth={1.75} />
+            Settings
+          </NavLink>
+          <NavLink
+            to="/billing"
+            onClick={() => setUserPanelOpen(false)}
+            className={({ isActive }) =>
+              panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
+            }
+          >
+            <CreditCard size={14} strokeWidth={1.75} />
+            Subscription
+          </NavLink>
           <button
             data-testid="logout-btn"
-            onClick={logout}
-            className="ml-auto text-white/20 hover:text-white/50 transition-colors"
+            onClick={() => { setUserPanelOpen(false); logout(); }}
+            className={panelItemClass}
           >
-            <LogOut size={13} />
+            <LogOut size={14} strokeWidth={1.75} />
+            Logout
           </button>
         </div>
-      </div>
+      )}
     </div>
   );
 }
