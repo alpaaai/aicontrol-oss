@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, select, text
+from sqlalchemy import case, func, select, text
 
 from app.core.auth import require_human
 from app.models.database import async_session_factory
@@ -128,6 +128,81 @@ async def get_summary(_=Depends(require_human)):
         "overdue_reviews": overdue_reviews,
         "top_denied_tool": top_denied_tool,
         "high_risk_sessions": high_risk_sessions,
+    }
+
+
+@router.get("/metrics")
+async def get_metrics(_=Depends(require_human)):
+    now = datetime.utcnow()
+    week_start = now - timedelta(days=7)
+    month_start = now - timedelta(days=30)
+
+    async with async_session_factory() as db:
+        total_7d = (await db.execute(
+            select(func.count()).select_from(AuditEvent)
+            .where(AuditEvent.created_at >= week_start)
+        )).scalar()
+
+        policy_hits_7d = (await db.execute(
+            select(func.count()).select_from(AuditEvent)
+            .where(AuditEvent.created_at >= week_start)
+            .where(AuditEvent.policy_id.isnot(None))
+        )).scalar()
+
+        policy_hit_rate = round(policy_hits_7d / total_7d * 100, 1) if total_7d else 0.0
+
+        deny_trend_rows = (await db.execute(
+            select(
+                func.date_trunc("day", AuditEvent.created_at).label("day"),
+                AuditEvent.decision,
+                func.count().label("count"),
+            )
+            .where(AuditEvent.created_at >= month_start)
+            .group_by("day", AuditEvent.decision)
+            .order_by("day")
+        )).all()
+        deny_trend = [
+            {"day": r.day.isoformat(), "decision": r.decision, "count": r.count}
+            for r in deny_trend_rows
+        ]
+
+        agent_deny_rows = (await db.execute(
+            select(
+                AuditEvent.agent_name,
+                func.count().label("total"),
+                func.sum(
+                    case((AuditEvent.decision == "deny", 1), else_=0)
+                ).label("denies"),
+            )
+            .where(AuditEvent.created_at >= week_start)
+            .where(AuditEvent.agent_name.isnot(None))
+            .group_by(AuditEvent.agent_name)
+            .order_by(text("denies DESC"))
+            .limit(10)
+        )).all()
+        top_agents_by_deny_rate = [
+            {
+                "agent_name": r.agent_name,
+                "total": r.total,
+                "deny_rate": round(r.denies / r.total * 100, 1) if r.total else 0.0,
+            }
+            for r in agent_deny_rows
+        ]
+
+        avg_resolution = (await db.execute(
+            select(func.avg(
+                func.extract("epoch", HITLReview.reviewed_at - HITLReview.created_at)
+            ))
+            .where(HITLReview.status.in_(["approved", "denied"]))
+            .where(HITLReview.reviewed_at.isnot(None))
+        )).scalar()
+        avg_review_seconds = round(float(avg_resolution), 0) if avg_resolution else None
+
+    return {
+        "policy_hit_rate": policy_hit_rate,
+        "deny_trend": deny_trend,
+        "top_agents_by_deny_rate": top_agents_by_deny_rate,
+        "avg_review_seconds": avg_review_seconds,
     }
 
 
