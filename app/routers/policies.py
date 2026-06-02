@@ -3,7 +3,7 @@ import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -74,9 +74,20 @@ class PolicyResponse(BaseModel):
     severity: Optional[str]
     active: Optional[bool]
     compliance_frameworks: Optional[list]
+    applies_to_agents: int = 0
+    created_by: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+    @field_validator("applies_to_agents", mode="before")
+    @classmethod
+    def _coerce_list_to_count(cls, v: Any) -> int:
+        if isinstance(v, list):
+            return len(v)
+        if isinstance(v, int):
+            return v
+        return 0
 
 
 @router.get("", response_model=list[PolicyResponse])
