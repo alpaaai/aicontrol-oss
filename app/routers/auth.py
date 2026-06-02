@@ -4,13 +4,14 @@ from datetime import datetime, timedelta
 import structlog
 from fastapi import APIRouter, HTTPException
 from jose import jwt
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import select
 
 from app.core.config import settings
 from app.models.database import async_session_factory
 from app.models.user import User
 from app.routers.setup import _hash_password
+from app.services.invite_service import validate_invite_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 log = structlog.get_logger()
@@ -48,6 +49,22 @@ class LoginBody(BaseModel):
     password: str
 
 
+class MagicLinkValidateBody(BaseModel):
+    token: str
+
+
+class SetPasswordBody(BaseModel):
+    token: str
+    password: str
+
+    @field_validator("password")
+    @classmethod
+    def password_min_length(cls, v: str) -> str:
+        if len(v) < 8:
+            raise ValueError("Password must be at least 8 characters")
+        return v
+
+
 @router.post("/login")
 async def login(body: LoginBody):
     async with async_session_factory() as session:
@@ -75,4 +92,48 @@ async def login(body: LoginBody):
         "token": token,
         "user": {"id": str(user.id), "email": user.email, "full_name": user.name, "role": user.role.value},
         "first_login": not user.password_set,
+    }
+
+
+@router.post("/magic-link/validate")
+async def validate_magic_link(body: MagicLinkValidateBody):
+    import hashlib as _hl
+    token_hash = _hl.sha256(body.token.encode()).hexdigest()
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(User).where(User.invite_token_hash == token_hash)
+        )
+        user = result.scalar_one_or_none()
+
+    if user is None or not validate_invite_token(body.token, user.invite_token_hash, user.invite_expires_at):
+        raise HTTPException(status_code=401, detail="Invalid or expired invite link")
+
+    return {"valid": True, "email": user.email, "full_name": user.name}
+
+
+@router.post("/set-password")
+async def set_password(body: SetPasswordBody):
+    import hashlib as _hl
+    token_hash = _hl.sha256(body.token.encode()).hexdigest()
+    async with async_session_factory() as session:
+        result = await session.execute(
+            select(User).where(User.invite_token_hash == token_hash)
+        )
+        user = result.scalar_one_or_none()
+
+        if user is None or not validate_invite_token(body.token, user.invite_token_hash, user.invite_expires_at):
+            raise HTTPException(status_code=401, detail="Invalid or expired invite link")
+
+        user.password_hash = _hash_password(body.password)
+        user.password_set = True
+        user.invite_token_hash = None
+        user.invite_expires_at = None
+        await session.commit()
+        await session.refresh(user)
+
+    jwt_token = _issue_human_jwt(user)
+    log.info("invite_set_password", email=user.email)
+    return {
+        "token": jwt_token,
+        "user": {"id": str(user.id), "email": user.email, "full_name": user.name, "role": user.role.value},
     }
