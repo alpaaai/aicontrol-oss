@@ -14,6 +14,7 @@ export interface AuditEvent {
   duration_ms: number | null;
   sequence_number: number;
   created_at: string;
+  tool_response: string | null;
 }
 
 export interface AuditEventsResponse {
