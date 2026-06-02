@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { LicenseProvider } from "./context/LicenseContext";
+import { OrgSettingsProvider } from "./context/OrgSettingsContext";
 import { Layout } from "./components/layout/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { SetupPage } from "./pages/SetupPage";
@@ -45,6 +46,7 @@ function RequireSetupOrAuth({ children }: { children: React.ReactElement }) {
 export default function App() {
   return (
     <LicenseProvider>
+    <OrgSettingsProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
@@ -77,6 +79,7 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </OrgSettingsProvider>
     </LicenseProvider>
   );
 }
