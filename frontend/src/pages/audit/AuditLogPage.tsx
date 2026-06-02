@@ -1,14 +1,16 @@
 import { useState, useCallback, useEffect } from "react";
-import { listAuditEvents } from "@/api/auditEvents";
+import { listAuditEvents, exportAuditEvents } from "@/api/auditEvents";
 import type { AuditFilters, AuditEventsResponse } from "@/api/auditEvents";
 import { AuditFilters as AuditFilterBar } from "./AuditFilters";
 import { AuditTable } from "./AuditTable";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Download } from "lucide-react";
+import { useLicense } from "@/hooks/useLicense";
 
 export function AuditLogPage() {
   const [data, setData] = useState<AuditEventsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<AuditFilters>({ limit: 50, offset: 0 });
+  const { isEnterprise } = useLicense();
 
   const load = useCallback(async (f: AuditFilters) => {
     setLoading(true);
@@ -35,13 +37,32 @@ export function AuditLogPage() {
         <h2 className="text-[18px] font-semibold text-ac-text-primary">
           Agent activity
         </h2>
-        <button
-          onClick={() => load(filters)}
-          className="flex items-center gap-1.5 text-sm text-ac-text-muted hover:text-ac-text-primary border border-ac-border rounded-lg px-3 py-1.5"
-        >
-          <RefreshCw size={13} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          {isEnterprise && (
+            <button
+              onClick={async () => {
+                const blob = await exportAuditEvents(filters);
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = "audit_events.csv";
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+              className="flex items-center gap-1.5 text-sm text-ac-text-muted hover:text-ac-text-primary border border-ac-border rounded-lg px-3 py-1.5"
+            >
+              <Download size={13} />
+              Export
+            </button>
+          )}
+          <button
+            onClick={() => load(filters)}
+            className="flex items-center gap-1.5 text-sm text-ac-text-muted hover:text-ac-text-primary border border-ac-border rounded-lg px-3 py-1.5"
+          >
+            <RefreshCw size={13} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       <AuditFilterBar onFilter={handleFilter} />
