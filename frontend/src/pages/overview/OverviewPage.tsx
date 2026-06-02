@@ -64,9 +64,33 @@ export function OverviewPage() {
               value={data?.pending_reviews ?? "—"}
               deltaPositive={data ? data.pending_reviews === 0 : undefined}
               delta={
-                data?.pending_reviews === 0 ? "Queue clear" : "Needs attention"
+                data?.pending_reviews === 0
+                  ? "Queue clear"
+                  : data && data.overdue_reviews > 0
+                  ? `${data.overdue_reviews} overdue`
+                  : "Needs attention"
               }
             />
+            {data && data.active_warnings > 0 && (
+              <StatCard
+                index={4}
+                accentColor="#BA7517"
+                label="Active warnings"
+                value={data.active_warnings}
+                delta="Policy drift detected"
+                deltaPositive={false}
+              />
+            )}
+            {data && data.high_risk_sessions > 0 && (
+              <StatCard
+                index={5}
+                accentColor="#E24B4A"
+                label="High-risk sessions"
+                value={data.high_risk_sessions}
+                delta="risk > 50, last hour"
+                deltaPositive={false}
+              />
+            )}
           </>
         )}
       </div>
@@ -88,6 +112,13 @@ export function OverviewPage() {
       {/* Live feed */}
       <div className="animate-fade-up" style={{ animationDelay: "320ms" }}>
         <LiveFeedTable />
+        {data?.top_denied_tool && (
+          <p className="text-[12px] text-ac-text-muted mt-2">
+            Most blocked tool today:{" "}
+            <span className="font-medium text-ac-deny">{data.top_denied_tool.tool}</span>
+            {" "}({data.top_denied_tool.count} denies)
+          </p>
+        )}
       </div>
     </div>
   );
