@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react'
 import { listActivityLog } from '../../api/activityLog'
 import type { ActivityLogEntry, ActivityLogFilters } from '../../api/activityLog'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { useOrgSettings } from '../../context/OrgSettingsContext'
+import { formatTs } from '../../lib/formatDate'
 
 const ACTION_LABELS: Record<string, string> = {
   'policy.create':  'Created policy',
@@ -34,8 +36,8 @@ function actionLabel(action: string): string {
   return ACTION_LABELS[action] ?? action
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleString('en-US', {
+function formatDate(iso: string, timezone: string): string {
+  return formatTs(iso, timezone, {
     month: 'short', day: 'numeric', year: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
   })
@@ -61,7 +63,7 @@ function StateSection({ label, state, accent }: { label: string; state: Record<s
   )
 }
 
-function ActivityRow({ entry }: { entry: ActivityLogEntry }) {
+function ActivityRow({ entry, timezone }: { entry: ActivityLogEntry; timezone: string }) {
   const [expanded, setExpanded] = useState(false)
   const hasDetail = entry.ip_address || entry.before_state || entry.after_state || entry.resource_id
 
@@ -80,7 +82,7 @@ function ActivityRow({ entry }: { entry: ActivityLogEntry }) {
         <div className="min-w-0 flex-1">
           <p className="text-[13px] font-medium text-slate-800">{actionLabel(entry.action)}</p>
           <p className="text-[12px] text-slate-400 mt-0.5">
-            {entry.user_email ?? 'system'} &middot; {formatDate(entry.created_at)}
+            {entry.user_email ?? 'system'} &middot; {formatDate(entry.created_at, timezone)}
           </p>
         </div>
       </div>
@@ -168,6 +170,7 @@ function ActivityFilters({ onFilter }: { onFilter: (f: ActivityLogFilters) => vo
 }
 
 export function ActivityLogPage() {
+  const { timezone } = useOrgSettings()
   const [data, setData] = useState<ActivityLogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -217,7 +220,7 @@ export function ActivityLogPage() {
       {!loading && data.length > 0 && (
         <div className="rounded-xl border border-ac-border overflow-hidden bg-white">
           {data.map(entry => (
-            <ActivityRow key={entry.id} entry={entry} />
+            <ActivityRow key={entry.id} entry={entry} timezone={timezone} />
           ))}
         </div>
       )}

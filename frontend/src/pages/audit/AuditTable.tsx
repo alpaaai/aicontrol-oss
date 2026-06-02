@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { AuditEvent } from "@/api/auditEvents";
 import { DecisionBadge } from "@/components/shared/DecisionBadge";
+import { useOrgSettings } from "@/context/OrgSettingsContext";
+import { formatTs } from "@/lib/formatDate";
 
 interface Props {
   events: AuditEvent[];
@@ -52,9 +54,10 @@ function Detail({
 
 function AuditRow({ event }: { event: AuditEvent }) {
   const [open, setOpen] = useState(false);
+  const { timezone } = useOrgSettings();
 
   const readable = `Agent ${event.agent_name} call to ${event.tool_name} tool ${decisionVerb[event.decision]}.`;
-  const timestamp = new Date(event.created_at).toLocaleString("en-US", {
+  const timestamp = formatTs(event.created_at, timezone, {
     month: "short",
     day: "numeric",
     hour: "2-digit",
