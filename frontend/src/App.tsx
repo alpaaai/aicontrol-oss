@@ -4,6 +4,7 @@ import { LicenseProvider } from "./context/LicenseContext";
 import { Layout } from "./components/layout/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { SetupPage } from "./pages/SetupPage";
+import { InvitePage } from "./pages/InvitePage";
 import { getStoredAuth } from "./store/auth";
 import { getSetupStatus } from "./api/setup";
 
@@ -48,6 +49,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
         <Route path="/setup" element={<SetupPage />} />
+        <Route path="/invite" element={<InvitePage />} />
         <Route
           path="/"
           element={
