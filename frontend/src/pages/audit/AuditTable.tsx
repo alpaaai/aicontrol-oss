@@ -140,6 +140,17 @@ function AuditRow({ event }: { event: AuditEvent }) {
               labelColor={lc}
             />
           </div>
+
+          {event.tool_response && (
+            <div>
+              <p className={`text-[10px] uppercase tracking-wide font-medium mb-0.5 ${lc}`}>
+                Tool response
+              </p>
+              <p className="text-[12px] font-mono text-ac-text-primary bg-white/60 rounded px-2 py-1.5 break-all">
+                {event.tool_response}
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>
