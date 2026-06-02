@@ -25,6 +25,7 @@ export interface ComplianceReport {
   mock_used: boolean
   token_input: number | null
   token_output: number | null
+  generated_by_email: string | null
 }
 
 // POST returns binary file — use responseType blob and trigger download at call site

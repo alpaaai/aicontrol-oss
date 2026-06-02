@@ -49,8 +49,16 @@ export function ReportHistory({ refreshKey }: Props) {
               </p>
               <p className="text-[11px] text-gray-400 mt-0.5">
                 {new Date(r.generated_at).toLocaleString()} · {r.format.toUpperCase()}
-                {r.mock_used && <span className="ml-2 text-amber-500">mock</span>}
+                {` · ${r.llm_model}`}
+                {r.generated_by_email && ` · ${r.generated_by_email}`}
+                {r.token_input != null && r.token_output != null &&
+                  ` · ${r.token_input.toLocaleString()} in / ${r.token_output.toLocaleString()} out`}
               </p>
+              {r.mock_used && (
+                <p className="text-[11px] text-red-600 font-medium bg-red-50 rounded px-2 py-0.5 inline-block mt-1">
+                  Mock data — not suitable for compliance submission
+                </p>
+              )}
             </div>
             <button
               onClick={() => handleDownload(r)}
