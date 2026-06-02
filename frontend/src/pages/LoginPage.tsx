@@ -1,10 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { requestCode, verifyCode } from "@/api/auth";
+import { login } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { Shield, Lock, Activity, FileCheck } from "lucide-react";
-
-type Step = "email" | "code";
 
 const trustSignals = [
   { icon: Shield,     text: "Policy-enforced agent control" },
@@ -14,38 +12,28 @@ const trustSignals = [
 ];
 
 export function LoginPage() {
-  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login: storeLogin } = useAuth();
   const navigate = useNavigate();
 
-  const handleRequestCode = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
-      await requestCode(email);
-      setStep("code");
-    } catch {
-      setError("Email not found. Contact your administrator.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const { data } = await verifyCode(email, code);
-      login({ email: data.email, role: data.role as "admin" | "analyst" | "auditor", token: data.token });
+      const { data } = await login(email, password);
+      storeLogin({
+        email: data.user.email,
+        role: data.user.role as "admin" | "analyst" | "auditor",
+        token: data.token,
+      });
       navigate("/overview");
-    } catch {
-      setError("Invalid or expired code. Try again.");
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
+      setError(msg ?? "Invalid email or password");
     } finally {
       setLoading(false);
     }
@@ -138,84 +126,49 @@ export function LoginPage() {
             </span>
           </div>
 
-          {step === "email" ? (
-            <>
-              <h2 className="text-[22px] font-bold text-ac-text-primary mb-1">
-                Sign in
-              </h2>
-              <p className="text-[14px] text-ac-text-muted mb-8">
-                Enter your work email to receive a one-time code.
-              </p>
-              <form onSubmit={handleRequestCode} className="space-y-4">
-                <div>
-                  <label className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
-                    Work email
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@company.com"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
-                  />
-                </div>
-                {error && (
-                  <p className="text-xs text-ac-deny bg-ac-deny-bg rounded-md px-3 py-2">{error}</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-ac-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#3251C5] active:bg-[#2B48B0] transition-colors disabled:opacity-50 shadow-sm"
-                >
-                  {loading ? "Sending…" : "Continue"}
-                </button>
-              </form>
-            </>
-          ) : (
-            <>
-              <h2 className="text-[22px] font-bold text-ac-text-primary mb-1">
-                Check your email
-              </h2>
-              <p className="text-[14px] text-ac-text-muted mb-8">
-                A 6-digit code was sent to{" "}
-                <span className="font-medium text-ac-text-primary">{email}</span>.
-              </p>
-              <form onSubmit={handleVerifyCode} className="space-y-4">
-                <div>
-                  <label className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
-                    One-time code
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={code}
-                    maxLength={6}
-                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-                    placeholder="000000"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm font-mono text-center tracking-[0.25em] outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
-                  />
-                </div>
-                {error && (
-                  <p className="text-xs text-ac-deny bg-ac-deny-bg rounded-md px-3 py-2">{error}</p>
-                )}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full bg-ac-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#3251C5] active:bg-[#2B48B0] transition-colors disabled:opacity-50 shadow-sm"
-                >
-                  {loading ? "Verifying…" : "Sign in"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStep("email")}
-                  className="w-full text-sm text-ac-text-muted hover:text-ac-text-primary transition-colors"
-                >
-                  Use a different email
-                </button>
-              </form>
-            </>
-          )}
+          <h2 className="text-[22px] font-bold text-ac-text-primary mb-1">Sign in</h2>
+          <p className="text-[14px] text-ac-text-muted mb-8">
+            Enter your credentials to access AIControl.
+          </p>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                Work email
+              </label>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+              />
+            </div>
+            <div>
+              <label className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                Password
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="••••••••"
+                className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+              />
+            </div>
+            {error && (
+              <p className="text-xs text-ac-deny bg-ac-deny-bg rounded-md px-3 py-2">{error}</p>
+            )}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-ac-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#3251C5] active:bg-[#2B48B0] transition-colors disabled:opacity-50 shadow-sm"
+            >
+              {loading ? "Signing in…" : "Sign in"}
+            </button>
+          </form>
 
           <p className="mt-10 text-[11px] text-ac-text-muted/60 text-center">
             Secured by AIControl · Enterprise tier
