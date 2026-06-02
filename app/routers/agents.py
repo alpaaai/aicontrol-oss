@@ -1,16 +1,17 @@
 """Agent registration CRUD — admin only."""
 import uuid
+from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import select, update
+from sqlalchemy import case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
 from app.core.logging import get_logger
 from app.models.database import get_db
-from app.models.schemas import Agent, APIToken
+from app.models.schemas import Agent, APIToken, AuditEvent
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 logger = get_logger("agents_api")
@@ -56,6 +57,22 @@ class AgentResponse(BaseModel):
     approved_by: Optional[str]
 
 
+class AgentListItem(BaseModel):
+    id: uuid.UUID
+    name: str
+    owner: str
+    status: str
+    framework: Optional[str]
+    model_version: Optional[str]
+    approved_tools: list
+    approved_by: Optional[str]
+    system_prompt_hash: Optional[str]
+    approved_at: Optional[datetime]
+    created_at: Optional[datetime]
+    last_active: Optional[datetime]
+    deny_rate: Optional[float]
+
+
 class ApprovedToolsUpdate(BaseModel):
     approved_tools: list[str]
 
@@ -67,13 +84,69 @@ class ApprovedToolsResponse(BaseModel):
     approved_tools: list[str]
 
 
-@router.get("", response_model=list[AgentResponse])
+@router.get("", response_model=list[AgentListItem])
 async def list_agents(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_admin),
-) -> list[AgentResponse]:
-    result = await db.execute(select(Agent).order_by(Agent.name))
-    return result.scalars().all()
+) -> list[AgentListItem]:
+    last_active_sq = (
+        select(func.max(AuditEvent.created_at))
+        .where(AuditEvent.agent_id == Agent.id)
+        .correlate(Agent)
+        .scalar_subquery()
+    )
+    total_sq = (
+        select(func.count())
+        .select_from(AuditEvent)
+        .where(AuditEvent.agent_id == Agent.id)
+        .correlate(Agent)
+        .scalar_subquery()
+    )
+    deny_sq = (
+        select(func.count())
+        .select_from(AuditEvent)
+        .where(AuditEvent.agent_id == Agent.id, AuditEvent.decision == "deny")
+        .correlate(Agent)
+        .scalar_subquery()
+    )
+
+    rows = (await db.execute(
+        select(
+            Agent.id,
+            Agent.name,
+            Agent.owner,
+            Agent.status,
+            Agent.framework,
+            Agent.model_version,
+            Agent.approved_tools,
+            Agent.approved_by,
+            Agent.system_prompt_hash,
+            Agent.approved_at,
+            Agent.created_at,
+            last_active_sq.label("last_active"),
+            total_sq.label("total_count"),
+            deny_sq.label("deny_count"),
+        ).order_by(Agent.name)
+    )).all()
+
+    return [
+        AgentListItem(
+            id=r.id,
+            name=r.name,
+            owner=r.owner,
+            status=r.status,
+            framework=r.framework,
+            model_version=r.model_version,
+            approved_tools=r.approved_tools or [],
+            approved_by=r.approved_by,
+            system_prompt_hash=r.system_prompt_hash,
+            approved_at=r.approved_at,
+            created_at=r.created_at,
+            last_active=r.last_active,
+            deny_rate=round(r.deny_count / r.total_count, 4) if r.total_count else None,
+        )
+        for r in rows
+    ]
 
 
 @router.get("/{agent_id}", response_model=AgentResponse)
