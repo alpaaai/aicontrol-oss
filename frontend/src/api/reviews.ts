@@ -9,6 +9,10 @@ export interface Review {
   review_note: string | null
   reviewed_at: string | null
   created_at: string
+  response_deadline: string | null
+  assigned_to: string | null
+  tool_name: string | null
+  tool_parameters: string | null
 }
 
 export const listReviews = (status?: string, limit = 50) =>
