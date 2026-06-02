@@ -114,7 +114,7 @@ export function Sidebar() {
     setOpenSection(prev => (prev === key ? null : key));
 
   const panelItemClass =
-    "flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/55 hover:bg-white/5 hover:text-white/80 transition-all duration-150 w-full text-left";
+    "flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/55 hover:bg-white/5 hover:text-white/80 w-full text-left";
 
   return (
     <div className="w-[224px] shrink-0 bg-ac-night flex flex-col h-screen sticky top-0 noise">
