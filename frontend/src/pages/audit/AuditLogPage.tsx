@@ -32,14 +32,9 @@ export function AuditLogPage() {
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-5 animate-fade-up">
-        <div>
-          <h2 className="text-[18px] font-semibold text-ac-text-primary">
-            Agent activity
-          </h2>
-          <p className="text-sm text-ac-text-muted mt-0.5">
-            {data ? `${data.total.toLocaleString()} total events` : "Loading…"}
-          </p>
-        </div>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary">
+          Agent activity
+        </h2>
         <button
           onClick={() => load(filters)}
           className="flex items-center gap-1.5 text-sm text-ac-text-muted hover:text-ac-text-primary border border-ac-border rounded-lg px-3 py-1.5"
@@ -50,6 +45,13 @@ export function AuditLogPage() {
       </div>
 
       <AuditFilterBar onFilter={handleFilter} />
+
+      {data && (
+        <p className="text-[12px] text-ac-text-muted mb-3">
+          {data.total.toLocaleString()} total events
+        </p>
+      )}
+
       <AuditTable events={data?.events ?? []} loading={loading} />
 
       {/* Pagination */}

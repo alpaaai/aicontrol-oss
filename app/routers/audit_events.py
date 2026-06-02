@@ -68,6 +68,7 @@ async def list_audit_events(
                 "policy_id": str(r.policy_id) if r.policy_id else None,
                 "policy_name": r.policy_name,
                 "duration_ms": r.duration_ms,
+                "sequence_number": r.sequence_number,
                 "created_at": r.created_at.isoformat(),
             }
             for r in rows

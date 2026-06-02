@@ -12,6 +12,7 @@ export interface AuditEvent {
   policy_id: string | null;
   policy_name: string | null;
   duration_ms: number | null;
+  sequence_number: number;
   created_at: string;
 }
 

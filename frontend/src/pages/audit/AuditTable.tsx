@@ -1,132 +1,185 @@
 import { useState } from "react";
 import type { AuditEvent } from "@/api/auditEvents";
 import { DecisionBadge } from "@/components/shared/DecisionBadge";
-import { ChevronDown, ChevronRight } from "lucide-react";
 
 interface Props {
   events: AuditEvent[];
   loading: boolean;
 }
 
-export function AuditTable({ events, loading }: Props) {
-  const [expanded, setExpanded] = useState<string | null>(null);
+const decisionVerb: Record<AuditEvent["decision"], string> = {
+  allow: "was approved",
+  deny: "was denied",
+  review: "was sent for review",
+};
 
+const expandedBg: Record<AuditEvent["decision"], string> = {
+  allow: "bg-green-50 border-green-100",
+  deny: "bg-red-50 border-red-100",
+  review: "bg-amber-50 border-amber-100",
+};
+
+const expandedLabelColor: Record<AuditEvent["decision"], string> = {
+  allow: "text-green-700",
+  deny: "text-red-700",
+  review: "text-amber-700",
+};
+
+function Detail({
+  label,
+  value,
+  mono,
+  labelColor,
+  className,
+}: {
+  label: string;
+  value: string;
+  mono?: boolean;
+  labelColor: string;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <p className={`text-[10px] uppercase tracking-wide font-medium mb-0.5 ${labelColor}`}>
+        {label}
+      </p>
+      <p className={`text-[12px] text-ac-text-primary break-all ${mono ? "font-mono" : ""}`}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function AuditRow({ event }: { event: AuditEvent }) {
+  const [open, setOpen] = useState(false);
+
+  const readable = `Agent ${event.agent_name} call to ${event.tool_name} tool ${decisionVerb[event.decision]}.`;
+  const timestamp = new Date(event.created_at).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: false,
+  });
+
+  const lc = expandedLabelColor[event.decision];
+
+  return (
+    <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+      {/* Main row */}
+      <div
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex-1 min-w-0">
+          <p className="text-[13px] font-medium text-ac-text-primary truncate">{readable}</p>
+          <p className="text-[11px] text-ac-text-muted mt-0.5">{timestamp}</p>
+        </div>
+
+        <span className="text-[12px] text-ac-text-muted hidden sm:block w-[130px] shrink-0 truncate text-right">
+          {event.policy_name ?? "—"}
+        </span>
+
+        <span className="text-[12px] text-ac-text-muted w-[60px] shrink-0 text-right tabular-nums">
+          {event.duration_ms != null ? `${event.duration_ms}ms` : "—"}
+        </span>
+
+        <div className="shrink-0">
+          <DecisionBadge decision={event.decision} />
+        </div>
+      </div>
+
+      {/* Accordion detail */}
+      {open && (
+        <div className={`border-t px-4 py-3 space-y-3 ${expandedBg[event.decision]}`}>
+          <Detail label="Reason" value={event.decision_reason ?? "No reason provided"} labelColor={lc} />
+
+          {event.tool_parameters && (
+            <div>
+              <p className={`text-[10px] uppercase tracking-wide font-medium mb-0.5 ${lc}`}>
+                Parameters
+              </p>
+              <p className="text-[12px] font-mono text-ac-text-primary bg-white/60 rounded px-2 py-1.5 break-all">
+                {event.tool_parameters}
+              </p>
+            </div>
+          )}
+
+          {event.policy_name && (
+            <div>
+              <p className={`text-[10px] uppercase tracking-wide font-medium mb-1 ${lc}`}>
+                Policies fired
+              </p>
+              <div className="flex items-center gap-3">
+                <span className="text-[12px] text-ac-text-primary font-medium">
+                  {event.policy_name}
+                </span>
+                {event.policy_id && (
+                  <span className="text-[11px] font-mono text-ac-text-muted">
+                    {event.policy_id}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-3">
+            <Detail label="Agent" value={event.agent_name} labelColor={lc} />
+            <Detail label="Agent ID" value={event.agent_id} mono labelColor={lc} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Detail label="Session ID" value={event.session_id} mono labelColor={lc} />
+            <Detail label="Event ID" value={event.id} mono labelColor={lc} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Detail label="Sequence" value={`#${event.sequence_number}`} labelColor={lc} />
+            <Detail
+              label="Duration"
+              value={event.duration_ms != null ? `${event.duration_ms}ms` : "—"}
+              labelColor={lc}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AuditTable({ events, loading }: Props) {
   if (loading) {
     return (
       <div className="space-y-2">
         {[...Array(8)].map((_, i) => (
-          <div key={i} className="h-10 bg-gray-50 rounded animate-pulse" />
+          <div key={i} className="h-[58px] bg-gray-50 rounded-[10px] animate-pulse" />
         ))}
       </div>
     );
   }
 
+  if (events.length === 0) {
+    return (
+      <p className="text-center text-sm text-ac-text-muted py-10">
+        No events match the current filters.
+      </p>
+    );
+  }
+
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
-      {/* Header */}
-      <div
-        className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted uppercase tracking-wide
-                   border-b border-ac-border bg-gray-50"
-        style={{ gridTemplateColumns: "28px 140px 1fr 140px 100px 80px" }}
-      >
-        <div />
-        <div>Time</div>
-        <div>Tool</div>
-        <div>Policy</div>
-        <div>Duration</div>
-        <div>Decision</div>
+    <>
+      {/* Column headers */}
+      <div className="flex items-center gap-4 px-4 pb-1.5 text-[11px] font-medium text-ac-text-muted uppercase tracking-wide">
+        <div className="flex-1">Activity</div>
+        <span className="hidden sm:block w-[130px] shrink-0 text-right">Policy</span>
+        <span className="w-[60px] shrink-0 text-right">Duration</span>
+        <span className="w-[68px] shrink-0 text-right">Decision</span>
       </div>
 
-      {events.length === 0 && (
-        <div className="text-center text-sm text-ac-text-muted py-10">
-          No events match the current filters.
-        </div>
-      )}
-
-      {events.map((event) => (
-        <div key={event.id}>
-          <div
-            onClick={() =>
-              setExpanded(expanded === event.id ? null : event.id)
-            }
-            className="grid gap-3 px-4 py-2.5 text-[13px] border-b border-gray-50
-                       hover:bg-gray-50 cursor-pointer transition-colors"
-            style={{ gridTemplateColumns: "28px 140px 1fr 140px 100px 80px" }}
-          >
-            <div className="flex items-center text-gray-300">
-              {expanded === event.id ? (
-                <ChevronDown size={13} />
-              ) : (
-                <ChevronRight size={13} />
-              )}
-            </div>
-            <div className="text-ac-text-muted font-mono text-[11px] flex items-center">
-              {new Date(event.created_at).toLocaleString("en-US", {
-                month: "short",
-                day: "numeric",
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
-                hour12: false,
-              })}
-            </div>
-            <div className="font-mono text-[12px] text-ac-text-primary flex items-center truncate">
-              {event.tool_name}
-            </div>
-            <div className="text-ac-text-muted text-[12px] flex items-center truncate">
-              {event.policy_name ?? "—"}
-            </div>
-            <div className="text-ac-text-muted text-[12px] flex items-center">
-              {event.duration_ms != null ? `${event.duration_ms}ms` : "—"}
-            </div>
-            <div className="flex items-center">
-              <DecisionBadge decision={event.decision} />
-            </div>
-          </div>
-
-          {/* Expanded detail */}
-          {expanded === event.id && (
-            <div className="px-12 py-3 bg-gray-50/80 border-b border-gray-100 space-y-2">
-              <div>
-                <p className="text-[10px] uppercase tracking-wide text-ac-text-muted mb-0.5">
-                  Reason
-                </p>
-                <p className="text-[13px] text-ac-text-primary">
-                  {event.decision_reason ?? "No reason provided"}
-                </p>
-              </div>
-              {event.tool_parameters && (
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide text-ac-text-muted mb-0.5">
-                    Parameters
-                  </p>
-                  <p className="text-[12px] font-mono text-ac-text-muted bg-gray-100 rounded px-2 py-1.5 truncate">
-                    {event.tool_parameters}
-                  </p>
-                </div>
-              )}
-              <div className="flex gap-6">
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide text-ac-text-muted mb-0.5">
-                    Session ID
-                  </p>
-                  <p className="text-[12px] font-mono text-ac-text-muted">
-                    {event.session_id}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[10px] uppercase tracking-wide text-ac-text-muted mb-0.5">
-                    Event ID
-                  </p>
-                  <p className="text-[12px] font-mono text-ac-text-muted">
-                    {event.id}
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
+      <div className="space-y-2">
+        {events.map((event) => (
+          <AuditRow key={event.id} event={event} />
+        ))}
+      </div>
+    </>
   );
 }

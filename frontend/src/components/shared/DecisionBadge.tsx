@@ -17,19 +17,11 @@ export function DecisionBadge({ decision, className }: DecisionBadgeProps) {
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-medium animate-badge-in",
+        "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium animate-badge-in",
         styles[decision],
         className
       )}
     >
-      {decision === "deny" ? (
-        <span className="w-1.5 h-1.5 rounded-full bg-ac-deny animate-pulse-dot" />
-      ) : (
-        <span className={cn(
-          "w-1.5 h-1.5 rounded-full",
-          decision === "allow" ? "bg-ac-allow" : "bg-ac-review"
-        )} />
-      )}
       {decision.charAt(0).toUpperCase() + decision.slice(1)}
     </span>
   );
