@@ -10,6 +10,8 @@ export interface Policy {
   severity: string | null;
   active: boolean | null;
   compliance_frameworks: string[] | null;
+  applies_to_agents: number;
+  created_by: string | null;
 }
 
 export interface CreatePolicyBody {
