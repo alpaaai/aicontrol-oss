@@ -43,7 +43,18 @@ export function SessionDetailPage() {
       </h2>
 
       {data && (
-        <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+        <>
+          {data.trigger_context && (
+            <div className="bg-ac-card border border-ac-border rounded-[10px] px-4 py-3">
+              <span className="text-[11px] font-medium text-ac-text-muted uppercase tracking-wide">
+                Trigger
+              </span>
+              <p className="text-[13px] text-ac-text-primary mt-0.5">
+                {data.trigger_context}
+              </p>
+            </div>
+          )}
+          <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
           {data.events.map((event) => (
             <div
               key={event.id}
@@ -72,7 +83,8 @@ export function SessionDetailPage() {
               </span>
             </div>
           ))}
-        </div>
+          </div>
+        </>
       )}
     </div>
   );

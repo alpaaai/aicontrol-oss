@@ -26,11 +26,12 @@ function SessionsTable() {
       <div
         className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted uppercase
                    tracking-wide border-b border-ac-border bg-gray-50"
-        style={{ gridTemplateColumns: "1fr 200px 120px 160px" }}
+        style={{ gridTemplateColumns: "1fr 140px 70px 80px 160px" }}
       >
-        <div>Session ID</div>
-        <div>Agent ID</div>
-        <div>Risk Score</div>
+        <div>Agent</div>
+        <div>Status</div>
+        <div>Events</div>
+        <div>Review</div>
         <div>Started</div>
       </div>
       {data.map((s) => (
@@ -39,14 +40,42 @@ function SessionsTable() {
           onClick={() => navigate(`/sessions/${s.id}`)}
           className="grid gap-3 px-4 py-2.5 text-[13px] border-b border-gray-50
                      hover:bg-gray-50 cursor-pointer transition-colors"
-          style={{ gridTemplateColumns: "1fr 200px 120px 160px" }}
+          style={{ gridTemplateColumns: "1fr 140px 70px 80px 160px" }}
         >
-          <div className="font-mono text-[11px] text-ac-text-muted truncate">{s.id}</div>
-          <div className="font-mono text-[11px] text-ac-text-muted truncate">
-            {s.agent_id ?? "—"}
+          <div>
+            <p className="font-medium text-ac-text-primary">
+              {s.agent_name ?? "Unknown"}
+            </p>
+            <p className="font-mono text-[10px] text-ac-text-muted truncate">
+              {s.id.slice(0, 8)}…
+            </p>
           </div>
-          <div className="text-ac-text-muted">{s.risk_score ?? "—"}</div>
-          <div className="text-ac-text-muted text-[12px]">
+          <div className="flex items-center">
+            <span
+              className={`text-[12px] font-medium ${
+                s.status === "completed"
+                  ? "text-ac-allow"
+                  : s.status === "active"
+                  ? "text-ac-primary"
+                  : "text-ac-text-muted"
+              }`}
+            >
+              {s.status}
+            </span>
+          </div>
+          <div className="flex items-center text-[12px] text-ac-text-muted">
+            {s.event_count}
+          </div>
+          <div className="flex items-center">
+            {s.has_pending_review ? (
+              <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                Pending
+              </span>
+            ) : (
+              <span className="text-[12px] text-ac-text-muted">—</span>
+            )}
+          </div>
+          <div className="flex items-center text-ac-text-muted text-[12px]">
             {s.started_at
               ? new Date(s.started_at).toLocaleString("en-US", {
                   month: "short",
