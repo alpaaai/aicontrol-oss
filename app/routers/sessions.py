@@ -1,11 +1,11 @@
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, exists
 
 from app.core.auth import require_human
 from app.models.database import async_session_factory
-from app.models.schemas import AuditEvent, Session
+from app.models.schemas import Agent, AuditEvent, HITLReview, Session
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
@@ -16,20 +16,47 @@ async def list_sessions(
     offset: int = Query(0, ge=0),
     _=Depends(require_human),
 ):
+    event_count_sq = (
+        select(func.count())
+        .where(AuditEvent.session_id == Session.id)
+        .correlate(Session)
+        .scalar_subquery()
+    )
+    pending_review_sq = (
+        select(exists().where(
+            (HITLReview.session_id == Session.id) &
+            (HITLReview.status == "pending")
+        ))
+        .correlate(Session)
+        .scalar_subquery()
+    )
+
     async with async_session_factory() as db:
         total = (await db.execute(select(func.count()).select_from(Session))).scalar()
         rows = (await db.execute(
-            select(Session).order_by(Session.started_at.desc()).limit(limit).offset(offset)
-        )).scalars().all()
+            select(
+                Session,
+                Agent.name.label("agent_name"),
+                event_count_sq.label("event_count"),
+                pending_review_sq.label("has_pending_review"),
+            )
+            .outerjoin(Agent, Session.agent_id == Agent.id)
+            .order_by(Session.started_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )).all()
 
     return {
         "sessions": [
             {
-                "id": str(r.id),
-                "agent_id": str(r.agent_id) if r.agent_id else None,
-                "risk_score": r.risk_score,
-                "status": r.status,
-                "started_at": r.started_at.isoformat() if r.started_at else None,
+                "id": str(r.Session.id),
+                "agent_id": str(r.Session.agent_id) if r.Session.agent_id else None,
+                "agent_name": r.agent_name,
+                "status": r.Session.status,
+                "started_at": r.Session.started_at.isoformat() if r.Session.started_at else None,
+                "completed_at": r.Session.completed_at.isoformat() if r.Session.completed_at else None,
+                "event_count": r.event_count or 0,
+                "has_pending_review": bool(r.has_pending_review),
             }
             for r in rows
         ],
@@ -55,7 +82,7 @@ async def get_session_events(session_id: uuid.UUID, _=Depends(require_human)):
     return {
         "session_id": str(session_id),
         "agent_id": str(session_row.agent_id) if session_row.agent_id else None,
-        "risk_score": session_row.risk_score,
+        "trigger_context": session_row.trigger_context,
         "events": [
             {
                 "id": str(e.id),
