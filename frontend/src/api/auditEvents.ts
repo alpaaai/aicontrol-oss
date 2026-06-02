@@ -38,3 +38,8 @@ export const listAuditEvents = (filters: AuditFilters = {}) =>
   apiClient
     .get<AuditEventsResponse>("/audit-events", { params: filters })
     .then((r) => r.data);
+
+export const exportAuditEvents = (f: AuditFilters) =>
+  apiClient
+    .get<Blob>("/audit-events/export", { params: f, responseType: "blob" })
+    .then((r) => r.data);
