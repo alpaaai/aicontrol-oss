@@ -1,10 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CreateTokenDialog } from "./CreateTokenDialog";
+import { listTokens } from "@/api/tokenList";
+import type { TokenListItem } from "@/api/tokenList";
 import { Plus, Info } from "lucide-react";
 
 export function TokensPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [createdCount, setCreatedCount] = useState(0);
+  const [tokens, setTokens] = useState<TokenListItem[]>([]);
+  const [activeOnly, setActiveOnly] = useState(true);
+  const [tokensLoading, setTokensLoading] = useState(true);
+
+  useEffect(() => {
+    setTokensLoading(true);
+    listTokens(activeOnly).then(setTokens).finally(() => setTokensLoading(false));
+  }, [activeOnly, createdCount]);
 
   return (
     <div className="p-6">
@@ -43,6 +53,87 @@ export function TokensPage() {
               session.
             </p>
           )}
+        </div>
+      </div>
+
+      <div className="mt-5">
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-[14px] font-semibold text-ac-text-primary">
+            Issued tokens
+          </h3>
+          <label className="flex items-center gap-2 text-[12px] text-ac-text-muted cursor-pointer">
+            <input
+              type="checkbox"
+              checked={activeOnly}
+              onChange={(e) => setActiveOnly(e.target.checked)}
+              className="rounded"
+            />
+            Active only
+          </label>
+        </div>
+
+        <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+          <div
+            className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted uppercase tracking-wide border-b border-ac-border bg-gray-50"
+            style={{ gridTemplateColumns: "1fr 80px 160px 80px 140px" }}
+          >
+            <div>Description</div>
+            <div>Role</div>
+            <div>Agent</div>
+            <div>Status</div>
+            <div>Created</div>
+          </div>
+
+          {tokensLoading && (
+            <div className="h-10 bg-gray-50 animate-pulse m-4 rounded" />
+          )}
+
+          {!tokensLoading && tokens.length === 0 && (
+            <div className="text-center text-sm text-ac-text-muted py-8">
+              No tokens found.
+            </div>
+          )}
+
+          {tokens.map((t) => (
+            <div
+              key={t.id}
+              className="grid gap-3 px-4 py-2.5 text-[13px] border-b border-gray-50"
+              style={{ gridTemplateColumns: "1fr 80px 160px 80px 140px" }}
+            >
+              <div>
+                <p className="font-medium text-ac-text-primary truncate">
+                  {t.description ?? "—"}
+                </p>
+                <p className="font-mono text-[10px] text-ac-text-muted">
+                  {t.id.slice(0, 8)}…
+                </p>
+              </div>
+              <div className="flex items-center">
+                <span className="text-[11px] font-mono bg-gray-100 px-1.5 py-0.5 rounded">
+                  {t.role}
+                </span>
+              </div>
+              <div className="flex items-center text-[12px] text-ac-text-muted truncate">
+                {t.agent_name ?? "—"}
+              </div>
+              <div className="flex items-center">
+                {t.revoked ? (
+                  <span className="text-[11px] text-red-500 font-medium">
+                    Revoked
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-ac-allow font-medium">
+                    Active
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center text-[12px] text-ac-text-muted">
+                {t.created_at
+                  ? new Date(t.created_at).toLocaleDateString()
+                  : "—"}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
