@@ -9,6 +9,11 @@ export interface Agent {
   model_version: string | null;
   approved_tools: string[];
   approved_by: string | null;
+  system_prompt_hash: string | null;
+  approved_at: string | null;
+  created_at: string | null;
+  last_active: string | null;
+  deny_rate: number | null;
 }
 
 export const listAgents = () =>
