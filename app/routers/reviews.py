@@ -4,18 +4,20 @@ from uuid import UUID
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
-from sqlalchemy import select
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import Text, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import _get_verified_token, require_admin, require_human
 from app.models.database import async_session_factory, get_db
-from app.models.schemas import HITLReview
+from app.models.schemas import AuditEvent as AuditEventModel, HITLReview
 
 router = APIRouter(prefix="/reviews", tags=["reviews"])
 
 
 class ReviewResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: UUID
     audit_event_id: Optional[UUID]
     session_id: Optional[UUID]
@@ -24,9 +26,10 @@ class ReviewResponse(BaseModel):
     review_note: Optional[str]
     reviewed_at: Optional[datetime]
     created_at: datetime
-
-    class Config:
-        from_attributes = True
+    response_deadline: Optional[datetime] = None
+    assigned_to: Optional[str] = None
+    tool_name: Optional[str] = None
+    tool_parameters: Optional[str] = None
 
 
 @router.get("/{review_id}", response_model=ReviewResponse)
@@ -63,18 +66,39 @@ async def list_reviews(
     List reviews. Admin only.
     Optionally filter by status. Ordered by created_at desc.
     """
-    query = (
-        select(HITLReview)
+    q = (
+        select(
+            HITLReview,
+            AuditEventModel.tool_name.label("ae_tool_name"),
+            cast(AuditEventModel.tool_parameters, Text).label("ae_tool_params"),
+        )
+        .outerjoin(AuditEventModel, HITLReview.audit_event_id == AuditEventModel.id)
         .order_by(HITLReview.created_at.desc())
         .limit(limit)
         .offset(offset)
     )
 
     if status:
-        query = query.where(HITLReview.status == status)
+        q = q.where(HITLReview.status == status)
 
-    result = await db.execute(query)
-    return result.scalars().all()
+    rows = (await db.execute(q)).all()
+    return [
+        ReviewResponse(
+            id=r.HITLReview.id,
+            audit_event_id=r.HITLReview.audit_event_id,
+            session_id=r.HITLReview.session_id,
+            status=r.HITLReview.status,
+            reviewer=r.HITLReview.reviewer,
+            review_note=r.HITLReview.review_note,
+            reviewed_at=r.HITLReview.reviewed_at,
+            created_at=r.HITLReview.created_at,
+            response_deadline=r.HITLReview.response_deadline,
+            assigned_to=r.HITLReview.assigned_to,
+            tool_name=r.ae_tool_name,
+            tool_parameters=r.ae_tool_params,
+        )
+        for r in rows
+    ]
 
 
 class ReviewActionBody(BaseModel):

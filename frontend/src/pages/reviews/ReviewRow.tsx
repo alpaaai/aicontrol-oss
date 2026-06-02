@@ -17,8 +17,11 @@ function timeAgo(dateStr: string): string {
   return `${Math.floor(hrs / 24)}d ago`
 }
 
-function isOverdue(dateStr: string, thresholdHours = 4): boolean {
-  return Date.now() - new Date(dateStr).getTime() > thresholdHours * 3600000
+function isOverdue(review: Review): boolean {
+  if (review.response_deadline) {
+    return Date.now() > new Date(review.response_deadline).getTime()
+  }
+  return Date.now() - new Date(review.created_at).getTime() > 4 * 3600000
 }
 
 export function ReviewRow({ review, onActioned }: Props) {
@@ -26,7 +29,7 @@ export function ReviewRow({ review, onActioned }: Props) {
   const [denying, setDenying] = useState(false)
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
-  const overdue = isOverdue(review.created_at)
+  const overdue = isOverdue(review)
 
   const handleAction = async (action: 'approve' | 'deny') => {
     if (action === 'approve') setApproving(true)
@@ -44,6 +47,18 @@ export function ReviewRow({ review, onActioned }: Props) {
     <div className={`p-4 border-b border-gray-50 ${overdue ? 'bg-red-50/30' : ''}`}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
+          {(review.tool_name || review.tool_parameters) && (
+            <div className="mb-2 bg-gray-50 rounded-lg px-3 py-2">
+              <p className="text-[11px] font-medium text-gray-700 mb-0.5">
+                {review.tool_name ?? 'Unknown tool'}
+              </p>
+              {review.tool_parameters && (
+                <p className="text-[11px] font-mono text-gray-500 truncate">
+                  {review.tool_parameters}
+                </p>
+              )}
+            </div>
+          )}
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-[12px] font-medium text-gray-800">
               Session: {review.session_id ? review.session_id.slice(0, 8) + '…' : '—'}
@@ -54,11 +69,27 @@ export function ReviewRow({ review, onActioned }: Props) {
               </span>
             )}
           </div>
+          {review.assigned_to && (
+            <p className="text-[11px] text-ac-text-muted mb-1">
+              Assigned to: <span className="font-medium">{review.assigned_to}</span>
+            </p>
+          )}
           {review.review_note && (
             <p className="text-[12px] text-gray-500 truncate">{review.review_note}</p>
           )}
           <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
             <span>{timeAgo(review.created_at)}</span>
+            {review.response_deadline && (
+              <span className={`${overdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+                Due {new Date(review.response_deadline).toLocaleString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                })}
+              </span>
+            )}
             <span
               className={`font-medium ${
                 review.status === 'pending' ? 'text-amber-500' :
