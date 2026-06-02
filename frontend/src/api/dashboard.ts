@@ -25,6 +25,10 @@ export interface DashboardSummary {
   active_policies: number;
   top_tools: TopTool[];
   decisions_by_hour: DecisionHour[];
+  active_warnings: number;
+  overdue_reviews: number;
+  top_denied_tool: { tool: string; count: number } | null;
+  high_risk_sessions: number;
 }
 
 export const getSummary = () =>
