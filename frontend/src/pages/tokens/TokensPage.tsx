@@ -11,7 +11,7 @@ export function TokensPage() {
       <div className="flex items-center justify-between mb-5 animate-fade-up">
         <div>
           <h2 className="text-[18px] font-semibold text-ac-text-primary">
-            API Tokens
+            API tokens
           </h2>
           <p className="text-sm text-ac-text-muted mt-0.5">
             Manage agent authentication tokens

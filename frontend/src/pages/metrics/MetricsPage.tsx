@@ -13,9 +13,8 @@ export function MetricsPage() {
     <div className="p-6 space-y-5">
       <div className="animate-fade-up">
         <h2 className="text-[18px] font-semibold text-ac-text-primary">
-          Decision Metrics
+          Decision metrics
         </h2>
-        <p className="text-sm text-ac-text-muted mt-0.5">Updates every 30s</p>
       </div>
 
       <div className="flex gap-4 flex-wrap">

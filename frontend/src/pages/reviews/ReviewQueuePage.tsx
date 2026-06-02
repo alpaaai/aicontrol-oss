@@ -84,7 +84,7 @@ export function ReviewQueuePage() {
   if (!isEnterprise) {
     return (
       <div className="p-6">
-        <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">Review Queue</h2>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">Review queue</h2>
         <EnterpriseLock
           title="Review Queue — Enterprise Feature"
           description="In-dashboard review approvals require an Enterprise license. Reviews are available via Slack integration on all plans."
@@ -105,7 +105,7 @@ export function ReviewQueuePage() {
   return (
     <div className="p-6">
       <div className="mb-5">
-        <h2 className="text-[18px] font-semibold text-ac-text-primary">Review Queue</h2>
+        <h2 className="text-[18px] font-semibold text-ac-text-primary">Review queue</h2>
         <p className="text-sm text-gray-400 mt-0.5">Pending HITL decisions · updates every 15s</p>
       </div>
       <ReviewQueueContent />
