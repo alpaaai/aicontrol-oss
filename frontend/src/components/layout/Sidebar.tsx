@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from "react-router-dom";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import {
   Lock, LayoutDashboard, List, BarChart2, GitBranch,
   Shield, Bot, Key, CheckSquare, Activity,
@@ -92,10 +92,7 @@ export function Sidebar() {
   const location = useLocation();
   const iconProps = { size: 14, strokeWidth: 1.75 };
   const [openSection, setOpenSection] = useState<string | null>(null);
-  const [userPanelOpen, setUserPanelOpen] = useState(false);
   const [pendingReviews, setPendingReviews] = useState(0);
-  const userRowRef = useRef<HTMLButtonElement>(null);
-  const userPanelRef = useRef<HTMLDivElement>(null);
 
   // Auto-open section containing the active route
   useEffect(() => {
@@ -104,21 +101,6 @@ export function Sidebar() {
     );
     if (match) setOpenSection(match[0]);
   }, [location.pathname]);
-
-  // Close user panel on outside click
-  useEffect(() => {
-    if (!userPanelOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (
-        !userPanelRef.current?.contains(e.target as Node) &&
-        !userRowRef.current?.contains(e.target as Node)
-      ) {
-        setUserPanelOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [userPanelOpen]);
 
   useEffect(() => {
     if (!isEnterprise) return;
@@ -236,13 +218,9 @@ export function Sidebar() {
         )}
       </nav>
 
-      {/* User row — wrapper is the positioning context for the flyout panel */}
-      <div className="relative border-t border-white/[0.07] z-10">
-        <button
-          ref={userRowRef}
-          onClick={() => setUserPanelOpen(v => !v)}
-          className="px-4 py-3 w-full text-left hover:bg-white/[0.03] transition-colors duration-150"
-        >
+      {/* User row — CSS hover, no click/state; fixed panel escapes stacking context */}
+      <div className="group border-t border-white/[0.07]">
+        <div className="px-4 py-3 hover:bg-white/[0.03] cursor-default">
           <div className="flex items-center gap-2">
             <div
               className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
@@ -254,50 +232,42 @@ export function Sidebar() {
               <p className="text-[12px] text-white/50 truncate">{user?.email}</p>
               <p className="text-[10px] text-white/25">{user?.role}</p>
             </div>
-            <ChevronRight
-              size={12}
-              className={`ml-auto text-white/20 transition-transform duration-200 ${userPanelOpen ? "rotate-180" : "rotate-0"}`}
-            />
+            <ChevronRight size={12} className="ml-auto text-white/20" />
           </div>
-        </button>
+        </div>
 
-        {/* Flyout panel — anchored to the right of the user row */}
-        {userPanelOpen && (
-          <div
-            ref={userPanelRef}
-            className="absolute left-full bottom-0 w-[160px] bg-ac-night border border-white/[0.07] rounded-lg noise z-50 py-1"
-            style={{ boxShadow: "4px -4px 24px rgba(0,0,0,0.5)" }}
+        {/* Flyout — fixed so it's above all page content regardless of stacking context */}
+        <div
+          className="fixed left-[224px] bottom-0 w-[160px] bg-ac-night border border-white/[0.07] rounded-lg noise z-[9999] py-1 hidden group-hover:block"
+          style={{ boxShadow: "4px -4px 24px rgba(0,0,0,0.5)" }}
+        >
+          <NavLink
+            to="/settings"
+            className={({ isActive }) =>
+              panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
+            }
           >
-            <NavLink
-              to="/settings"
-              onClick={() => setUserPanelOpen(false)}
-              className={({ isActive }) =>
-                panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
-              }
-            >
-              <Settings size={14} strokeWidth={1.75} />
-              Settings
-            </NavLink>
-            <NavLink
-              to="/billing"
-              onClick={() => setUserPanelOpen(false)}
-              className={({ isActive }) =>
-                panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
-              }
-            >
-              <CreditCard size={14} strokeWidth={1.75} />
-              Subscription
-            </NavLink>
-            <button
-              data-testid="logout-btn"
-              onClick={() => { setUserPanelOpen(false); logout(); }}
-              className={panelItemClass}
-            >
-              <LogOut size={14} strokeWidth={1.75} />
-              Logout
-            </button>
-          </div>
-        )}
+            <Settings size={14} strokeWidth={1.75} />
+            Settings
+          </NavLink>
+          <NavLink
+            to="/billing"
+            className={({ isActive }) =>
+              panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
+            }
+          >
+            <CreditCard size={14} strokeWidth={1.75} />
+            Subscription
+          </NavLink>
+          <button
+            data-testid="logout-btn"
+            onClick={logout}
+            className={panelItemClass}
+          >
+            <LogOut size={14} strokeWidth={1.75} />
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );
