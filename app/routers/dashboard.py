@@ -7,6 +7,7 @@ from app.core.auth import require_human
 from app.models.database import async_session_factory
 from app.models.schemas import Agent, AuditEvent, HITLReview, Policy, Session
 from app.models.user import UserActivityLog
+from app.models.policy_warning import PolicyWarning
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
@@ -79,6 +80,36 @@ async def get_summary(_=Depends(require_human)):
             for h, d, c in hours_rows
         ]
 
+        active_warnings = (await db.execute(
+            select(func.count()).select_from(PolicyWarning)
+            .where(PolicyWarning.is_active == True)
+        )).scalar()
+
+        overdue_reviews = (await db.execute(
+            select(func.count()).select_from(HITLReview)
+            .where(HITLReview.status == "pending")
+            .where(HITLReview.response_deadline < now)
+        )).scalar()
+
+        top_deny_row = (await db.execute(
+            select(AuditEvent.tool_name, func.count().label("cnt"))
+            .where(AuditEvent.created_at >= today_start)
+            .where(AuditEvent.decision == "deny")
+            .group_by(AuditEvent.tool_name)
+            .order_by(text("cnt DESC"))
+            .limit(1)
+        )).first()
+        top_denied_tool = (
+            {"tool": top_deny_row.tool_name, "count": top_deny_row.cnt}
+            if top_deny_row else None
+        )
+
+        high_risk_sessions = (await db.execute(
+            select(func.count()).select_from(Session)
+            .where(Session.risk_score > 50)
+            .where(Session.started_at >= now - timedelta(hours=1))
+        )).scalar()
+
     return {
         "intercepts_today": intercepts_today,
         "intercepts_7d": intercepts_7d,
@@ -93,6 +124,10 @@ async def get_summary(_=Depends(require_human)):
         "active_policies": active_policies,
         "top_tools": top_tools,
         "decisions_by_hour": decisions_by_hour,
+        "active_warnings": active_warnings,
+        "overdue_reviews": overdue_reviews,
+        "top_denied_tool": top_denied_tool,
+        "high_risk_sessions": high_risk_sessions,
     }
 
 
