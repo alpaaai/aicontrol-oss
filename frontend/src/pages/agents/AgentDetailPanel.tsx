@@ -90,6 +90,41 @@ export function AgentDetailPanel({
               </span>
             </div>
           ))}
+          <div className="flex justify-between text-[13px]">
+            <span className="text-ac-text-muted">System prompt</span>
+            {agent.system_prompt_hash ? (
+              <span className="font-mono text-[11px] text-ac-text-primary">
+                {agent.system_prompt_hash.slice(0, 12)}…
+              </span>
+            ) : (
+              <span className="text-[11px] bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded font-medium">
+                Unverified
+              </span>
+            )}
+          </div>
+          <div className="flex justify-between text-[13px]">
+            <span className="text-ac-text-muted">Approved by</span>
+            {agent.approved_by && agent.approved_at ? (
+              <span className="text-ac-text-primary font-medium text-right">
+                {agent.approved_by}
+                <span className="block text-[11px] text-ac-text-muted font-normal">
+                  {new Date(agent.approved_at).toLocaleDateString()}
+                </span>
+              </span>
+            ) : (
+              <span className="text-[11px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-medium">
+                Not approved
+              </span>
+            )}
+          </div>
+          {agent.created_at && (
+            <div className="flex justify-between text-[13px]">
+              <span className="text-ac-text-muted">Created</span>
+              <span className="text-ac-text-primary">
+                {new Date(agent.created_at).toLocaleDateString()}
+              </span>
+            </div>
+          )}
         </div>
 
         <div>
