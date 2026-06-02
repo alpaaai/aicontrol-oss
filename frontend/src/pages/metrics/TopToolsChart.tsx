@@ -19,7 +19,7 @@ export function TopToolsChart({ data }: Props) {
       <p className="text-[13px] font-medium text-ac-text-primary mb-4">
         Top tools — last 24h
       </p>
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height={Math.max(220, data.length * 28)}>
         <BarChart
           data={data}
           layout="vertical"
@@ -34,6 +34,7 @@ export function TopToolsChart({ data }: Props) {
           <YAxis
             type="category"
             dataKey="tool"
+            interval={0}
             tick={{
               fontSize: 11,
               fill: "#4B5563",
