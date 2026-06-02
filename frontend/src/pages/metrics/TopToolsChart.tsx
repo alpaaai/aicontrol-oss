@@ -23,7 +23,7 @@ export function TopToolsChart({ data }: Props) {
         <BarChart
           data={data}
           layout="vertical"
-          margin={{ top: 0, right: 16, bottom: 0, left: 8 }}
+          margin={{ top: 8, right: 16, bottom: 0, left: 8 }}
         >
           <XAxis
             type="number"
