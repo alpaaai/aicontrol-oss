@@ -96,7 +96,7 @@ async def require_admin(payload: dict = Depends(_get_verified_token)) -> dict:
 async def require_human(
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
 ) -> dict:
-    """Dependency: validates human JWTs issued by /auth/verify-code.
+    """Dependency: validates human JWTs issued by /auth/login or /auth/set-password.
 
     Checks signature and type=='human' only — no DB lookup against api_tokens.
     """
