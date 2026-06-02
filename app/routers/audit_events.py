@@ -70,6 +70,7 @@ async def list_audit_events(
                 "duration_ms": r.duration_ms,
                 "sequence_number": r.sequence_number,
                 "created_at": r.created_at.isoformat(),
+                "tool_response": str(r.tool_response)[:200] if r.tool_response else None,
             }
             for r in rows
         ],
