@@ -5,7 +5,7 @@ import {
   Shield, Bot, Key, CheckSquare, Activity,
   Brain, Lightbulb, FileCheck, LogOut, Settings, CreditCard,
   Layers, ShieldCheck, ClipboardList, BarChart3, Sparkles,
-  ChevronRight,
+  ChevronRight, HeartPulse, SlidersHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
@@ -17,6 +17,7 @@ const SECTION_PATHS: Record<string, string[]> = {
   reviews:      ["/reviews"],
   reports:      ["/reports"],
   intelligence: ["/intelligence", "/policy-suggestions"],
+  admin:        ["/health", "/settings", "/billing"],
 };
 
 interface NavItemProps {
@@ -112,9 +113,6 @@ export function Sidebar() {
 
   const toggleSection = (key: string) =>
     setOpenSection(prev => (prev === key ? null : key));
-
-  const panelItemClass =
-    "flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/55 hover:bg-white/5 hover:text-white/80 w-full text-left";
 
   return (
     <div className="w-[224px] shrink-0 bg-ac-night flex flex-col h-screen sticky top-0 noise">
@@ -216,56 +214,43 @@ export function Sidebar() {
             <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />} label="Policy insights"  locked={!isEnterprise} />
           </div>
         )}
+
+        {/* ADMIN */}
+        <SectionHeader
+          icon={<SlidersHorizontal {...iconProps} />}
+          label="Admin"
+          isOpen={openSection === "admin"}
+          onClick={() => toggleSection("admin")}
+        />
+        {openSection === "admin" && (
+          <div className="animate-fade-up pb-1">
+            <NavItem to="/health"   icon={<HeartPulse {...iconProps} />} label="System health" />
+            <NavItem to="/settings" icon={<Settings {...iconProps} />}   label="Settings" />
+            <NavItem to="/billing"  icon={<CreditCard {...iconProps} />} label="Subscription" />
+          </div>
+        )}
       </nav>
 
-      {/* User row — CSS hover, no click/state; fixed panel escapes stacking context */}
-      <div className="group border-t border-white/[0.07]">
-        <div className="px-4 py-3 hover:bg-white/[0.03] cursor-default">
-          <div className="flex items-center gap-2">
-            <div
-              className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-              style={{ boxShadow: "0 0 8px rgba(59,91,219,0.4)" }}
-            >
-              {user?.email?.[0]?.toUpperCase() ?? "A"}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[12px] text-white/50 truncate">{user?.email}</p>
-              <p className="text-[10px] text-white/25">{user?.role}</p>
-            </div>
-            <ChevronRight size={12} className="ml-auto text-white/20" />
+      {/* User row */}
+      <div className="border-t border-white/[0.07] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <div
+            className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
+            style={{ boxShadow: "0 0 8px rgba(59,91,219,0.4)" }}
+          >
+            {user?.email?.[0]?.toUpperCase() ?? "A"}
           </div>
-        </div>
-
-        {/* Flyout — fixed so it's above all page content regardless of stacking context */}
-        <div
-          className="fixed left-[224px] bottom-0 w-[160px] bg-ac-night border border-white/[0.07] rounded-lg noise z-[9999] py-1 hidden group-hover:block"
-          style={{ boxShadow: "4px -4px 24px rgba(0,0,0,0.5)" }}
-        >
-          <NavLink
-            to="/settings"
-            className={({ isActive }) =>
-              panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
-            }
-          >
-            <Settings size={14} strokeWidth={1.75} />
-            Settings
-          </NavLink>
-          <NavLink
-            to="/billing"
-            className={({ isActive }) =>
-              panelItemClass + (isActive ? " text-[#7C9FFF]" : "")
-            }
-          >
-            <CreditCard size={14} strokeWidth={1.75} />
-            Subscription
-          </NavLink>
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] text-white/50 truncate">{user?.email}</p>
+            <p className="text-[10px] text-white/25">{user?.role}</p>
+          </div>
           <button
             data-testid="logout-btn"
             onClick={logout}
-            className={panelItemClass}
+            className="text-white/30 hover:text-white/70 transition-colors duration-150 shrink-0"
+            title="Logout"
           >
             <LogOut size={14} strokeWidth={1.75} />
-            Logout
           </button>
         </div>
       </div>
