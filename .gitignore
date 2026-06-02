@@ -12,6 +12,9 @@ postgres_data/
 *.log
 .env
 
+# Internal plans and specs — not for public repo
+docs/superpowers/
+
 # Internal docs — strategy, GTM, dev tooling
 PROJECT_CONTEXT.md
 CLAUDE.md
