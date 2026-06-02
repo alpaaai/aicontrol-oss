@@ -3,9 +3,12 @@ import { apiClient } from "./client";
 export interface Session {
   id: string;
   agent_id: string | null;
-  risk_score: number | null;
+  agent_name: string | null;
   status: string;
   started_at: string | null;
+  completed_at: string | null;
+  event_count: number;
+  has_pending_review: boolean;
 }
 
 export interface SessionsResponse {
@@ -29,7 +32,7 @@ export interface SessionEvent {
 export interface SessionDetailResponse {
   session_id: string;
   agent_id: string | null;
-  risk_score: number | null;
+  trigger_context: string | null;
   events: SessionEvent[];
 }
 
