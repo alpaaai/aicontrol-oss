@@ -1,10 +1,11 @@
 """POST /tokens — admin-authenticated token issuance with optional agent scoping."""
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
-from sqlalchemy import update
+from pydantic import BaseModel, ConfigDict
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import create_token, hash_token, require_admin
@@ -26,6 +27,47 @@ class TokenCreateResponse(BaseModel):
     description: str
     agent_id: Optional[uuid.UUID]
     token: str
+
+
+class TokenListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    role: str
+    description: Optional[str]
+    agent_id: Optional[uuid.UUID]
+    agent_name: Optional[str]
+    revoked: bool
+    created_at: Optional[datetime]
+
+
+@router.get("", response_model=list[TokenListItem])
+async def list_tokens(
+    active_only: bool = False,
+    db: AsyncSession = Depends(get_db),
+    _token: dict = Depends(require_admin),
+) -> list[TokenListItem]:
+    q = (
+        select(APIToken, Agent.name.label("agent_name"))
+        .outerjoin(Agent, APIToken.agent_id == Agent.id)
+        .order_by(APIToken.created_at.desc())
+    )
+    if active_only:
+        q = q.where(APIToken.revoked == False)  # noqa: E712
+
+    rows = (await db.execute(q)).all()
+    return [
+        TokenListItem(
+            id=r.APIToken.id,
+            role=r.APIToken.role,
+            description=r.APIToken.description,
+            agent_id=r.APIToken.agent_id,
+            agent_name=r.agent_name,
+            revoked=r.APIToken.revoked,
+            created_at=r.APIToken.created_at,
+        )
+        for r in rows
+    ]
 
 
 @router.post("", response_model=TokenCreateResponse)
