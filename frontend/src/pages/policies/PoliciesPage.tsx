@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { listPolicies, deletePolicy } from "@/api/policies";
 import type { Policy } from "@/api/policies";
 import { PolicyTable } from "./PolicyTable";
-import { PolicyFormDialog } from "./PolicyFormDialog";
+import { PolicyEditor } from "./PolicyEditor";
 import { DriftWarnings } from "./DriftWarnings";
 import { Plus } from "lucide-react";
 
@@ -89,7 +89,7 @@ export function PoliciesPage() {
 
       <DriftWarnings />
 
-      <PolicyFormDialog
+      <PolicyEditor
         open={dialogOpen}
         policy={editTarget}
         onClose={() => setDialogOpen(false)}
