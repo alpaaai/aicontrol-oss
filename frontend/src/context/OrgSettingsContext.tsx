@@ -1,26 +1,35 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { getOrgSettings } from "../api/orgSettings";
 
 interface OrgSettingsValue {
   orgName: string;
   timezone: string;
+  refresh: () => void;
 }
 
-const DEFAULT: OrgSettingsValue = { orgName: "", timezone: "UTC" };
+const DEFAULT: OrgSettingsValue = { orgName: "", timezone: "UTC", refresh: () => {} };
 
 const OrgSettingsContext = createContext<OrgSettingsValue>(DEFAULT);
 
 export function OrgSettingsProvider({ children }: { children: React.ReactNode }) {
-  const [value, setValue] = useState<OrgSettingsValue>(DEFAULT);
+  const [orgName, setOrgName] = useState("");
+  const [timezone, setTimezone] = useState("UTC");
 
-  useEffect(() => {
+  const refresh = useCallback(() => {
     getOrgSettings()
-      .then(({ data }) => setValue({ orgName: data.org_name, timezone: data.timezone }))
+      .then(({ data }) => {
+        setOrgName(data.org_name);
+        setTimezone(data.timezone);
+      })
       .catch(() => {});
   }, []);
 
+  useEffect(() => {
+    refresh();
+  }, [refresh]);
+
   return (
-    <OrgSettingsContext.Provider value={value}>
+    <OrgSettingsContext.Provider value={{ orgName, timezone, refresh }}>
       {children}
     </OrgSettingsContext.Provider>
   );

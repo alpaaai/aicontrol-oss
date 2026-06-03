@@ -10,6 +10,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
 import { getSummary } from "../../api/dashboard";
+import { useOrgSettings } from "../../context/OrgSettingsContext";
 
 const SECTION_PATHS: Record<string, string[]> = {
   activity:     ["/overview", "/audit-log", "/metrics", "/sessions", "/activity-log"],
@@ -90,6 +91,7 @@ function SectionHeader({ icon, label, isOpen, onClick }: SectionHeaderProps) {
 export function Sidebar() {
   const { user, logout } = useAuth();
   const { isEnterprise } = useLicense();
+  const { orgName } = useOrgSettings();
   const location = useLocation();
   const iconProps = { size: 14, strokeWidth: 1.75 };
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -131,7 +133,7 @@ export function Sidebar() {
         >
           <div className="w-[10px] h-[10px] bg-white/90 rounded-[2px]" />
         </div>
-        <span className="text-[13.5px] font-semibold tracking-[-0.01em] text-white font-display">AIControl</span>
+        <span className="text-[13.5px] font-semibold tracking-[-0.01em] text-white font-display">{orgName || "AIControl"}</span>
         <span className="ml-auto text-[10px] text-white/30">v2</span>
       </div>
 
