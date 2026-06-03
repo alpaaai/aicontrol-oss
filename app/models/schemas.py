@@ -69,6 +69,9 @@ class Policy(Base):
     active: Mapped[Optional[bool]] = mapped_column(Boolean, server_default="true")
     created_by: Mapped[Optional[str]] = mapped_column(String(100))
     created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, server_default=func.now())
+    library: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="policy")
 

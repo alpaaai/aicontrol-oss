@@ -114,3 +114,11 @@ async def test_list_policies_with_human_admin_jwt_returns_200():
     ) as client:
         response = await client.get("/policies", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_policy_model_has_library_priority_category():
+    from app.models.schemas import Policy
+    assert hasattr(Policy, "library")
+    assert hasattr(Policy, "priority")
+    assert hasattr(Policy, "category")
