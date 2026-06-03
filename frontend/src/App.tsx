@@ -1,8 +1,13 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { LicenseProvider } from "./context/LicenseContext";
+import { OrgSettingsProvider } from "./context/OrgSettingsContext";
 import { Layout } from "./components/layout/Layout";
 import { LoginPage } from "./pages/LoginPage";
+import { SetupPage } from "./pages/SetupPage";
+import { InvitePage } from "./pages/InvitePage";
 import { getStoredAuth } from "./store/auth";
+import { getSetupStatus } from "./api/setup";
 
 import { OverviewPage } from "./pages/overview/OverviewPage";
 import { AuditLogPage } from "./pages/audit/AuditLogPage";
@@ -20,22 +25,39 @@ import { ReportsPage } from "./pages/reports/ReportsPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import BillingPage from "./pages/BillingPage";
 
-function RequireAuth({ children }: { children: React.ReactElement }) {
-  return getStoredAuth() ? children : <Navigate to="/login" replace />;
+function RequireSetupOrAuth({ children }: { children: React.ReactElement }) {
+  const auth = getStoredAuth();
+  const [redirect, setRedirect] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (auth) return;
+    getSetupStatus()
+      .then(({ data }) => {
+        setRedirect(data.setup_required ? "/setup" : "/login");
+      })
+      .catch(() => setRedirect("/login"));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (auth) return children;
+  if (redirect) return <Navigate to={redirect} replace />;
+  return null;
 }
 
 export default function App() {
   return (
     <LicenseProvider>
+    <OrgSettingsProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/setup" element={<SetupPage />} />
+        <Route path="/invite" element={<InvitePage />} />
         <Route
           path="/"
           element={
-            <RequireAuth>
+            <RequireSetupOrAuth>
               <Layout />
-            </RequireAuth>
+            </RequireSetupOrAuth>
           }
         >
           <Route index element={<Navigate to="/overview" replace />} />
@@ -57,6 +79,7 @@ export default function App() {
         </Route>
       </Routes>
     </BrowserRouter>
+    </OrgSettingsProvider>
     </LicenseProvider>
   );
 }

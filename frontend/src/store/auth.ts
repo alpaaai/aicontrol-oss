@@ -1,4 +1,5 @@
 export interface AuthUser {
+  id: string;
   email: string;
   role: "admin" | "analyst" | "auditor";
   token: string;

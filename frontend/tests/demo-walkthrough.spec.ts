@@ -31,16 +31,22 @@ test.beforeEach(async ({ page }) => {
 
 test.describe('P1-8 Demo Walkthrough', () => {
 
-  test('1. Login via email OTP', async ({ page }) => {
-    await page.route('**/auth/request-code', route =>
-      route.fulfill({ status: 200, body: JSON.stringify({ message: 'Code sent' }) }))
+  test('1. Login via email and password', async ({ page }) => {
+    await page.route('**/auth/login', route =>
+      route.fulfill({
+        status: 200,
+        body: JSON.stringify({
+          token: 'demo-token',
+          user: { id: '1', email: 'admin@aicontrol.dev', full_name: 'Admin', role: 'admin' },
+          first_login: false,
+        }),
+      }))
     await page.goto('/login')
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
     await page.fill('input[type="email"]', 'admin@aicontrol.dev')
+    await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
-    await expect(page.getByText('Check your email')).toBeVisible({ timeout: 10000 })
-    await page.goto('/overview')
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 10000 })
   })
 
   test('2. Overview — stat cards visible, live feed running', async ({ page }) => {
