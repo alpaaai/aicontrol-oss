@@ -122,3 +122,27 @@ async def test_policy_model_has_library_priority_category():
     assert hasattr(Policy, "library")
     assert hasattr(Policy, "priority")
     assert hasattr(Policy, "category")
+
+
+@pytest.mark.asyncio
+async def test_create_policy_response_includes_new_fields():
+    from app.main import app
+    payload = {
+        "name": f"test_newfields_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_denylist",
+        "condition": {"blocked_tools": ["bad_tool"]},
+        "action": "deny",
+        "priority": 50,
+        "library": False,
+        "category": "Dangerous Operations",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201
+    body = response.json()
+    assert body["priority"] == 50
+    assert body["library"] is False
+    assert body["category"] == "Dangerous Operations"
