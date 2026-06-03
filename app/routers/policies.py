@@ -108,6 +108,19 @@ async def list_policies(
     return result.scalars().all()
 
 
+@router.get("/library", response_model=list[PolicyResponse])
+async def list_library_policies(
+    db: AsyncSession = Depends(get_db),
+    _token: dict = Depends(require_admin),
+) -> list[PolicyResponse]:
+    result = await db.execute(
+        select(Policy)
+        .where(Policy.library == True)
+        .order_by(Policy.priority, Policy.name)
+    )
+    return result.scalars().all()
+
+
 @router.get("/{policy_id}", response_model=PolicyResponse)
 async def get_policy(
     policy_id: uuid.UUID,
