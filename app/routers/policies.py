@@ -52,6 +52,9 @@ class PolicyCreate(BaseModel):
     action: str
     severity: str = "medium"
     compliance_frameworks: list[str] = []
+    priority: int = 100
+    library: bool = False
+    category: Optional[str] = None
 
 
 class PolicyUpdate(BaseModel):
@@ -62,6 +65,9 @@ class PolicyUpdate(BaseModel):
     severity: Optional[str] = None
     active: Optional[bool] = None
     compliance_frameworks: Optional[list[str]] = None
+    priority: Optional[int] = None
+    library: Optional[bool] = None
+    category: Optional[str] = None
 
 
 class PolicyResponse(BaseModel):
@@ -76,6 +82,9 @@ class PolicyResponse(BaseModel):
     compliance_frameworks: Optional[list]
     applies_to_agents: int = 0
     created_by: Optional[str] = None
+    priority: int = 100
+    library: bool = False
+    category: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -95,7 +104,7 @@ async def list_policies(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_admin),
 ) -> list[PolicyResponse]:
-    result = await db.execute(select(Policy).order_by(Policy.name))
+    result = await db.execute(select(Policy).order_by(Policy.priority, Policy.name))
     return result.scalars().all()
 
 
@@ -131,6 +140,9 @@ async def create_policy(
         severity=body.severity,
         compliance_frameworks=body.compliance_frameworks,
         active=True,
+        priority=body.priority,
+        library=body.library,
+        category=body.category,
     )
     db.add(policy)
     await db.flush()
