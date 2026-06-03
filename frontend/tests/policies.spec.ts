@@ -69,6 +69,44 @@ test("ToolDenylistForm renders tag input and adds tools", async ({ page }) => {
 
 const MOCK_EMPTY: never[] = [];
 
+test("Active Policies table shows action badge and priority", async ({ page }) => {
+  const mockPolicies = [
+    {
+      id: "p1",
+      name: "block_shell_execution",
+      description: "Block shells",
+      rule_type: "tool_denylist",
+      condition: { blocked_tools: ["bash"] },
+      action: "deny",
+      severity: "critical",
+      active: true,
+      library: false,
+      priority: 10,
+      category: "Dangerous Operations",
+      compliance_frameworks: ["SOC2"],
+      applies_to_agents: 0,
+      created_by: null,
+    },
+  ];
+
+  await page.route("http://localhost:8001/policies*", (route) => {
+    if (route.request().url().includes("/library")) {
+      route.fulfill({ status: 200, body: JSON.stringify([]) });
+    } else {
+      route.fulfill({ status: 200, body: JSON.stringify(mockPolicies) });
+    }
+  });
+
+  await page.goto("/policies");
+  await expect(page.getByText("block_shell_execution")).toBeVisible();
+  // Action badge
+  await expect(page.getByText("deny", { exact: true })).toBeVisible();
+  // Priority
+  await expect(page.getByText("10", { exact: true })).toBeVisible();
+  // Condition type badge
+  await expect(page.getByText("Tool Denylist")).toBeVisible();
+});
+
 test.describe("PolicyEditor slide-over", () => {
   test.beforeEach(async ({ page }) => {
     await page.route("http://localhost:8001/policies*", (route) => {
