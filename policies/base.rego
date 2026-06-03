@@ -320,43 +320,118 @@ rate_limit_reason := reason if {
     )
 }
 
+# ── Standalone parameter_match rule_type ──────────────────────────────────────
+# Evaluates policies with rule_type == "parameter_match".
+# Semantics: OR across all keys — any matching key fires the policy.
+# Supports two spec forms per key:
+#   {key: {contains_any: [...]}}  — case-insensitive substring match
+#   {key: {equals: "value"}}      — exact string match
+# Wildcard key "*" checks all parameter values for a contains_any match.
+
+_param_str(v) := sprintf("%v", [v])
+
+standalone_param_matches(policy) if {
+    some key, spec in policy.condition.parameter_match
+    key != "*"
+    spec.contains_any
+    actual := input.tool_parameters[key]
+    some pattern in spec.contains_any
+    contains(lower(_param_str(actual)), lower(pattern))
+}
+
+standalone_param_matches(policy) if {
+    some key, spec in policy.condition.parameter_match
+    key != "*"
+    spec.equals
+    actual := input.tool_parameters[key]
+    _param_str(actual) == spec.equals
+}
+
+standalone_param_matches(policy) if {
+    spec := policy.condition.parameter_match["*"]
+    spec.contains_any
+    some pattern in spec.contains_any
+    some _, actual in input.tool_parameters
+    contains(lower(_param_str(actual)), lower(pattern))
+}
+
+is_standalone_param_deny if {
+    some policy in input.policies
+    policy.rule_type == "parameter_match"
+    policy.action == "deny"
+    standalone_param_matches(policy)
+}
+
+is_standalone_param_review if {
+    some policy in input.policies
+    policy.rule_type == "parameter_match"
+    policy.action == "review"
+    standalone_param_matches(policy)
+}
+
+# ── Standalone numeric_conditions rule_type ───────────────────────────────────
+# Evaluates policies with rule_type == "numeric_conditions".
+# Semantics: OR across all fields — any matching field fires the policy.
+# Condition format: {numeric_conditions: {field: {op: ">"|">="|"<"|"<="|"==", value: N}}}
+
+_snum_op_passes(">",  actual, threshold) if { actual > threshold }
+_snum_op_passes(">=", actual, threshold) if { actual >= threshold }
+_snum_op_passes("<",  actual, threshold) if { actual < threshold }
+_snum_op_passes("<=", actual, threshold) if { actual <= threshold }
+_snum_op_passes("==", actual, threshold) if { actual == threshold }
+
+standalone_numeric_matches(policy) if {
+    some field, spec in policy.condition.numeric_conditions
+    _snum_op_passes(spec.op, input.tool_parameters[field], spec.value)
+}
+
+is_standalone_numeric_deny if {
+    some policy in input.policies
+    policy.rule_type == "numeric_conditions"
+    policy.action == "deny"
+    standalone_numeric_matches(policy)
+}
+
+is_standalone_numeric_review if {
+    some policy in input.policies
+    policy.rule_type == "numeric_conditions"
+    policy.action == "review"
+    standalone_numeric_matches(policy)
+}
+
 # Deny: global tool blacklist (highest priority)
 decision := "deny" if is_blacklisted
-
 reason := "tool_denylisted" if is_blacklisted
 
-# Deny: rate limit exceeded (second priority)
+# Deny: rate limit exceeded
 decision := "deny" if {
     not is_blacklisted
     is_rate_exceeded_deny
 }
-
 reason := rate_limit_reason if {
     not is_blacklisted
     is_rate_exceeded_deny
 }
 
-# Deny: parameter-level violation (third priority)
+# Deny: parameter-level violation (tool_denylist + parameter_match condition)
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
     is_parameter_violation
 }
-
 reason := violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
     is_parameter_violation
 }
 
-# Deny: numeric condition violation (fourth priority)
+# Deny: numeric condition violation (tool_denylist + numeric_conditions)
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
     not is_parameter_violation
     is_numeric_violation
 }
-
 reason := numeric_violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -364,7 +439,7 @@ reason := numeric_violation_detail if {
     is_numeric_violation
 }
 
-# Deny: compound AND/OR violation (fifth priority)
+# Deny: compound AND/OR violation
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -372,7 +447,6 @@ decision := "deny" if {
     not is_numeric_violation
     is_compound_violation
 }
-
 reason := compound_violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -381,7 +455,7 @@ reason := compound_violation_detail if {
     is_compound_violation
 }
 
-# Deny: temporal condition violation (sixth priority)
+# Deny: temporal condition violation
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -390,7 +464,6 @@ decision := "deny" if {
     not is_compound_violation
     is_time_violation
 }
-
 reason := time_violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -400,7 +473,49 @@ reason := time_violation_detail if {
     is_time_violation
 }
 
-# Review: rate limit exceeded (before pattern review)
+# Deny: standalone parameter_match rule_type
+decision := "deny" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    is_standalone_param_deny
+}
+reason := "standalone_parameter_match_deny" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    is_standalone_param_deny
+}
+
+# Deny: standalone numeric_conditions rule_type
+decision := "deny" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    is_standalone_numeric_deny
+}
+reason := "standalone_numeric_conditions_deny" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    is_standalone_numeric_deny
+}
+
+# Review: rate limit exceeded
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -408,9 +523,10 @@ decision := "review" if {
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
     is_rate_exceeded_review
 }
-
 reason := rate_limit_reason if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -418,10 +534,12 @@ reason := rate_limit_reason if {
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
     is_rate_exceeded_review
 }
 
-# Review if tool matches a pattern and is not denied
+# Review: tool_pattern match
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -429,10 +547,11 @@ decision := "review" if {
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
     not is_rate_exceeded_review
     needs_review
 }
-
 reason := "requires_human_review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -440,11 +559,13 @@ reason := "requires_human_review" if {
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
     not is_rate_exceeded_review
     needs_review
 }
 
-# Review if tool matches a tool_denylist policy with numeric conditions and is not denied
+# Review: tool_denylist + numeric_conditions with action=review
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -452,10 +573,12 @@ decision := "review" if {
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not needs_review
     needs_review_numeric
 }
-
 reason := "requires_human_review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
@@ -463,8 +586,73 @@ reason := "requires_human_review" if {
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not needs_review
     needs_review_numeric
+}
+
+# Review: standalone parameter_match rule_type with action=review
+decision := "review" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    is_standalone_param_review
+}
+reason := "requires_human_review" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    is_standalone_param_review
+}
+
+# Review: standalone numeric_conditions rule_type with action=review
+decision := "review" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    not is_standalone_param_review
+    is_standalone_numeric_review
+}
+reason := "requires_human_review" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    not is_standalone_param_review
+    is_standalone_numeric_review
 }
 
 # ── Fired policy attribution ───────────────────────────────────────────────────
@@ -570,6 +758,90 @@ fired_policy_id := min(ids) if {
     not is_time_violation
     not is_rate_exceeded_review
     ids := {p.id | some p in input.policies; _review_policy_fires(p)}
+    count(ids) > 0
+}
+
+# 9. Standalone parameter_match deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    is_standalone_param_deny
+    ids := {p.id |
+        some p in input.policies
+        p.rule_type == "parameter_match"
+        p.action == "deny"
+        standalone_param_matches(p)
+    }
+    count(ids) > 0
+}
+
+# 10. Standalone numeric_conditions deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    is_standalone_numeric_deny
+    ids := {p.id |
+        some p in input.policies
+        p.rule_type == "numeric_conditions"
+        p.action == "deny"
+        standalone_numeric_matches(p)
+    }
+    count(ids) > 0
+}
+
+# 11. Standalone parameter_match review
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    is_standalone_param_review
+    ids := {p.id |
+        some p in input.policies
+        p.rule_type == "parameter_match"
+        p.action == "review"
+        standalone_param_matches(p)
+    }
+    count(ids) > 0
+}
+
+# 12. Standalone numeric_conditions review
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    not is_standalone_param_review
+    is_standalone_numeric_review
+    ids := {p.id |
+        some p in input.policies
+        p.rule_type == "numeric_conditions"
+        p.action == "review"
+        standalone_numeric_matches(p)
+    }
     count(ids) > 0
 }
 
