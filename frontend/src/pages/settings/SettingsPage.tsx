@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Copy, CheckCircle, UserPlus, X } from 'lucide-react'
+import { Copy, CheckCircle, UserPlus, X, Pencil } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
 import { useLicense } from '../../hooks/useLicense'
+import { useOrgSettings } from '../../context/OrgSettingsContext'
+import { updateOrgSettings } from '@/api/orgSettings'
 import { listUsers } from '@/api/users'
 import type { UserItem } from '@/api/users'
 import {
@@ -11,6 +13,18 @@ import {
   regenerateInvite,
 } from '@/api/userManagement'
 import type { MagicLinkResult } from '@/api/userManagement'
+
+const TIMEZONES = [
+  "UTC",
+  "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles",
+  "America/Anchorage", "America/Honolulu", "America/Sao_Paulo", "America/Toronto",
+  "America/Vancouver", "Europe/London", "Europe/Paris", "Europe/Berlin",
+  "Europe/Amsterdam", "Europe/Stockholm", "Europe/Zurich", "Europe/Warsaw",
+  "Europe/Helsinki", "Europe/Istanbul", "Europe/Moscow", "Asia/Dubai",
+  "Asia/Kolkata", "Asia/Dhaka", "Asia/Bangkok", "Asia/Singapore",
+  "Asia/Shanghai", "Asia/Tokyo", "Asia/Seoul", "Australia/Sydney",
+  "Australia/Melbourne", "Pacific/Auckland",
+]
 
 function SettingRow({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
@@ -330,6 +344,112 @@ function DeleteConfirmDialog({
 }
 
 // ---------------------------------------------------------------------------
+// Organization section
+// ---------------------------------------------------------------------------
+function OrgSection({ isAdmin }: { isAdmin: boolean }) {
+  const { orgName, timezone, refresh } = useOrgSettings()
+  const [editing, setEditing] = useState(false)
+  const [nameInput, setNameInput] = useState('')
+  const [tzInput, setTzInput] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  const startEdit = () => {
+    setNameInput(orgName)
+    setTzInput(timezone)
+    setError('')
+    setEditing(true)
+  }
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError('')
+    try {
+      await updateOrgSettings({ org_name: nameInput, timezone: tzInput })
+      refresh()
+      setEditing(false)
+    } catch (err: unknown) {
+      const e = err as { response?: { data?: { detail?: string } } }
+      setError(e?.response?.data?.detail ?? 'Failed to save')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-white border border-gray-200 rounded-[10px] px-4 mt-4">
+      <div className="flex items-center justify-between py-2.5 border-b border-gray-50">
+        <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide">Organization</p>
+        {isAdmin && !editing && (
+          <button
+            onClick={startEdit}
+            className="flex items-center gap-1 text-[11px] text-ac-primary hover:underline"
+          >
+            <Pencil size={11} />
+            Edit
+          </button>
+        )}
+      </div>
+
+      {editing ? (
+        <form onSubmit={handleSave} className="py-3 space-y-3">
+          <div>
+            <label className="text-[12px] text-gray-500 block mb-1">Organization name</label>
+            <input
+              required
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
+            />
+          </div>
+          <div>
+            <label className="text-[12px] text-gray-500 block mb-1">Timezone</label>
+            <select
+              value={tzInput}
+              onChange={(e) => setTzInput(e.target.value)}
+              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 bg-white"
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>{tz}</option>
+              ))}
+            </select>
+          </div>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="flex-1 border border-ac-border rounded-lg py-2 text-sm text-ac-text-muted hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 bg-ac-primary text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <div className="flex items-center justify-between py-3 border-b border-gray-50">
+            <span className="text-[13px] text-gray-600">Name</span>
+            <span className="text-[13px] text-gray-800 font-medium">{orgName || '—'}</span>
+          </div>
+          <div className="flex items-center justify-between py-3">
+            <span className="text-[13px] text-gray-600">Timezone</span>
+            <span className="text-[13px] text-gray-800 font-medium">{timezone}</span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Users section
 // ---------------------------------------------------------------------------
 function UsersSection({ currentUserId }: { currentUserId: string | undefined }) {
@@ -527,6 +647,9 @@ export function SettingsPage() {
         <SettingRow label="User email" value={user?.email ?? '—'} />
         <SettingRow label="Role" value={user?.role ?? '—'} />
       </div>
+
+      {/* Organization */}
+      <OrgSection isAdmin={user?.role === 'admin'} />
 
       {/* Users (admin only) */}
       {user?.role === 'admin' && <UsersSection currentUserId={user?.id} />}
