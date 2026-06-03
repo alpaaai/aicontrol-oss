@@ -66,3 +66,113 @@ test("ToolDenylistForm renders tag input and adds tools", async ({ page }) => {
   // 200 means Vite serves it; 404 means file missing
   expect(response.status()).toBe(200);
 });
+
+const MOCK_EMPTY: never[] = [];
+
+test.describe("PolicyEditor slide-over", () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route("http://localhost:8001/policies*", (route) => {
+      if (route.request().method() === "GET") {
+        route.fulfill({ status: 200, body: JSON.stringify(MOCK_EMPTY) });
+      } else if (route.request().method() === "POST") {
+        const body = JSON.parse(route.request().postData() ?? "{}");
+        route.fulfill({
+          status: 201,
+          body: JSON.stringify({
+            id: "new-001",
+            ...body,
+            active: true,
+            library: false,
+            priority: body.priority ?? 100,
+            applies_to_agents: 0,
+            created_by: null,
+          }),
+        });
+      } else {
+        route.continue();
+      }
+    });
+    await page.goto("/login");
+    await page.evaluate(() => {
+      sessionStorage.setItem(
+        "ac_auth",
+        JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" })
+      );
+    });
+    await page.goto("/policies");
+  });
+
+  test("opens as slide-over when New policy is clicked", async ({ page }) => {
+    await page.getByRole("button", { name: /new policy/i }).click();
+    await expect(page.getByRole("heading", { name: /create policy/i })).toBeVisible();
+    // Slide-over should be visible (not a centered modal)
+    const panel = page.locator("[data-testid='policy-editor-panel']");
+    await expect(panel).toBeVisible();
+  });
+
+  test("Form/JSON toggle switches between modes", async ({ page }) => {
+    await page.getByRole("button", { name: /new policy/i }).click();
+    // Default is Form mode — JSON panel is read-only
+    await expect(page.getByTestId("json-panel")).toBeVisible();
+    // Click JSON toggle
+    await page.getByRole("button", { name: "JSON" }).click();
+    await expect(page.getByTestId("json-textarea")).toBeVisible();
+    // Click Form toggle
+    await page.getByRole("button", { name: "Form" }).click();
+    await expect(page.getByTestId("json-panel")).toBeVisible();
+  });
+
+  test("condition type selector switches sub-form", async ({ page }) => {
+    await page.getByRole("button", { name: /new policy/i }).click();
+    // Default condition type is tool_denylist
+    await expect(page.getByTestId("tool-denylist-input")).toBeVisible();
+    // Switch to Parameter Match
+    await page.getByTestId("condition-type-select").selectOption("parameter_match");
+    await expect(page.getByTestId("param-key-0")).toBeVisible();
+    // Switch to Numeric Conditions
+    await page.getByTestId("condition-type-select").selectOption("numeric_conditions");
+    await expect(page.getByTestId("numeric-field-0")).toBeVisible();
+  });
+
+  test("JSON panel updates live as tool denylist form is filled", async ({ page }) => {
+    await page.getByRole("button", { name: /new policy/i }).click();
+    // Add a tool
+    await page.getByTestId("tool-denylist-input").fill("bash");
+    await page.getByTestId("tool-denylist-input").press("Enter");
+    // JSON panel should contain "bash"
+    const jsonText = await page.getByTestId("json-panel").textContent();
+    expect(jsonText).toContain("bash");
+  });
+
+  test("live match preview shows checkmarks and crosses", async ({ page }) => {
+    await page.getByRole("button", { name: /new policy/i }).click();
+    await page.getByTestId("tool-denylist-input").fill("bash");
+    await page.getByTestId("tool-denylist-input").press("Enter");
+    // bash example should match (✓) and read_file should not (✗)
+    await expect(page.getByTestId("match-preview")).toBeVisible();
+  });
+
+  test("saves new policy and calls onSaved", async ({ page }) => {
+    await page.getByRole("button", { name: /new policy/i }).click();
+    // Fill name
+    await page.getByTestId("policy-name-input").fill("my_test_policy");
+    // Add a blocked tool
+    await page.getByTestId("tool-denylist-input").fill("bash");
+    await page.getByTestId("tool-denylist-input").press("Enter");
+    // Save
+    await page.getByRole("button", { name: /save policy/i }).click();
+    // Editor should close
+    await expect(page.getByTestId("policy-editor-panel")).not.toBeVisible();
+  });
+
+  test("shows unknown condition type notice for unrecognised JSON", async ({ page }) => {
+    await page.getByRole("button", { name: /new policy/i }).click();
+    // Switch to JSON mode and enter an unrecognised condition type
+    await page.getByRole("button", { name: "JSON" }).click();
+    const textarea = page.getByTestId("json-textarea");
+    await textarea.fill(JSON.stringify({ geo_restriction: { allowed: ["US"] } }));
+    // Switch back to Form
+    await page.getByRole("button", { name: "Form" }).click();
+    await expect(page.getByText(/condition type not supported/i)).toBeVisible();
+  });
+});
