@@ -6,6 +6,8 @@ export interface UserItem {
   name: string | null;
   role: string;
   is_active: boolean;
+  is_root: boolean;
+  password_set: boolean;
   last_login: string | null;
   created_at: string;
 }
