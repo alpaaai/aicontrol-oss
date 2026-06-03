@@ -54,6 +54,7 @@ export function InvitePage() {
     try {
       const { data } = await setPassword(token, password);
       login({
+        id: data.user.id,
         email: data.user.email,
         role: data.user.role as "admin" | "analyst" | "auditor",
         token: data.token,

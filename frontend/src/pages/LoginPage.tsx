@@ -26,6 +26,7 @@ export function LoginPage() {
     try {
       const { data } = await login(email, password);
       storeLogin({
+        id: data.user.id,
         email: data.user.email,
         role: data.user.role as "admin" | "analyst" | "auditor",
         token: data.token,

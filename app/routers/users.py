@@ -27,6 +27,8 @@ class UserResponse(BaseModel):
     name: Optional[str]
     role: str
     is_active: bool
+    is_root: bool
+    password_set: bool
     last_login: Optional[datetime]
     created_at: datetime
 

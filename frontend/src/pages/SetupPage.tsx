@@ -72,7 +72,7 @@ export function SetupPage() {
     setLoading(true);
     try {
       const { data } = await completeSetup({ full_name: fullName, email, password, org_name: orgName, timezone });
-      login({ email: data.user.email, role: data.user.role as "admin" | "analyst" | "auditor", token: data.token });
+      login({ id: data.user.id, email: data.user.email, role: data.user.role as "admin" | "analyst" | "auditor", token: data.token });
       navigate("/overview");
     } catch (err: unknown) {
       const msg = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
