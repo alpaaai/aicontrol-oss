@@ -44,6 +44,81 @@ def validate_rate_limit_condition(condition: dict) -> list[str]:
     return errors
 
 
+def validate_tool_denylist_condition(condition: dict) -> list[str]:
+    blocked = condition.get("blocked_tools", [])
+    if not isinstance(blocked, list) or not blocked:
+        return ["tool_denylist condition requires non-empty 'blocked_tools' array"]
+    if not all(isinstance(t, str) for t in blocked):
+        return ["tool_denylist.blocked_tools must be an array of strings"]
+    return []
+
+
+def validate_parameter_match_condition(condition: dict) -> list[str]:
+    pm = condition.get("parameter_match", {})
+    if not pm or not isinstance(pm, dict):
+        return ["parameter_match condition requires non-empty 'parameter_match' object"]
+    errors: list[str] = []
+    for key, spec in pm.items():
+        if not isinstance(spec, dict):
+            errors.append(
+                f"parameter_match[{key!r}] must be an object with 'contains_any' or 'equals'"
+            )
+            continue
+        has_contains = "contains_any" in spec
+        has_equals = "equals" in spec
+        if not has_contains and not has_equals:
+            errors.append(
+                f"parameter_match[{key!r}] must have 'contains_any' (list) or 'equals' (string)"
+            )
+        if has_contains and not isinstance(spec["contains_any"], list):
+            errors.append(f"parameter_match[{key!r}].contains_any must be an array")
+    return errors
+
+
+def validate_tool_pattern_condition(condition: dict) -> list[str]:
+    patterns = condition.get("tool_name_contains", [])
+    if not isinstance(patterns, list) or not patterns:
+        return ["tool_pattern condition requires non-empty 'tool_name_contains' array"]
+    return []
+
+
+VALID_NUMERIC_OPS = {">", ">=", "<", "<=", "=="}
+
+
+def validate_numeric_conditions_condition(condition: dict) -> list[str]:
+    nc = condition.get("numeric_conditions", {})
+    if not nc or not isinstance(nc, dict):
+        return ["numeric_conditions requires non-empty 'numeric_conditions' object"]
+    errors: list[str] = []
+    for field, spec in nc.items():
+        if not isinstance(spec, dict):
+            errors.append(
+                f"numeric_conditions[{field!r}] must be an object with 'op' and 'value'"
+            )
+            continue
+        if spec.get("op") not in VALID_NUMERIC_OPS:
+            errors.append(
+                f"numeric_conditions[{field!r}].op must be one of {sorted(VALID_NUMERIC_OPS)}"
+            )
+        if "value" not in spec or not isinstance(spec.get("value"), (int, float)):
+            errors.append(f"numeric_conditions[{field!r}].value must be a number")
+    return errors
+
+
+def validate_condition(rule_type: str, condition: dict) -> list[str]:
+    if rule_type == "tool_denylist":
+        return validate_tool_denylist_condition(condition)
+    if rule_type == "parameter_match":
+        return validate_parameter_match_condition(condition)
+    if rule_type == "rate_limit":
+        return validate_rate_limit_condition(condition)
+    if rule_type == "tool_pattern":
+        return validate_tool_pattern_condition(condition)
+    if rule_type == "numeric_conditions":
+        return validate_numeric_conditions_condition(condition)
+    return []
+
+
 class PolicyCreate(BaseModel):
     name: str
     description: Optional[str] = None
@@ -140,10 +215,9 @@ async def create_policy(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_admin),
 ) -> PolicyResponse:
-    if body.rule_type == "rate_limit":
-        errors = validate_rate_limit_condition(body.condition)
-        if errors:
-            raise HTTPException(status_code=422, detail="; ".join(errors))
+    errors = validate_condition(body.rule_type, body.condition)
+    if errors:
+        raise HTTPException(status_code=422, detail="; ".join(errors))
     policy = Policy(
         name=body.name,
         description=body.description,
@@ -177,10 +251,9 @@ async def update_policy(
     updated = body.model_dump(exclude_none=True)
     effective_rule_type = updated.get("rule_type", policy.rule_type)
     effective_condition = updated.get("condition", policy.condition)
-    if effective_rule_type == "rate_limit":
-        errors = validate_rate_limit_condition(effective_condition)
-        if errors:
-            raise HTTPException(status_code=422, detail="; ".join(errors))
+    errors = validate_condition(effective_rule_type, effective_condition)
+    if errors:
+        raise HTTPException(status_code=422, detail="; ".join(errors))
     before = {k: getattr(policy, k) for k in updated}
     for field, value in updated.items():
         setattr(policy, field, value)

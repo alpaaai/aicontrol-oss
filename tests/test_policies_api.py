@@ -191,3 +191,173 @@ async def test_list_library_policies_requires_admin():
         ) as client:
             response = await client.get("/policies/library")
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_tool_denylist_requires_blocked_tools():
+    from app.main import app
+    payload = {
+        "name": f"test_val_td_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_denylist",
+        "condition": {},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_tool_denylist_rejects_empty_blocked_tools():
+    from app.main import app
+    payload = {
+        "name": f"test_val_td2_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_denylist",
+        "condition": {"blocked_tools": []},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_parameter_match_valid():
+    from app.main import app
+    payload = {
+        "name": f"test_pm_{uuid.uuid4().hex[:6]}",
+        "rule_type": "parameter_match",
+        "condition": {"parameter_match": {"path": {"contains_any": ["/etc/passwd"]}}},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_parameter_match_wildcard_valid():
+    from app.main import app
+    payload = {
+        "name": f"test_pm_wc_{uuid.uuid4().hex[:6]}",
+        "rule_type": "parameter_match",
+        "condition": {"parameter_match": {"*": {"contains_any": ["jailbreak"]}}},
+        "action": "review",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_parameter_match_rejects_flat_string_spec():
+    from app.main import app
+    payload = {
+        "name": f"test_pm_bad_{uuid.uuid4().hex[:6]}",
+        "rule_type": "parameter_match",
+        "condition": {"parameter_match": {"path": "flat_string_not_allowed"}},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_tool_pattern_valid():
+    from app.main import app
+    payload = {
+        "name": f"test_tp_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_pattern",
+        "condition": {"tool_name_contains": ["write", "update"]},
+        "action": "review",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_tool_pattern_rejects_empty_patterns():
+    from app.main import app
+    payload = {
+        "name": f"test_tp_bad_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_pattern",
+        "condition": {"tool_name_contains": []},
+        "action": "review",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_numeric_conditions_valid():
+    from app.main import app
+    payload = {
+        "name": f"test_nc_{uuid.uuid4().hex[:6]}",
+        "rule_type": "numeric_conditions",
+        "condition": {"numeric_conditions": {"amount": {"op": ">", "value": 10000}}},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_numeric_conditions_rejects_bad_op():
+    from app.main import app
+    payload = {
+        "name": f"test_nc_bad_{uuid.uuid4().hex[:6]}",
+        "rule_type": "numeric_conditions",
+        "condition": {"numeric_conditions": {"amount": {"op": "neq", "value": 100}}},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_numeric_conditions_rejects_non_number_value():
+    from app.main import app
+    payload = {
+        "name": f"test_nc_bad2_{uuid.uuid4().hex[:6]}",
+        "rule_type": "numeric_conditions",
+        "condition": {"numeric_conditions": {"amount": {"op": ">", "value": "big"}}},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
