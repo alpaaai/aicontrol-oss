@@ -146,3 +146,48 @@ async def test_create_policy_response_includes_new_fields():
     assert body["priority"] == 50
     assert body["library"] is False
     assert body["category"] == "Dangerous Operations"
+
+
+@pytest.mark.asyncio
+async def test_list_library_policies_returns_200():
+    from app.main import app
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/policies/library")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+
+
+@pytest.mark.asyncio
+async def test_list_library_policies_excludes_non_library():
+    from app.main import app
+    non_lib_name = f"not_lib_{uuid.uuid4().hex[:6]}"
+    payload = {
+        "name": non_lib_name,
+        "rule_type": "tool_denylist",
+        "condition": {"blocked_tools": ["bad"]},
+        "action": "deny",
+        "library": False,
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            await client.post("/policies", json=payload)
+            response = await client.get("/policies/library")
+    body = response.json()
+    names = [p["name"] for p in body]
+    assert non_lib_name not in names
+
+
+@pytest.mark.asyncio
+async def test_list_library_policies_requires_admin():
+    from app.main import app
+    with _auth_override("agent"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.get("/policies/library")
+    assert response.status_code == 403
