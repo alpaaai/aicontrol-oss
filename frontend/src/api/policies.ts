@@ -12,6 +12,9 @@ export interface Policy {
   compliance_frameworks: string[] | null;
   applies_to_agents: number;
   created_by: string | null;
+  priority: number;
+  library: boolean;
+  category: string | null;
 }
 
 export interface CreatePolicyBody {
@@ -22,6 +25,9 @@ export interface CreatePolicyBody {
   action: string;
   severity?: string;
   compliance_frameworks?: string[];
+  priority?: number;
+  library?: boolean;
+  category?: string;
 }
 
 export interface UpdatePolicyBody extends Partial<CreatePolicyBody> {
@@ -30,6 +36,12 @@ export interface UpdatePolicyBody extends Partial<CreatePolicyBody> {
 
 export const listPolicies = () =>
   apiClient.get<Policy[]>("/policies").then((r) => r.data);
+
+export const listLibraryPolicies = () =>
+  apiClient.get<Policy[]>("/policies/library").then((r) => r.data);
+
+export const getPolicy = (id: string) =>
+  apiClient.get<Policy>(`/policies/${id}`).then((r) => r.data);
 
 export const createPolicy = (body: CreatePolicyBody) =>
   apiClient.post<Policy>("/policies", body).then((r) => r.data);
