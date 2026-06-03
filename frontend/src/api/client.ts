@@ -17,7 +17,8 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (r) => r,
   (error) => {
-    if (error.response?.status === 401) {
+    const url: string = error.config?.url ?? "";
+    if (error.response?.status === 401 && !url.includes("/auth/login") && !url.includes("/auth/magic-link") && !url.includes("/auth/set-password")) {
       clearAuth();
       window.location.href = "/login";
     }

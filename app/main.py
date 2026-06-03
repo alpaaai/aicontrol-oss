@@ -22,6 +22,8 @@ from app.routers.license import router as license_router
 from app.routers.billing import router as billing_router
 from app.routers.warnings import router as warnings_router
 from app.routers.users import router as users_router
+from app.routers.setup import router as setup_router
+from app.routers.org_settings import router as org_settings_router
 from enterprise.compliance.router import router as compliance_router
 from app.services.drift_detector import DriftDetector
 from app.services.opa_health_watcher import OpaHealthWatcher
@@ -86,6 +88,7 @@ app.add_middleware(
 
 
 app.include_router(license_router)
+app.include_router(setup_router)
 app.include_router(auth_router)
 app.include_router(audit_events_router)
 app.include_router(dashboard_router)
@@ -100,6 +103,7 @@ app.include_router(tokens_router)
 app.include_router(billing_router)
 app.include_router(warnings_router)
 app.include_router(users_router)
+app.include_router(org_settings_router)
 app.include_router(compliance_router)
 
 
