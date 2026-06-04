@@ -47,29 +47,37 @@ bash scripts/quickstart.sh    # seed demo data, run lending scenario, open dashb
 
 ---
 
-## Community vs Enterprise
+## Plans
 
-| Feature | Community | Enterprise |
-|---------|-----------|------------|
-| OPA policy enforcement (deterministic) | ✅ | ✅ |
-| Per-agent approved_tools enforcement | ✅ | ✅ |
-| Rate-based policies (per-session + rolling window) | ✅ | ✅ |
-| Append-only audit log | ✅ | ✅ |
-| React dashboard | ✅ | ✅ |
-| HITL review queue (in-dashboard approve/deny) | ✅ | ✅ |
-| Slack HITL notifications | ✅ | ✅ |
-| OPA health-watch + observability dashboard | — | ✅ |
-| Policy drift detection + warning feed | — | ✅ |
-| Compliance report export (PDF — SOC 2, PCI, HIPAA, GLBA) | — | ✅ |
+| Feature | Community | Business | Enterprise |
+|---------|-----------|----------|------------|
+| OPA policy enforcement (deterministic) | ✅ | ✅ | ✅ |
+| Per-agent approved_tools enforcement | ✅ | ✅ | ✅ |
+| Rate-based policies (session + rolling window) | ✅ | ✅ | ✅ |
+| Append-only audit log (7-day retention) | ✅ | — | — |
+| Append-only audit log (1-year retention) | — | ✅ | ✅ |
+| React dashboard | ✅ | ✅ | ✅ |
+| First-run setup wizard | ✅ | ✅ | ✅ |
+| User management (invite, deactivate, reset password) | ✅ | ✅ | ✅ |
+| Policy library (18 pre-built templates) | ✅ | ✅ | ✅ |
+| Baseline activation wizard | ✅ | ✅ | ✅ |
+| HITL review queue (in-dashboard) | ✅ | ✅ | ✅ |
+| Slack HITL notifications | — | ✅ | ✅ |
+| Audit log CSV export | — | — | ✅ |
+| OPA health-watch + observability dashboard | — | — | ✅ |
+| Policy drift detection + warning feed | — | — | ✅ |
+| Compliance report export (PDF — SOC 2, HIPAA, GLBA) | — | — | ✅ |
 
-**Enterprise:** add `AICONTROL_LICENSE_KEY=your-key` to `.env` and restart the stack:
+**Business:** $49/month + $15 per million intercepts. Contact: hello@aictl.io
+**Enterprise:** $149/month + $25.25 per million intercepts. Contact: hello@aictl.io
+
+To enable Business or Enterprise features, add `AICONTROL_LICENSE_KEY=your-key` to `.env` and restart:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.app.yml up -d
 ```
 
-Enterprise sections unlock in the dashboard immediately — no frontend rebuild required. License is read from the API at runtime.
-Contact: hello@aictl.io
+License is read from the API at runtime — no frontend rebuild required.
 
 ---
 
