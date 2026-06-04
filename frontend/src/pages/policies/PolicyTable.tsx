@@ -23,7 +23,7 @@ export function PolicyTable({ policies, onEdit, onDelete }: Props) {
     <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
       <div
         className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted
-                   uppercase tracking-wide border-b border-ac-border bg-gray-50"
+                   border-b border-ac-border bg-gray-50"
         style={{ gridTemplateColumns: "1fr 110px 120px 60px 70px 70px" }}
       >
         <div>Policy</div>
