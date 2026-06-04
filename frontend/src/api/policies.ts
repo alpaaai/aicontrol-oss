@@ -51,3 +51,13 @@ export const updatePolicy = (id: string, body: UpdatePolicyBody) =>
 
 export const deletePolicy = (id: string) =>
   apiClient.delete(`/policies/${id}`).then((r) => r.data);
+
+export interface BaselineActivateResponse {
+  mode: string;
+  activated: string[];
+}
+
+export const activateBaseline = (mode: "standard" | "strict") =>
+  apiClient
+    .post<BaselineActivateResponse>("/policies/activate-baseline", { mode })
+    .then((r) => r.data);
