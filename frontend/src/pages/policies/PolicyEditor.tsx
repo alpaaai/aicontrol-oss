@@ -99,7 +99,7 @@ function MatchPreview({
   const examples = MATCH_EXAMPLES[conditionType];
   return (
     <div data-testid="match-preview" className="mt-4 border border-ac-border rounded-lg p-3 bg-ac-surface">
-      <p className="text-[11px] text-ac-text-muted font-medium mb-2 uppercase tracking-wide">
+      <p className="text-[11px] text-ac-text-muted font-medium mb-2">
         Match preview
       </p>
       <div className="space-y-1">
@@ -423,7 +423,7 @@ export function PolicyEditor({ open, policy, onClose, onSaved }: Props) {
 
                   {/* Read-only JSON panel in form mode */}
                   <div className="mt-4">
-                    <p className="text-[11px] text-ac-text-muted mb-1 font-medium uppercase tracking-wide">
+                    <p className="text-[11px] text-ac-text-muted mb-1 font-medium">
                       Condition JSON (live preview)
                     </p>
                     <pre

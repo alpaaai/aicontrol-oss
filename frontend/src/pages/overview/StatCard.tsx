@@ -3,12 +3,13 @@ interface StatCardProps {
   value: string | number;
   delta?: string;
   deltaPositive?: boolean;
+  onDeltaClick?: () => void;
   live?: boolean;
   index?: number;
   accentColor?: string;
 }
 
-export function StatCard({ label, value, delta, deltaPositive, live, index = 0, accentColor }: StatCardProps) {
+export function StatCard({ label, value, delta, deltaPositive, onDeltaClick, live, index = 0, accentColor }: StatCardProps) {
   return (
     <div
       className="bg-ac-card border border-ac-border rounded-[10px] p-4 flex-1 min-w-[140px] animate-fade-up transition-shadow duration-200 hover:shadow-md relative overflow-hidden"
@@ -35,17 +36,32 @@ export function StatCard({ label, value, delta, deltaPositive, live, index = 0, 
         {value}
       </p>
       {delta && (
-        <p
-          className={`text-[11px] mt-1 ${
-            deltaPositive === true
-              ? "text-ac-allow"
-              : deltaPositive === false
-              ? "text-ac-deny"
-              : "text-ac-text-muted"
-          }`}
-        >
-          {delta}
-        </p>
+        onDeltaClick ? (
+          <button
+            onClick={onDeltaClick}
+            className={`text-[11px] mt-1 underline underline-offset-2 cursor-pointer text-left ${
+              deltaPositive === true
+                ? "text-ac-allow"
+                : deltaPositive === false
+                ? "text-ac-deny"
+                : "text-ac-text-muted"
+            }`}
+          >
+            {delta}
+          </button>
+        ) : (
+          <p
+            className={`text-[11px] mt-1 ${
+              deltaPositive === true
+                ? "text-ac-allow"
+                : deltaPositive === false
+                ? "text-ac-deny"
+                : "text-ac-text-muted"
+            }`}
+          >
+            {delta}
+          </p>
+        )
       )}
     </div>
   );

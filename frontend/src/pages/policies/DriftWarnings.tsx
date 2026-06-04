@@ -43,10 +43,7 @@ export function DriftWarnings() {
 
   if (!isEnterprise || notLicensed) {
     return (
-      <div className="mt-6">
-        <h3 className="text-[14px] font-semibold text-ac-text-primary mb-3">
-          Policy Drift Warnings
-        </h3>
+      <div>
         <EnterpriseLock
           title="Drift Detection — Enterprise"
           description="Policy drift warnings require an Enterprise license."
@@ -67,17 +64,14 @@ export function DriftWarnings() {
   }
 
   return (
-    <div className="mt-6">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-[14px] font-semibold text-ac-text-primary">
-          Policy Drift Warnings
-          {warnings.length > 0 && (
-            <span className="ml-2 text-[11px] bg-ac-review-bg text-ac-review px-2 py-0.5 rounded-full font-medium">
-              {warnings.length} active
-            </span>
-          )}
-        </h3>
-      </div>
+    <div>
+      {warnings.length > 0 && (
+        <div className="flex items-center mb-3">
+          <span className="text-[11px] bg-ac-review-bg text-ac-review px-2 py-0.5 rounded-full font-medium">
+            {warnings.length} active
+          </span>
+        </div>
+      )}
 
       {loading && (
         <div className="h-10 bg-gray-50 rounded animate-pulse" />

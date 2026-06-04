@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { usePoll } from "@/hooks/usePoll";
 import { getSummary } from "@/api/dashboard";
 import { StatCard } from "./StatCard";
@@ -8,6 +9,7 @@ import { InterceptSparkline } from "./InterceptSparkline";
 import { SkeletonCard } from "@/components/shared/LoadingSkeleton";
 
 export function OverviewPage() {
+  const navigate = useNavigate();
   const fetcher = useCallback(() => getSummary(), []);
   const { data, loading } = usePoll(fetcher, 30000);
 
@@ -79,6 +81,7 @@ export function OverviewPage() {
                 value={data.active_warnings}
                 delta="Policy drift detected"
                 deltaPositive={false}
+                onDeltaClick={() => navigate("/policies?tab=drift")}
               />
             )}
             {data && data.high_risk_sessions > 0 && (

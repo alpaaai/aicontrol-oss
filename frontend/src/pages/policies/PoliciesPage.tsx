@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { listPolicies, listLibraryPolicies, deletePolicy } from "@/api/policies";
 import type { Policy } from "@/api/policies";
 import { PolicyTable } from "./PolicyTable";
@@ -8,10 +9,14 @@ import { DriftWarnings } from "./DriftWarnings";
 import { BaselineActivationDialog } from "./BaselineActivationDialog";
 import { Plus } from "lucide-react";
 
-type Tab = "active" | "library";
+type Tab = "active" | "library" | "drift";
 
 export function PoliciesPage() {
-  const [tab, setTab] = useState<Tab>("active");
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState<Tab>(() => {
+    const t = searchParams.get("tab");
+    return t === "drift" || t === "library" ? (t as Tab) : "active";
+  });
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [libraryPolicies, setLibraryPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,7 +79,9 @@ export function PoliciesPage() {
           <p className="text-sm text-ac-text-muted mt-0.5">
             {tab === "active"
               ? loading ? "—" : `${policies.length} active polic${policies.length !== 1 ? "ies" : "y"}`
-              : `${libraryPolicies.length} templates available`}
+              : tab === "library"
+              ? `${libraryPolicies.length} templates available`
+              : "Drift monitoring"}
           </p>
         </div>
 
@@ -93,7 +100,7 @@ export function PoliciesPage() {
 
       {/* Tabs */}
       <div className="flex gap-0 mb-5 border-b border-ac-border">
-        {(["active", "library"] as Tab[]).map((t) => (
+        {(["active", "library", "drift"] as Tab[]).map((t) => (
           <button
             key={t}
             role="tab"
@@ -104,7 +111,7 @@ export function PoliciesPage() {
                 : "border-transparent text-ac-text-muted hover:text-ac-text-primary"
             }`}
           >
-            {t === "active" ? "Active Policies" : "Policy Library"}
+            {t === "active" ? "Active Policies" : t === "library" ? "Policy Library" : "Policy Drift Warnings"}
           </button>
         ))}
       </div>
@@ -124,14 +131,15 @@ export function PoliciesPage() {
               onDelete={handleDelete}
             />
           )}
-          <DriftWarnings />
         </>
-      ) : (
+      ) : tab === "library" ? (
         <PolicyLibrary
           policies={libraryPolicies}
           loading={libraryLoading}
           onActivate={handleActivateLibrary}
         />
+      ) : (
+        <DriftWarnings />
       )}
 
       <PolicyEditor
