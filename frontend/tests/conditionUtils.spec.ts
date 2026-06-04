@@ -53,7 +53,87 @@ test("conditionToFormState round-trips tool_denylist", async ({ page }) => {
   });
   expect(result).toEqual({
     type: "tool_denylist",
-    data: { blocked_tools: ["bash", "run_shell"] },
+    data: { blocked_tools: ["bash", "run_shell"], numericConditions: [], parameterMatch: {}, _extra: {} },
+  });
+});
+
+test("conditionToFormState parses numeric_conditions from tool_denylist", async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const mod = await import("/src/pages/policies/condition-form/conditionUtils.ts");
+    const condition = {
+      blocked_tools: ["approve_claim_payment"],
+      numeric_conditions: [{ parameter: "amount", operator: "gt", value: 5000 }],
+    };
+    return mod.conditionToFormState("tool_denylist", condition);
+  });
+  expect(result).toEqual({
+    type: "tool_denylist",
+    data: {
+      blocked_tools: ["approve_claim_payment"],
+      numericConditions: [{ field: "amount", op: ">", value: 5000 }],
+      parameterMatch: {},
+      _extra: {},
+    },
+  });
+});
+
+test("conditionToFormState preserves parameter_match in tool_denylist", async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const mod = await import("/src/pages/policies/condition-form/conditionUtils.ts");
+    const condition = {
+      blocked_tools: ["query_credit_bureau"],
+      parameter_match: { applicant_id: "*" },
+    };
+    return mod.conditionToFormState("tool_denylist", condition);
+  });
+  expect(result).toEqual({
+    type: "tool_denylist",
+    data: {
+      blocked_tools: ["query_credit_bureau"],
+      numericConditions: [],
+      parameterMatch: { applicant_id: "*" },
+      _extra: {},
+    },
+  });
+});
+
+test("formStateToCondition emits numeric_conditions for tool_denylist", async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const mod = await import("/src/pages/policies/condition-form/conditionUtils.ts");
+    const state = {
+      type: "tool_denylist" as const,
+      data: {
+        blocked_tools: ["approve_claim_payment"],
+        numericConditions: [{ field: "amount", op: ">" as const, value: 5000 }],
+        parameterMatch: {},
+        _extra: {},
+      },
+    };
+    return mod.formStateToCondition(state);
+  });
+  expect(result).toEqual({
+    blocked_tools: ["approve_claim_payment"],
+    numeric_conditions: [{ parameter: "amount", operator: "gt", value: 5000 }],
+  });
+});
+
+test("formStateToCondition emits parameter_match for tool_denylist", async ({ page }) => {
+  const result = await page.evaluate(async () => {
+    const mod = await import("/src/pages/policies/condition-form/conditionUtils.ts");
+    const state = {
+      type: "tool_denylist" as const,
+      data: {
+        blocked_tools: ["query_credit_bureau"],
+        numericConditions: [],
+        parameterMatch: { applicant_id: "*" },
+        _extra: {},
+      },
+    };
+    return mod.formStateToCondition(state);
+  });
+  expect(result).toEqual({
+    blocked_tools: ["query_credit_bureau"],
+    parameter_match: { applicant_id: "*" },
   });
 });
 
