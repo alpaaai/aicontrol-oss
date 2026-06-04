@@ -63,15 +63,24 @@ def reset_config_and_db_engine():
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _cleanup_test_policies():
-    """Session teardown: remove any test_ policies that leaked into the DB."""
+    """Session setup + teardown: remove test_ and not_lib_ policies so they don't
+    accumulate across pytest runs. Runs cleanup both before and after."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        await session.execute(text(
+            "UPDATE audit_events SET policy_id = NULL, policy_name = NULL "
+            "WHERE policy_id IN (SELECT id FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%')"
+        ))
+        await session.execute(text("DELETE FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%'"))
+        await session.commit()
     yield
     from app.models.database import async_session_factory
     async with async_session_factory() as session:
         await session.execute(text(
             "UPDATE audit_events SET policy_id = NULL, policy_name = NULL "
-            "WHERE policy_id IN (SELECT id FROM policies WHERE name LIKE 'test_%')"
+            "WHERE policy_id IN (SELECT id FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%')"
         ))
-        await session.execute(text("DELETE FROM policies WHERE name LIKE 'test_%'"))
+        await session.execute(text("DELETE FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%'"))
         await session.commit()
 
 
