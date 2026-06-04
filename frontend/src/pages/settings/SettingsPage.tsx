@@ -543,6 +543,14 @@ function UsersSection({ currentUserId }: { currentUserId: string | undefined }) 
                             Resend Invite
                           </button>
                         )}
+                        {u.password_set && u.is_active && (
+                          <button
+                            onClick={() => setResendTarget(u)}
+                            className="text-[11px] text-ac-primary hover:underline"
+                          >
+                            Reset Password
+                          </button>
+                        )}
                         {u.password_set && (
                           <button
                             onClick={() => toggleActive(u)}
