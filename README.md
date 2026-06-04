@@ -34,10 +34,12 @@ Policies evaluated in under 10ms. Every decision logged — no exceptions.
 ```bash
 git clone https://github.com/alpaaai/aicontrol
 cd aicontrol
-cp .env.example .env          # set Postgres password + optional Slack token
-bash install.sh               # pull images, run migrations, seed agents, issue tokens
-bash scripts/quickstart.sh    # seed V2 demo data, run lending scenario, open dashboard
+cp .env.example .env          # set POSTGRES_PASSWORD, optional SLACK_BOT_TOKEN
+bash install.sh               # pull images, run migrations, seed demo agents + tokens
+bash scripts/quickstart.sh    # seed demo data, run lending scenario, open dashboard
 ```
+
+**First-time setup:** Open `http://localhost:3000` — the setup wizard runs automatically on first launch. Set your organisation name, timezone, and root admin email + password. After setup, login with those credentials.
 
 **Dashboard:** http://localhost:3000
 **API docs:** http://localhost:8001/docs
@@ -60,9 +62,14 @@ bash scripts/quickstart.sh    # seed V2 demo data, run lending scenario, open da
 | Policy drift detection + warning feed | — | ✅ |
 | Compliance report export (PDF — SOC 2, PCI, HIPAA, GLBA) | — | ✅ |
 
-**Enterprise:** set `AICONTROL_LICENSE_KEY=your-key` and `VITE_ENTERPRISE=true` in `.env`,
-then `docker compose -f docker-compose.yml -f docker-compose.app.yml build frontend && up -d`.
-Contact: enterprise@aictl.io
+**Enterprise:** add `AICONTROL_LICENSE_KEY=your-key` to `.env` and restart the stack:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.app.yml up -d
+```
+
+Enterprise sections unlock in the dashboard immediately — no frontend rebuild required. License is read from the API at runtime.
+Contact: hello@aictl.io
 
 ---
 
@@ -129,4 +136,4 @@ See [aictl.io/docs/integration](https://aictl.io/docs/integration).
 ## License
 
 Apache 2.0 — community edition.
-Enterprise features require a license key. Contact enterprise@aictl.io.
+Enterprise features require a license key. Contact hello@aictl.io.
