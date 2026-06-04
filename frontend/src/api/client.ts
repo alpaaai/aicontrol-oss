@@ -14,11 +14,20 @@ apiClient.interceptors.request.use((config) => {
   return config;
 });
 
+const PUBLIC_PATHS = ["/login", "/setup", "/invite"];
+
 apiClient.interceptors.response.use(
   (r) => r,
   (error) => {
     const url: string = error.config?.url ?? "";
-    if (error.response?.status === 401 && !url.includes("/auth/login") && !url.includes("/auth/magic-link") && !url.includes("/auth/set-password")) {
+    const onPublicPage = PUBLIC_PATHS.includes(window.location.pathname);
+    if (
+      error.response?.status === 401 &&
+      !onPublicPage &&
+      !url.includes("/auth/login") &&
+      !url.includes("/auth/magic-link") &&
+      !url.includes("/auth/set-password")
+    ) {
       clearAuth();
       window.location.href = "/login";
     }

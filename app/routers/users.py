@@ -113,8 +113,6 @@ async def regenerate_invite(
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    if user.password_set:
-        raise HTTPException(status_code=400, detail="User has already set their password")
 
     token, token_hash = generate_invite_token()
     user.invite_token_hash = token_hash

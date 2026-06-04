@@ -251,11 +251,15 @@ async def test_regenerate_invite_creates_new_token(_regen_user, human_admin_toke
 
 
 @pytest.mark.asyncio
-async def test_regenerate_invite_400_if_password_already_set(_password_set_user, human_admin_token):
+async def test_regenerate_invite_succeeds_for_password_set_user(_password_set_user, human_admin_token):
+    """Admin-mediated password reset: regenerate-invite must work even when password_set=True."""
     user_id = _password_set_user["user_id"]
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.post(
             f"/users/{user_id}/regenerate-invite",
             headers={"Authorization": f"Bearer {human_admin_token}"},
         )
-    assert resp.status_code == 400
+    assert resp.status_code == 200
+    body = resp.json()
+    assert "magic_link" in body
+    assert "token=" in body["magic_link"]
