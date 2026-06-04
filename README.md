@@ -125,13 +125,19 @@ See [aictl.io/docs/integration](https://aictl.io/docs/integration).
 
 | Script | Purpose |
 |--------|---------|
-| `bash install.sh` | First-time setup — images, migrations, seed agents, issue tokens |
-| `bash scripts/quickstart.sh` | Demo-ready — V2 seed data, run demo, open browser |
-| `bash verify.sh` | Health checks — all components |
-| `bash diagnose.sh` | Debug output for support |
+| `bash install.sh` | First-time setup — pull images, run migrations, seed demo agents, issue tokens |
+| `bash scripts/quickstart.sh` | Demo-ready — seed V2 demo data, run lending scenario, open browser |
+| `bash verify.sh` | Health checks — verify all components are running |
+| `bash diagnose.sh` | Debug output — attach to support requests |
 | `python scripts/seed.py` | Seed demo agents and policies (idempotent) |
-| `python scripts/demo_reset.py` | Reset audit log for clean demo run |
-| `python scripts/demos/run_demo.py --scenario lending` | Run industry demo |
+| `python scripts/seed_library_policies.py` | Seed 18 pre-built policy library templates (idempotent) |
+| `python scripts/demo_reset.py` | Reset audit log for a clean demo run |
+| `python scripts/demos/run_demo.py --scenario lending` | Run an industry demo scenario |
+| `python scripts/onboard_agent.py --name "agent-name" --desc "desc"` | Register agent + issue token in one step |
+| `python scripts/issue_token.py --role agent --desc "desc"` | Issue a new API token |
+| `python scripts/revoke_token.py --id TOKEN_UUID` | Revoke a token |
+| `python scripts/issue_license.py --company "Acme" --plan enterprise --days 365` | Generate an offline license key (requires private key) |
+| `python scripts/reset_password.py --email admin@company.com` | CLI password reset for locked-out users (admin escape hatch) |
 
 ---
 
