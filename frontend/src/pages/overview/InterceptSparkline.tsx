@@ -14,17 +14,16 @@ export function InterceptSparkline({ data }: Props) {
   const chartData = Object.entries(byHour)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([hour, count]) => ({
-      hour: new Date(hour).toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: false,
+      hour: new Date(hour).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
       }),
       count,
     }));
 
   return (
     <div className="bg-ac-card border border-ac-border rounded-[10px] p-4">
-      <p className="text-[12px] font-medium text-ac-text-muted mb-3">Intercepts — last 24h</p>
+      <p className="text-[12px] font-medium text-ac-text-muted mb-3">Intercepts — last 30 days</p>
       <ResponsiveContainer width="100%" height={100}>
         <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>

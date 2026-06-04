@@ -67,11 +67,11 @@ async def get_summary(_=Depends(require_human)):
 
         hours_rows = (await db.execute(
             select(
-                func.date_trunc("hour", AuditEvent.created_at).label("hour"),
+                func.date_trunc("day", AuditEvent.created_at).label("hour"),
                 AuditEvent.decision,
                 func.count().label("count"),
             )
-            .where(AuditEvent.created_at >= now - timedelta(hours=24))
+            .where(AuditEvent.created_at >= now - timedelta(days=30))
             .group_by("hour", AuditEvent.decision)
             .order_by("hour")
         )).all()
