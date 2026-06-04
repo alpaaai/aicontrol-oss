@@ -20,6 +20,9 @@ export const CONDITION_TYPE_LABELS: Record<ConditionType, string> = {
 
 export interface ToolDenylistFormState {
   blocked_tools: string[];
+  numericConditions?: NumericConditionRow[];
+  parameterMatch?: Record<string, unknown>;
+  _extra?: Record<string, unknown>;
 }
 
 export type ParamMatchOperator = "contains" | "equals";
@@ -66,12 +69,21 @@ export type ConditionFormState =
   | { type: "tool_pattern"; data: ToolPatternFormState }
   | { type: "numeric_conditions"; data: NumericConditionsFormState };
 
+// ── Operator mappings for tool_denylist numeric_conditions (array format) ────
+
+const OPERATOR_TO_SYMBOL: Record<string, NumericOp> = {
+  gt: ">", gte: ">=", lt: "<", lte: "<=", eq: "==",
+};
+const SYMBOL_TO_OPERATOR: Record<string, string> = {
+  ">": "gt", ">=": "gte", "<": "lt", "<=": "lte", "==": "eq",
+};
+
 // ── Defaults ──────────────────────────────────────────────────────────────────
 
 export function defaultFormState(type: ConditionType): ConditionFormState {
   switch (type) {
     case "tool_denylist":
-      return { type, data: { blocked_tools: [] } };
+      return { type, data: { blocked_tools: [], numericConditions: [], parameterMatch: {}, _extra: {} } };
     case "parameter_match":
       return { type, data: { rows: [{ key: "", operator: "contains", values: [""] }] } };
     case "rate_limit":
@@ -87,8 +99,25 @@ export function defaultFormState(type: ConditionType): ConditionFormState {
 
 export function formStateToCondition(state: ConditionFormState): Record<string, unknown> {
   switch (state.type) {
-    case "tool_denylist":
-      return { blocked_tools: state.data.blocked_tools };
+    case "tool_denylist": {
+      const result: Record<string, unknown> = { blocked_tools: state.data.blocked_tools };
+      const pm = state.data.parameterMatch ?? {};
+      if (Object.keys(pm).length > 0) {
+        result.parameter_match = pm;
+      }
+      const ncRows = (state.data.numericConditions ?? []).filter((nc) => nc.field);
+      if (ncRows.length > 0) {
+        result.numeric_conditions = ncRows.map((nc) => ({
+          parameter: nc.field,
+          operator: SYMBOL_TO_OPERATOR[nc.op] ?? "gt",
+          value: nc.value,
+        }));
+      }
+      for (const [key, val] of Object.entries(state.data._extra ?? {})) {
+        result[key] = val;
+      }
+      return result;
+    }
 
     case "parameter_match": {
       const pm: Record<string, unknown> = {};
@@ -137,7 +166,29 @@ export function conditionToFormState(
     case "tool_denylist": {
       const blocked = condition.blocked_tools;
       if (!Array.isArray(blocked)) return null;
-      return { type: "tool_denylist", data: { blocked_tools: blocked as string[] } };
+      const numericConditions: NumericConditionRow[] = [];
+      if (Array.isArray(condition.numeric_conditions)) {
+        for (const nc of condition.numeric_conditions as Array<{ parameter: string; operator: string; value: number }>) {
+          numericConditions.push({
+            field: nc.parameter,
+            op: OPERATOR_TO_SYMBOL[nc.operator] ?? ">",
+            value: nc.value,
+          });
+        }
+      }
+      const parameterMatch =
+        condition.parameter_match && typeof condition.parameter_match === "object"
+          ? (condition.parameter_match as Record<string, unknown>)
+          : {};
+      const handled = new Set(["blocked_tools", "numeric_conditions", "parameter_match"]);
+      const _extra: Record<string, unknown> = {};
+      for (const [key, val] of Object.entries(condition)) {
+        if (!handled.has(key)) _extra[key] = val;
+      }
+      return {
+        type: "tool_denylist",
+        data: { blocked_tools: blocked as string[], numericConditions, parameterMatch, _extra },
+      };
     }
 
     case "parameter_match": {
