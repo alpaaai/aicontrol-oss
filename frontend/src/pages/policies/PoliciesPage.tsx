@@ -5,6 +5,7 @@ import { PolicyTable } from "./PolicyTable";
 import { PolicyEditor } from "./PolicyEditor";
 import { PolicyLibrary } from "./PolicyLibrary";
 import { DriftWarnings } from "./DriftWarnings";
+import { BaselineActivationDialog } from "./BaselineActivationDialog";
 import { Plus } from "lucide-react";
 
 type Tab = "active" | "library";
@@ -17,6 +18,12 @@ export function PoliciesPage() {
   const [libraryLoading, setLibraryLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Policy | null>(null);
+  const [showBaseline, setShowBaseline] = useState(() => {
+    return (
+      sessionStorage.getItem("show_baseline_dialog") === "true" &&
+      !sessionStorage.getItem("baseline_offered")
+    );
+  });
 
   const loadActive = () => {
     setLoading(true);
@@ -136,6 +143,16 @@ export function PoliciesPage() {
           loadActive();
         }}
       />
+
+      {showBaseline && (
+        <BaselineActivationDialog
+          onClose={() => setShowBaseline(false)}
+          onDone={() => {
+            setShowBaseline(false);
+            loadActive();
+          }}
+        />
+      )}
     </div>
   );
 }

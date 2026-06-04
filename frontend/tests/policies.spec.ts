@@ -296,6 +296,63 @@ test("Policy Library preview toggle shows condition JSON inline", async ({ page 
   await expect(page.getByText("exec_command")).toBeVisible();
 });
 
+test("BaselineActivationDialog shows Standard and Strict options", async ({ page }) => {
+  await page.route("http://localhost:8001/policies*", (route) =>
+    route.fulfill({ status: 200, body: JSON.stringify([]) })
+  );
+  await page.route("http://localhost:8001/policies/activate-baseline", (route) =>
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({ mode: "standard", activated: ["block_shell_execution"] }),
+    })
+  );
+
+  await page.goto("/login");
+  await page.evaluate(() => {
+    sessionStorage.setItem(
+      "ac_auth",
+      JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" })
+    );
+    // Simulate: setup just completed, baseline not yet offered
+    sessionStorage.removeItem("baseline_offered");
+    sessionStorage.setItem("show_baseline_dialog", "true");
+  });
+  await page.goto("/policies");
+
+  await expect(page.getByTestId("baseline-dialog")).toBeVisible();
+  await expect(page.getByText("Standard").first()).toBeVisible();
+  await expect(page.getByText("Strict").first()).toBeVisible();
+});
+
+test("BaselineActivationDialog activates standard baseline on confirm", async ({ page }) => {
+  await page.route("http://localhost:8001/policies/activate-baseline", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ mode: "standard", activated: ["block_shell_execution"] }),
+    })
+  );
+
+  await page.goto("/login");
+  await page.evaluate(() => {
+    sessionStorage.setItem(
+      "ac_auth",
+      JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" })
+    );
+    sessionStorage.removeItem("baseline_offered");
+    sessionStorage.setItem("show_baseline_dialog", "true");
+  });
+  await page.goto("/policies");
+
+  const [activateRequest] = await Promise.all([
+    page.waitForRequest((req) => req.url().includes("activate-baseline")),
+    page.getByTestId("baseline-standard-btn").click(),
+  ]);
+  await expect(page.getByTestId("baseline-dialog")).not.toBeVisible();
+  const activateBody = JSON.parse(activateRequest.postData() ?? "{}");
+  expect(activateBody.mode).toBe("standard");
+});
+
 test("Policy Library Activate opens PolicyEditor pre-filled", async ({ page }) => {
   const mockLibrary = [
     {
