@@ -196,6 +196,62 @@ async def list_library_policies(
     return result.scalars().all()
 
 
+STANDARD_BASELINE_NAMES = [
+    "block_shell_execution",
+    "block_file_deletion",
+    "block_cloud_metadata_access",
+    "block_sensitive_file_reads",
+]
+
+STRICT_ADDITIONAL_NAMES = [
+    "block_wildcard_queries",
+    "block_large_record_exports",
+    "block_prompt_injection_in_params",
+    "block_credential_patterns",
+]
+
+
+class BaselineActivateBody(BaseModel):
+    mode: str
+
+    @field_validator("mode")
+    @classmethod
+    def _validate_mode(cls, v: str) -> str:
+        if v not in {"standard", "strict"}:
+            raise ValueError("mode must be 'standard' or 'strict'")
+        return v
+
+
+class BaselineActivateResponse(BaseModel):
+    mode: str
+    activated: list[str]
+
+
+@router.post("/activate-baseline", response_model=BaselineActivateResponse)
+async def activate_baseline(
+    body: BaselineActivateBody,
+    db: AsyncSession = Depends(get_db),
+    _token: dict = Depends(require_admin),
+) -> BaselineActivateResponse:
+    names = list(STANDARD_BASELINE_NAMES)
+    if body.mode == "strict":
+        names = names + STRICT_ADDITIONAL_NAMES
+
+    result = await db.execute(
+        select(Policy).where(Policy.name.in_(names))
+    )
+    policies = result.scalars().all()
+
+    activated: list[str] = []
+    for policy in policies:
+        policy.active = True
+        activated.append(policy.name)
+
+    await db.flush()
+    await push_rego_to_opa()
+    return BaselineActivateResponse(mode=body.mode, activated=activated)
+
+
 @router.get("/{policy_id}", response_model=PolicyResponse)
 async def get_policy(
     policy_id: uuid.UUID,

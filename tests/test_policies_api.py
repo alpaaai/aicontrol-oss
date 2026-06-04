@@ -361,3 +361,59 @@ async def test_create_numeric_conditions_rejects_non_number_value():
         ) as client:
             response = await client.post("/policies", json=payload)
     assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_activate_baseline_standard_returns_200():
+    from app.main import app
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/policies/activate-baseline", json={"mode": "standard"}
+            )
+    assert response.status_code == 200
+    body = response.json()
+    assert "activated" in body
+    assert isinstance(body["activated"], list)
+
+
+@pytest.mark.asyncio
+async def test_activate_baseline_strict_returns_more_than_standard():
+    from app.main import app
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            strict_response = await client.post(
+                "/policies/activate-baseline", json={"mode": "strict"}
+            )
+    body = strict_response.json()
+    assert len(body["activated"]) >= 4
+
+
+@pytest.mark.asyncio
+async def test_activate_baseline_rejects_invalid_mode():
+    from app.main import app
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/policies/activate-baseline", json={"mode": "extreme"}
+            )
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_activate_baseline_requires_admin():
+    from app.main import app
+    with _auth_override("agent"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post(
+                "/policies/activate-baseline", json={"mode": "standard"}
+            )
+    assert response.status_code == 403
