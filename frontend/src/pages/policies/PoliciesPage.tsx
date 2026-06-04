@@ -111,7 +111,7 @@ export function PoliciesPage() {
                 : "border-transparent text-ac-text-muted hover:text-ac-text-primary"
             }`}
           >
-            {t === "active" ? "Active Policies" : t === "library" ? "Policy Library" : "Policy Drift Warnings"}
+            {t === "active" ? "Active policies" : t === "library" ? "Policy library" : "Policy drift warnings"}
           </button>
         ))}
       </div>
