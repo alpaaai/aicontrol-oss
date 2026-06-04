@@ -1,67 +1,77 @@
 import { useState, useEffect } from "react";
-import { listPolicies, deletePolicy } from "@/api/policies";
+import { listPolicies, listLibraryPolicies, deletePolicy } from "@/api/policies";
 import type { Policy } from "@/api/policies";
 import { PolicyTable } from "./PolicyTable";
 import { PolicyEditor } from "./PolicyEditor";
+import { PolicyLibrary } from "./PolicyLibrary";
 import { DriftWarnings } from "./DriftWarnings";
 import { Plus } from "lucide-react";
 
+type Tab = "active" | "library";
+
 export function PoliciesPage() {
+  const [tab, setTab] = useState<Tab>("active");
   const [policies, setPolicies] = useState<Policy[]>([]);
+  const [libraryPolicies, setLibraryPolicies] = useState<Policy[]>([]);
   const [loading, setLoading] = useState(true);
+  const [libraryLoading, setLibraryLoading] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Policy | null>(null);
-  const [frameworkFilter, setFrameworkFilter] = useState("");
 
-  const load = () => {
+  const loadActive = () => {
     setLoading(true);
     listPolicies()
-      .then((data) => setPolicies(data))
+      .then(setPolicies)
       .finally(() => setLoading(false));
   };
 
+  const loadLibrary = () => {
+    setLibraryLoading(true);
+    listLibraryPolicies()
+      .then(setLibraryPolicies)
+      .finally(() => setLibraryLoading(false));
+  };
+
   useEffect(() => {
-    load();
+    loadActive();
   }, []);
+
+  useEffect(() => {
+    if (tab === "library" && libraryPolicies.length === 0) {
+      loadLibrary();
+    }
+  }, [tab]);
 
   const handleDelete = async (p: Policy) => {
     if (!confirm(`Delete policy "${p.name}"? This cannot be undone.`)) return;
     await deletePolicy(p.id);
-    load();
+    loadActive();
   };
 
-  const allFrameworks = Array.from(
-    new Set(policies.flatMap((p) => p.compliance_frameworks ?? []))
-  ).sort();
-
-  const visiblePolicies = frameworkFilter
-    ? policies.filter((p) => p.compliance_frameworks?.includes(frameworkFilter))
-    : policies;
+  const handleActivateLibrary = (policy: Policy) => {
+    setEditTarget({
+      ...policy,
+      id: "",
+      active: true,
+      library: false,
+    } as Policy);
+    setDialogOpen(true);
+  };
 
   return (
     <div className="p-6">
+      {/* Page header */}
       <div className="flex items-center justify-between mb-5 animate-fade-up">
         <div>
-          <h2 className="text-[18px] font-semibold text-ac-text-primary">
-            Policies
-          </h2>
+          <h2 className="text-[18px] font-semibold text-ac-text-primary">Policies</h2>
           <p className="text-sm text-ac-text-muted mt-0.5">
-            {loading ? "—" : `${visiblePolicies.length} policies`}
+            {tab === "active"
+              ? loading ? "—" : `${policies.length} active polic${policies.length !== 1 ? "ies" : "y"}`
+              : `${libraryPolicies.length} templates available`}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          {allFrameworks.length > 0 && (
-            <select
-              value={frameworkFilter}
-              onChange={(e) => setFrameworkFilter(e.target.value)}
-              className="border border-ac-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 bg-white"
-            >
-              <option value="">All frameworks</option>
-              {allFrameworks.map((fw) => (
-                <option key={fw} value={fw}>{fw}</option>
-              ))}
-            </select>
-          )}
+
+        {tab === "active" && (
           <button
             onClick={() => {
               setEditTarget(null);
@@ -71,23 +81,51 @@ export function PoliciesPage() {
           >
             <Plus size={14} /> New policy
           </button>
-        </div>
+        )}
       </div>
 
-      {loading ? (
-        <div className="h-40 bg-gray-50 rounded animate-pulse" />
+      {/* Tabs */}
+      <div className="flex gap-0 mb-5 border-b border-ac-border">
+        {(["active", "library"] as Tab[]).map((t) => (
+          <button
+            key={t}
+            role="tab"
+            onClick={() => setTab(t)}
+            className={`px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
+              tab === t
+                ? "border-ac-primary text-ac-primary"
+                : "border-transparent text-ac-text-muted hover:text-ac-text-primary"
+            }`}
+          >
+            {t === "active" ? "Active Policies" : "Policy Library"}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab content */}
+      {tab === "active" ? (
+        <>
+          {loading ? (
+            <div className="h-40 bg-gray-50 rounded animate-pulse" />
+          ) : (
+            <PolicyTable
+              policies={policies}
+              onEdit={(p) => {
+                setEditTarget(p);
+                setDialogOpen(true);
+              }}
+              onDelete={handleDelete}
+            />
+          )}
+          <DriftWarnings />
+        </>
       ) : (
-        <PolicyTable
-          policies={visiblePolicies}
-          onEdit={(p) => {
-            setEditTarget(p);
-            setDialogOpen(true);
-          }}
-          onDelete={handleDelete}
+        <PolicyLibrary
+          policies={libraryPolicies}
+          loading={libraryLoading}
+          onActivate={handleActivateLibrary}
         />
       )}
-
-      <DriftWarnings />
 
       <PolicyEditor
         open={dialogOpen}
@@ -95,7 +133,7 @@ export function PoliciesPage() {
         onClose={() => setDialogOpen(false)}
         onSaved={() => {
           setDialogOpen(false);
-          load();
+          loadActive();
         }}
       />
     </div>
