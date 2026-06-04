@@ -214,3 +214,116 @@ test.describe("PolicyEditor slide-over", () => {
     await expect(page.getByText(/condition type not supported/i)).toBeVisible();
   });
 });
+
+test("Policy Library tab shows cards grouped by category", async ({ page }) => {
+  const mockLibrary = [
+    {
+      id: "lib-1",
+      name: "block_shell_execution",
+      description: "Block all shell tools",
+      rule_type: "tool_denylist",
+      condition: { blocked_tools: ["bash"] },
+      action: "deny",
+      severity: "critical",
+      active: false,
+      library: true,
+      priority: 10,
+      category: "Dangerous Operations",
+      compliance_frameworks: ["SOC2"],
+      applies_to_agents: 0,
+      created_by: null,
+    },
+    {
+      id: "lib-2",
+      name: "review_write_operations",
+      description: "Review write ops",
+      rule_type: "tool_pattern",
+      condition: { tool_name_contains: ["write"] },
+      action: "review",
+      severity: "medium",
+      active: false,
+      library: true,
+      priority: 30,
+      category: "Human Review Gates",
+      compliance_frameworks: [],
+      applies_to_agents: 0,
+      created_by: null,
+    },
+  ];
+
+  await page.route("http://localhost:8001/policies/library*", (route) =>
+    route.fulfill({ status: 200, body: JSON.stringify(mockLibrary) })
+  );
+
+  await page.goto("/policies");
+  await page.getByRole("tab", { name: "Policy Library" }).click();
+
+  await expect(page.getByText("Dangerous Operations")).toBeVisible();
+  await expect(page.getByText("block_shell_execution")).toBeVisible();
+  await expect(page.getByText("Human Review Gates")).toBeVisible();
+  await expect(page.getByText("review_write_operations")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Preview" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "Activate" }).first()).toBeVisible();
+});
+
+test("Policy Library preview toggle shows condition JSON inline", async ({ page }) => {
+  const mockLibrary = [
+    {
+      id: "lib-1",
+      name: "block_shell_execution",
+      description: "Block all shell tools",
+      rule_type: "tool_denylist",
+      condition: { blocked_tools: ["bash", "exec_command"] },
+      action: "deny",
+      severity: "critical",
+      active: false,
+      library: true,
+      priority: 10,
+      category: "Dangerous Operations",
+      compliance_frameworks: [],
+      applies_to_agents: 0,
+      created_by: null,
+    },
+  ];
+
+  await page.route("http://localhost:8001/policies/library*", (route) =>
+    route.fulfill({ status: 200, body: JSON.stringify(mockLibrary) })
+  );
+
+  await page.goto("/policies");
+  await page.getByRole("tab", { name: "Policy Library" }).click();
+  await page.getByRole("button", { name: "Preview" }).click();
+  await expect(page.getByText("exec_command")).toBeVisible();
+});
+
+test("Policy Library Activate opens PolicyEditor pre-filled", async ({ page }) => {
+  const mockLibrary = [
+    {
+      id: "lib-1",
+      name: "block_shell_execution",
+      description: "Block all shell tools",
+      rule_type: "tool_denylist",
+      condition: { blocked_tools: ["bash"] },
+      action: "deny",
+      severity: "critical",
+      active: false,
+      library: true,
+      priority: 10,
+      category: "Dangerous Operations",
+      compliance_frameworks: [],
+      applies_to_agents: 0,
+      created_by: null,
+    },
+  ];
+
+  await page.route("http://localhost:8001/policies/library*", (route) =>
+    route.fulfill({ status: 200, body: JSON.stringify(mockLibrary) })
+  );
+
+  await page.goto("/policies");
+  await page.getByRole("tab", { name: "Policy Library" }).click();
+  await page.getByRole("button", { name: "Activate" }).click();
+  // PolicyEditor should open with the library policy's name pre-filled
+  await expect(page.getByTestId("policy-editor-panel")).toBeVisible();
+  await expect(page.getByTestId("policy-name-input")).toHaveValue("block_shell_execution");
+});
