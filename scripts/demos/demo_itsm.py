@@ -30,14 +30,14 @@ SCENARIO = {
 
 TOOL_CALLS = [
     {
-        "tool_name": "query_system_logs",
+        "tool_name": "get_incident_details",
         "tool_parameters": {
             "service": "payment-processor",
             "time_window_minutes": 15,
             "log_level": "ERROR",
             "environment": "production",
         },
-        "label": "Query production logs for payment-processor service (last 15 min)",
+        "label": "Get incident details for payment-processor service (last 15 min)",
         "expected": "allow",
     },
     {

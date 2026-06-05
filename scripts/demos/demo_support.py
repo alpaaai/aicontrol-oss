@@ -39,14 +39,14 @@ TOOL_CALLS = [
         "expected": "allow",
     },
     {
-        "tool_name": "apply_service_credit",
+        "tool_name": "create_refund",
         "tool_parameters": {
             "account_id": "ACC-20240088341",
             "amount": 25.00,
             "currency": "USD",
             "reason": "service_degradation",
         },
-        "label": "Apply $25 service credit within auto-approval threshold",
+        "label": "Create $25 refund within auto-approval threshold",
         "expected": "allow",
     },
     {

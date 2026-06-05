@@ -40,7 +40,7 @@ TOOL_CALLS = [
         "expected": "allow",
     },
     {
-        "tool_name": "query_lab_results",
+        "tool_name": "get_lab_results",
         "tool_parameters": {
             "patient_id": "PT-2024-118847",
             "encounter_id": "ENC-20240315-001",

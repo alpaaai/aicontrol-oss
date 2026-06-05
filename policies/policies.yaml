@@ -172,7 +172,7 @@ policies:
     description: "Route claim payments above $5,000 to senior adjuster for human review — insurance demo"
     rule_type: tool_denylist
     condition:
-      blocked_tools: ["approve_claim_payment"]
+      blocked_tools: ["process_claim_payment"]
       numeric_conditions:
         - parameter: amount
           operator: gt
