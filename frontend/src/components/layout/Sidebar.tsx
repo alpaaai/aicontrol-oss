@@ -5,7 +5,7 @@ import {
   Shield, Bot, Key, CheckSquare, Activity,
   Brain, Lightbulb, FileCheck, LogOut, Settings, CreditCard,
   Layers, ShieldCheck, ClipboardList, BarChart3, Sparkles,
-  ChevronRight, HeartPulse, SlidersHorizontal, Play,
+  ChevronRight, HeartPulse, SlidersHorizontal,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
@@ -232,9 +232,6 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* DEMO — separated by a divider */}
-        <div className="mx-4 my-2 border-t border-white/[0.07]" />
-        <NavItem to="/demo" icon={<Play {...iconProps} />} label="Demo" />
       </nav>
 
       {/* User row */}
