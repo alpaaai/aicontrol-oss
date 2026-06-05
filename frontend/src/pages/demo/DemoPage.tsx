@@ -38,15 +38,15 @@ interface SummaryRow {
 }
 
 const DECISION_COLOR: Record<Decision, string> = {
-  allow: "text-green-400",
-  deny: "text-red-400",
-  review: "text-amber-400",
+  allow: "text-green-600",
+  deny: "text-red-600",
+  review: "text-amber-600",
 };
 
 const DECISION_BG: Record<Decision, string> = {
-  allow: "bg-green-900/30 border-green-800/50",
-  deny: "bg-red-900/40 border-red-700/60",
-  review: "bg-amber-900/30 border-amber-800/50",
+  allow: "bg-green-50 border-green-200",
+  deny: "bg-red-50 border-red-200",
+  review: "bg-amber-50 border-amber-200",
 };
 
 function formatTime(d: Date): string {
@@ -88,14 +88,20 @@ export function DemoPage() {
   const [customToolLabel, setCustomToolLabel] = useState("");
   const [customRunning, setCustomRunning] = useState(false);
 
-  // Load status on mount
+  // Load status on mount; if already seeded but no token in env, re-issue silently
   useEffect(() => {
     getDemoStatus()
-      .then((s) => {
+      .then(async (s) => {
         setSeeded(s.seeded);
         if (s.demo_token) {
           setDemoToken(s.demo_token);
           setSeedBadge(true);
+        } else if (s.seeded) {
+          try {
+            const resp = await seedDemo();
+            setDemoToken(resp.demo_token);
+            setSeedBadge(true);
+          } catch { /* silent */ }
         }
       })
       .catch(() => {});
@@ -336,13 +342,13 @@ export function DemoPage() {
     <div className="flex flex-col h-full min-h-0 p-6 gap-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-lg font-semibold text-white">Demo Runner</h1>
-          <p className="text-xs text-white/40 mt-0.5">Live browser-based prospect demo — no terminal required</p>
+          <h1 className="text-lg font-semibold text-gray-900">Demo Runner</h1>
+          <p className="text-xs text-gray-500 mt-0.5">Live browser-based prospect demo — no terminal required</p>
         </div>
         <button
           onClick={handleReset}
           disabled={resetLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-white/50 hover:text-white/80 border border-white/10 hover:border-white/20 rounded transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-gray-200 hover:border-gray-300 rounded transition-colors"
         >
           <RefreshCw size={12} className={resetLoading ? "animate-spin" : ""} />
           Reset
@@ -353,9 +359,9 @@ export function DemoPage() {
         {/* Left panel */}
         <div className="w-[40%] shrink-0 flex flex-col gap-4 overflow-y-auto">
           {/* Selectors */}
-          <div className="bg-ac-night border border-white/[0.08] rounded-lg p-4 space-y-3">
+          <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
             <div>
-              <label className="block text-xs text-white/50 mb-1">Industry</label>
+              <label className="block text-xs text-gray-500 mb-1">Industry</label>
               <select
                 disabled={running}
                 value={industry}
@@ -364,7 +370,7 @@ export function DemoPage() {
                   setScenarioName("");
                   setScenario(null);
                 }}
-                className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-sm text-white/80 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
+                className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
               >
                 <option value="">Select industry…</option>
                 {INDUSTRIES.map((ind) => (
@@ -375,7 +381,7 @@ export function DemoPage() {
 
             {industry && (
               <div>
-                <label className="block text-xs text-white/50 mb-1">Scenario</label>
+                <label className="block text-xs text-gray-500 mb-1">Scenario</label>
                 <select
                   disabled={running}
                   value={scenarioName}
@@ -386,7 +392,7 @@ export function DemoPage() {
                       scenariosForIndustry.find((s) => s.scenario_name === name) ?? null
                     );
                   }}
-                  className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-sm text-white/80 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
+                  className="w-full bg-white border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
                 >
                   <option value="">Select scenario…</option>
                   {scenariosForIndustry.map((s) => (
@@ -401,8 +407,8 @@ export function DemoPage() {
 
           {/* Incident headline card */}
           {scenario && (
-            <div className="bg-[#0F1117] border border-white/[0.08] rounded-lg p-4">
-              <p className="text-xs leading-relaxed text-white/80 italic">
+            <div className="bg-white border border-gray-200 rounded-lg p-4">
+              <p className="text-xs leading-relaxed text-gray-700 italic">
                 {scenario.incident_headline}
               </p>
             </div>
@@ -413,13 +419,13 @@ export function DemoPage() {
             <button
               onClick={handleSeed}
               disabled={seedLoading || running}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white rounded transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 hover:text-gray-900 rounded transition-colors disabled:opacity-50"
             >
               <Leaf size={12} />
               {seedLoading ? "Seeding…" : "Seed"}
             </button>
             {seedBadge && (
-              <span className="text-xs text-green-400 font-medium">Seeded</span>
+              <span className="text-xs text-green-600 font-medium">Seeded</span>
             )}
             <button
               onClick={handleRun}
@@ -433,22 +439,22 @@ export function DemoPage() {
 
           {/* Step-by-step runner */}
           {running && scenario && (
-            <div className="bg-ac-night border border-white/[0.08] rounded-lg p-4 space-y-3">
-              <div className="text-xs text-white/40">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
+              <div className="text-xs text-gray-500">
                 Step {currentStep + 1} of {scenario.tool_calls.length}
               </div>
               <div>
                 <div className="flex items-start gap-2">
                   <ChevronRight size={14} className="text-ac-primary mt-0.5 shrink-0" />
-                  <span className="text-sm text-white/90 font-medium">
+                  <span className="text-sm text-gray-900 font-medium">
                     {scenario.tool_calls[currentStep].label}
                   </span>
                 </div>
                 <div className="mt-2 pl-5 space-y-1">
-                  <div className="text-xs text-white/50">
-                    Tool: <span className="text-cyan-400 font-mono">{scenario.tool_calls[currentStep].tool_name}</span>
+                  <div className="text-xs text-gray-500">
+                    Tool: <span className="text-blue-600 font-mono">{scenario.tool_calls[currentStep].tool_name}</span>
                   </div>
-                  <div className="text-xs text-white/40 font-mono break-all">
+                  <div className="text-xs text-gray-400 font-mono break-all">
                     {JSON.stringify(scenario.tool_calls[currentStep].tool_parameters, null, 2)
                       .split("\n")
                       .slice(0, 6)
@@ -457,7 +463,7 @@ export function DemoPage() {
                 </div>
               </div>
 
-              <div className="text-xs text-white/55 leading-relaxed">
+              <div className="text-xs text-gray-600 leading-relaxed">
                 {scenario.step_narratives[currentStep]}
               </div>
 
@@ -467,7 +473,7 @@ export function DemoPage() {
                   <span className={`font-medium ${DECISION_COLOR[log[log.length - 1].decision!]}`}>
                     {log[log.length - 1].decision?.toUpperCase()}
                   </span>{" "}
-                  <span className="text-white/70">
+                  <span className="text-gray-700">
                     {scenario.decision_narratives[currentStep]?.[log[log.length - 1].decision!]}
                   </span>
                 </div>
@@ -485,13 +491,13 @@ export function DemoPage() {
 
           {/* Custom tool call section */}
           {completed && (
-            <div className="bg-ac-night border border-white/[0.08] rounded-lg p-4 space-y-3">
+            <div className="bg-white border border-gray-200 rounded-lg p-4 space-y-3">
               {!showCustomForm && showCustomPrompt && (
                 <div className="space-y-2">
-                  <p className="text-xs text-white/70">Want to add a tool call with your own policy?</p>
+                  <p className="text-xs text-gray-700">Want to add a tool call with your own policy?</p>
                   <button
                     onClick={() => setShowCustomForm(true)}
-                    className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-white/70 hover:text-white rounded transition-colors"
+                    className="px-3 py-1.5 text-xs bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 hover:text-gray-900 rounded transition-colors"
                   >
                     Yes, show me
                   </button>
@@ -500,22 +506,22 @@ export function DemoPage() {
 
               {showCustomForm && customStep === "policy" && (
                 <div className="space-y-3">
-                  <div className="text-xs text-white/50 font-medium uppercase tracking-wide">Step 1 — Define a Policy</div>
+                  <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Step 1 — Define a Policy</div>
                   <div>
-                    <label className="block text-xs text-white/50 mb-1">Policy name</label>
+                    <label className="block text-xs text-gray-500 mb-1">Policy name</label>
                     <input
                       value={customPolicyName}
                       onChange={(e) => setCustomPolicyName(e.target.value)}
-                      className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                       placeholder="my-custom-policy"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-white/50 mb-1">Rule type</label>
+                    <label className="block text-xs text-gray-500 mb-1">Rule type</label>
                     <select
                       value={customRuleType}
                       onChange={(e) => setCustomRuleType(e.target.value)}
-                      className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                     >
                       <option value="tool_denylist">tool_denylist</option>
                       <option value="parameter_match">parameter_match</option>
@@ -524,12 +530,12 @@ export function DemoPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs text-white/50 mb-1">Condition (JSON)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Condition (JSON)</label>
                     <textarea
                       value={customCondition}
                       onChange={(e) => setCustomCondition(e.target.value)}
                       rows={4}
-                      className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-xs font-mono text-white/80 focus:outline-none focus:border-ac-primary resize-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-ac-primary resize-none"
                     />
                   </div>
                   <button
@@ -544,31 +550,31 @@ export function DemoPage() {
 
               {showCustomForm && customStep === "tool" && (
                 <div className="space-y-3">
-                  <div className="text-xs text-white/50 font-medium uppercase tracking-wide">Step 2 — Add the Tool Call</div>
+                  <div className="text-xs text-gray-500 font-medium uppercase tracking-wide">Step 2 — Add the Tool Call</div>
                   <div>
-                    <label className="block text-xs text-white/50 mb-1">Tool name</label>
+                    <label className="block text-xs text-gray-500 mb-1">Tool name</label>
                     <input
                       value={customToolName}
                       onChange={(e) => setCustomToolName(e.target.value)}
-                      className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                       placeholder="my_tool_name"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-white/50 mb-1">Parameters (JSON)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Parameters (JSON)</label>
                     <textarea
                       value={customToolParams}
                       onChange={(e) => setCustomToolParams(e.target.value)}
                       rows={4}
-                      className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-xs font-mono text-white/80 focus:outline-none focus:border-ac-primary resize-none"
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-ac-primary resize-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-white/50 mb-1">Expected label (display only)</label>
+                    <label className="block text-xs text-gray-500 mb-1">Expected label (display only)</label>
                     <input
                       value={customToolLabel}
                       onChange={(e) => setCustomToolLabel(e.target.value)}
-                      className="w-full bg-[#0F1117] border border-white/10 rounded px-3 py-1.5 text-sm text-white/80 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-gray-50 border border-gray-200 rounded px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                       placeholder="e.g. Exfiltrate customer data"
                     />
                   </div>
