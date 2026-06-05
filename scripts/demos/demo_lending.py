@@ -26,7 +26,7 @@ SCENARIO = {
     "agent_id": "00000000-0000-0000-0000-000000000010",
     "description": (
         "Processes loan applications: pulls credit reports, runs risk model. "
-        "Call 4 triggers the session rate limit (max 3 credit bureau queries per session). "
+        "Call 4 triggers the session rate limit (max 2 credit bureau queries per session). "
         "Call 5 attempts to export a credit report — tool not in agent approved list."
     ),
     "incident_ref": "2024 financial services reconciliation agent exfiltration via repeated scoped queries",

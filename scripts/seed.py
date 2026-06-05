@@ -126,7 +126,7 @@ V2_POLICIES = [
     {
         "name": "deny_credit_bureau_rate_limit",
         "description": (
-            "No agent may query the credit bureau more than 3 times in a single session. "
+            "No agent may query the credit bureau more than 2 times in a single session. "
             "Prevents bulk data extraction via repeated single-record queries."
         ),
         "rule_type": "rate_limit",
@@ -134,7 +134,7 @@ V2_POLICIES = [
             "tools": ["query_credit_bureau"],
             "rate_limit": {
                 "window": "session",
-                "max_calls": 3,
+                "max_calls": 2,
             },
         },
         "action": "deny",

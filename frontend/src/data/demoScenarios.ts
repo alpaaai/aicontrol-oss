@@ -90,7 +90,7 @@ export const DEMO_SCENARIOS: DemoScenario[] = [
       "Credit bureau query for a specific applicant. Approved tool, scoped correctly. Watch the dashboard — audit event already written. Agent name, tool, parameters, session, timestamp. Immutable. This is your evidence trail building in real time.",
       "Risk model. Internal computation, approved. Two rows in the audit log. Both show the full parameters — which applicant, which model, which loan amount.",
       "Second applicant credit query. Scoped correctly, within the authorized set of tools. Allow.",
-      "Third credit bureau call in this session. The policy allows a maximum of 3 credit bureau queries per session. This call triggers the session rate limit. The agent is attempting to pull a third record — same pattern as repeated single-record queries that build into bulk extraction.",
+      "Third credit bureau call in this session. The policy allows a maximum of 2 credit bureau queries per session — this is the third call, so it triggers the session rate limit. The agent is attempting to pull a third record — same pattern as repeated single-record queries that build into bulk extraction.",
       "Export attempt. This tool — export_credit_report — is not in this agent's approved tool list. The agent that's authorized to query credit data is not authorized to export it. That distinction is enforced at the tool call layer, not in the agent's code.",
     ],
     decision_narratives: [
