@@ -49,44 +49,82 @@ const DECISION_BG: Record<Decision, string> = {
   review: "bg-amber-50 border-amber-200",
 };
 
+const STORAGE_KEY = "aicontrol_demo_state";
+
 function formatTime(d: Date): string {
   return d.toLocaleTimeString("en-US", { hour12: false });
 }
 
 export function DemoPage() {
+  // Load persisted state once on mount via lazy initializer
+  const [_saved] = useState<Record<string, unknown>>(() => {
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch { return {}; }
+  });
+
   const [seeded, setSeeded] = useState(false);
   const [demoToken, setDemoToken] = useState<string | null>(null);
   const [seedLoading, setSeedLoading] = useState(false);
   const [seedBadge, setSeedBadge] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
-  const [industry, setIndustry] = useState("");
-  const [scenarioName, setScenarioName] = useState("");
-  const [scenario, setScenario] = useState<DemoScenario | null>(null);
+  const [industry, setIndustry] = useState<string>((_saved.industry as string) ?? "");
+  const [scenarioName, setScenarioName] = useState<string>((_saved.scenarioName as string) ?? "");
+  const [scenario, setScenario] = useState<DemoScenario | null>(
+    (_saved.scenario as DemoScenario | null) ?? null
+  );
 
+  // running is never restored as true — in-flight calls cannot survive navigation
   const [running, setRunning] = useState(false);
-  const [sessionId, setSessionId] = useState<string | null>(null);
-  const [currentStep, setCurrentStep] = useState(0);
+  const [sessionId, setSessionId] = useState<string | null>((_saved.sessionId as string) ?? null);
+  const [currentStep, setCurrentStep] = useState<number>((_saved.currentStep as number) ?? 0);
   const [callInFlight, setCallInFlight] = useState(false);
   const [denyPause, setDenyPause] = useState(false);
-  const [completed, setCompleted] = useState(false);
+  const [completed, setCompleted] = useState<boolean>((_saved.completed as boolean) ?? false);
 
-  const [log, setLog] = useState<LogEntry[]>([]);
-  const [summary, setSummary] = useState<SummaryRow[]>([]);
+  const [log, setLog] = useState<LogEntry[]>((_saved.log as LogEntry[]) ?? []);
+  const [summary, setSummary] = useState<SummaryRow[]>((_saved.summary as SummaryRow[]) ?? []);
   const logEndRef = useRef<HTMLDivElement>(null);
 
   // Custom tool call state
-  const [showCustomPrompt, setShowCustomPrompt] = useState(false);
-  const [showCustomForm, setShowCustomForm] = useState(false);
-  const [customStep, setCustomStep] = useState<"policy" | "tool">("policy");
-  const [customPolicyName, setCustomPolicyName] = useState("");
-  const [customRuleType, setCustomRuleType] = useState("tool_denylist");
-  const [customCondition, setCustomCondition] = useState('{"blocked_tools": ["my_tool"]}');
-  const [customPolicySaved, setCustomPolicySaved] = useState(false);
-  const [customToolName, setCustomToolName] = useState("");
-  const [customToolParams, setCustomToolParams] = useState('{"param": "value"}');
-  const [customToolLabel, setCustomToolLabel] = useState("");
+  const [showCustomPrompt, setShowCustomPrompt] = useState<boolean>((_saved.showCustomPrompt as boolean) ?? false);
+  const [showCustomForm, setShowCustomForm] = useState<boolean>((_saved.showCustomForm as boolean) ?? false);
+  const [customStep, setCustomStep] = useState<"policy" | "tool">(
+    (_saved.customStep as "policy" | "tool") ?? "policy"
+  );
+  const [customPolicyName, setCustomPolicyName] = useState<string>((_saved.customPolicyName as string) ?? "");
+  const [customRuleType, setCustomRuleType] = useState<string>((_saved.customRuleType as string) ?? "tool_denylist");
+  const [customCondition, setCustomCondition] = useState<string>(
+    (_saved.customCondition as string) ?? '{"blocked_tools": ["my_tool"]}'
+  );
+  const [customPolicySaved, setCustomPolicySaved] = useState<boolean>((_saved.customPolicySaved as boolean) ?? false);
+  const [customToolName, setCustomToolName] = useState<string>((_saved.customToolName as string) ?? "");
+  const [customToolParams, setCustomToolParams] = useState<string>(
+    (_saved.customToolParams as string) ?? '{"param": "value"}'
+  );
+  const [customToolLabel, setCustomToolLabel] = useState<string>((_saved.customToolLabel as string) ?? "");
   const [customRunning, setCustomRunning] = useState(false);
+
+  // Persist demo state to sessionStorage so navigating away and back restores it
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
+        industry, scenarioName, scenario,
+        log, summary, completed, currentStep, sessionId,
+        showCustomPrompt, showCustomForm, customStep, customPolicySaved,
+        customPolicyName, customRuleType, customCondition,
+        customToolName, customToolParams, customToolLabel,
+      }));
+    } catch { /* quota exceeded — silently skip */ }
+  }, [
+    industry, scenarioName, scenario,
+    log, summary, completed, currentStep, sessionId,
+    showCustomPrompt, showCustomForm, customStep, customPolicySaved,
+    customPolicyName, customRuleType, customCondition,
+    customToolName, customToolParams, customToolLabel,
+  ]);
 
   // Load status on mount; if already seeded but no token in env, re-issue silently
   useEffect(() => {
@@ -139,6 +177,7 @@ export function DemoPage() {
       setShowCustomPrompt(false);
       setShowCustomForm(false);
       setCustomPolicySaved(false);
+      sessionStorage.removeItem(STORAGE_KEY);
     } catch {
     } finally {
       setResetLoading(false);
@@ -591,20 +630,20 @@ export function DemoPage() {
           )}
         </div>
 
-        {/* Right panel */}
+        {/* Right panel — terminal */}
         <div className="flex-1 flex flex-col min-h-0 bg-[#0F1117] border border-white/[0.08] rounded-lg overflow-hidden">
           {/* Header */}
           <div className="px-4 py-2.5 border-b border-white/[0.06] flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
             <div className="w-2.5 h-2.5 rounded-full bg-amber-500/70" />
             <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
-            <span className="ml-2 text-xs text-white/30 font-mono">aicontrol / intercept</span>
+            <span className="ml-2 text-xs text-white/60 font-mono">aicontrol / intercept</span>
           </div>
 
           {/* Log */}
           <div className="flex-1 overflow-y-auto p-4 font-mono text-xs space-y-3">
             {log.length === 0 && (
-              <div className="text-white/20 text-center mt-8">
+              <div className="text-white/50 text-center mt-8">
                 Select a scenario and click Run to begin.
               </div>
             )}
@@ -621,30 +660,30 @@ export function DemoPage() {
                   key={i}
                   className={`space-y-1 ${entry.decision === "deny" ? "border-l-2 border-red-600/50 pl-3" : ""}`}
                 >
-                  <div className="text-white/30">
+                  <div className="text-white">
                     [{entry.timestamp}] Step {entry.step} — {entry.tool_name}
                   </div>
                   {entry.pending ? (
-                    <div className="text-white/50 animate-pulse">  → sending…</div>
+                    <div className="text-white/90 animate-pulse">  → sending…</div>
                   ) : (
                     <>
                       <div className="flex items-center gap-2">
-                        <span className="text-white/40">  →</span>
+                        <span className="text-white">  →</span>
                         <span className={`font-bold ${DECISION_COLOR[entry.decision!]}`}>
                           {entry.decision?.toUpperCase()}
                         </span>
                         {entry.reason && (
-                          <span className="text-white/35">| reason: {entry.reason}</span>
+                          <span className="text-white">| reason: {entry.reason}</span>
                         )}
                         {entry.duration_ms !== undefined && (
-                          <span className="text-white/25">| {entry.duration_ms}ms</span>
+                          <span className="text-white/70">| {entry.duration_ms}ms</span>
                         )}
                       </div>
                       {entry.slack_message && (
                         <div className="text-amber-400/70 pl-4">⚑ {entry.slack_message}</div>
                       )}
                       {entry.audit_event_id && (
-                        <div className="text-white/20 pl-4">audit_event_id: {entry.audit_event_id}</div>
+                        <div className="text-white/60 pl-4">audit_event_id: {entry.audit_event_id}</div>
                       )}
                     </>
                   )}
@@ -655,10 +694,10 @@ export function DemoPage() {
             {/* Summary */}
             {completed && summary.length > 0 && (
               <div className="mt-4 border-t border-white/[0.08] pt-4 space-y-3">
-                <div className="text-white/50 text-xs font-semibold uppercase tracking-wider">Session Summary</div>
+                <div className="text-white text-xs font-semibold uppercase tracking-wider">Session Summary</div>
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="text-white/30 border-b border-white/[0.06]">
+                    <tr className="text-white border-b border-white/[0.06]">
                       <th className="text-left pb-1 pr-3">Step</th>
                       <th className="text-left pb-1 pr-3">Tool</th>
                       <th className="text-left pb-1 pr-3">Decision</th>
@@ -669,19 +708,19 @@ export function DemoPage() {
                   <tbody>
                     {summary.map((row) => (
                       <tr key={row.step} className="border-b border-white/[0.04]">
-                        <td className="py-1 pr-3 text-white/40">{row.step}</td>
+                        <td className="py-1 pr-3 text-white">{row.step}</td>
                         <td className="py-1 pr-3 text-cyan-400">{row.tool}</td>
                         <td className={`py-1 pr-3 font-medium ${DECISION_COLOR[row.decision]}`}>
                           {row.decision.toUpperCase()}
                         </td>
-                        <td className="py-1 pr-3 text-white/40 max-w-[200px] truncate">{row.reason}</td>
-                        <td className="py-1 text-right text-white/30">{row.ms}</td>
+                        <td className="py-1 pr-3 text-white max-w-[200px] truncate">{row.reason}</td>
+                        <td className="py-1 text-right text-white/70">{row.ms}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
 
-                <div className="text-white/40 text-xs">
+                <div className="text-white text-xs">
                   {["allow", "deny", "review"].map((d) => {
                     const count = summary.filter((r) => r.decision === d).length;
                     if (count === 0) return null;
@@ -694,7 +733,7 @@ export function DemoPage() {
                 </div>
 
                 {scenario && (
-                  <div className="text-white/55 text-xs italic leading-relaxed">
+                  <div className="text-white text-xs italic leading-relaxed">
                     {scenario.closing_line}
                   </div>
                 )}
