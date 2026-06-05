@@ -1,11 +1,24 @@
+import os
+from pathlib import Path
 from typing import Literal
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def _find_env_file() -> str:
+    """Walk up from this file's location to find the nearest .env file."""
+    search = Path(__file__).resolve().parent
+    for _ in range(6):
+        candidate = search / ".env"
+        if candidate.is_file():
+            return str(candidate)
+        search = search.parent
+    return ".env"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=_find_env_file(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
@@ -25,6 +38,9 @@ class Settings(BaseSettings):
     AICONTROL_LICENSE_KEY: str = ""
     CORS_ORIGINS: str = "http://localhost:3000"
     FRONTEND_BASE_URL: str = "http://localhost:3000"
+
+    # Demo dashboard — pre-issued agent JWT for browser-based demo runner.
+    DEMO_TOKEN: str = ""
 
     # AI-native features — customer's own LLM account. AIControl never bills tokens.
     LLM_PROVIDER: str = "anthropic"
