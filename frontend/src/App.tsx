@@ -24,6 +24,7 @@ import { IntelligencePage } from "./pages/intelligence/IntelligencePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import BillingPage from "./pages/BillingPage";
+import { DemoPage } from "./pages/demo/DemoPage";
 
 function RequireSetupOrAuth({ children }: { children: React.ReactElement }) {
   const auth = getStoredAuth();
@@ -76,6 +77,7 @@ export default function App() {
           <Route path="reports"       element={<ReportsPage />} />
           <Route path="settings"      element={<SettingsPage />} />
           <Route path="billing"       element={<BillingPage />} />
+          <Route path="demo"          element={<DemoPage />} />
         </Route>
       </Routes>
     </BrowserRouter>
