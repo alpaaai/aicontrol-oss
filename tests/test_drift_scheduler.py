@@ -6,7 +6,7 @@ from httpx import AsyncClient, ASGITransport
 
 import pytest
 
-from app.services.drift_detector import (
+from enterprise.app.services.drift_detector import (
     AgentSnapshot,
     DriftDetector,
     PolicySnapshot,
@@ -36,11 +36,11 @@ def db_session_factory_mock():
 @pytest.mark.asyncio
 async def test_run_once_calls_reconcile(db_session_factory_mock):
     """run_once() calls _reconcile with output of detect_drift."""
-    with patch("app.services.drift_detector._load_agents", new_callable=AsyncMock,
+    with patch("enterprise.app.services.drift_detector._load_agents", new_callable=AsyncMock,
                return_value=[]), \
-         patch("app.services.drift_detector._load_policies", new_callable=AsyncMock,
+         patch("enterprise.app.services.drift_detector._load_policies", new_callable=AsyncMock,
                return_value=[]), \
-         patch("app.services.drift_detector._reconcile", new_callable=AsyncMock) as mock_rec:
+         patch("enterprise.app.services.drift_detector._reconcile", new_callable=AsyncMock) as mock_rec:
         detector = DriftDetector(db_session_factory_mock, interval_hours=6)
         await detector.run_once()
         mock_rec.assert_called_once()
@@ -48,11 +48,11 @@ async def test_run_once_calls_reconcile(db_session_factory_mock):
 
 @pytest.mark.asyncio
 async def test_run_once_sets_status_healthy_on_success(db_session_factory_mock):
-    with patch("app.services.drift_detector._load_agents", new_callable=AsyncMock,
+    with patch("enterprise.app.services.drift_detector._load_agents", new_callable=AsyncMock,
                return_value=[]), \
-         patch("app.services.drift_detector._load_policies", new_callable=AsyncMock,
+         patch("enterprise.app.services.drift_detector._load_policies", new_callable=AsyncMock,
                return_value=[]), \
-         patch("app.services.drift_detector._reconcile", new_callable=AsyncMock):
+         patch("enterprise.app.services.drift_detector._reconcile", new_callable=AsyncMock):
         detector = DriftDetector(db_session_factory_mock, interval_hours=6)
         await detector.run_once()
         assert detector.status == "healthy"
@@ -60,7 +60,7 @@ async def test_run_once_sets_status_healthy_on_success(db_session_factory_mock):
 
 @pytest.mark.asyncio
 async def test_run_once_sets_status_degraded_on_exception(db_session_factory_mock):
-    with patch("app.services.drift_detector._load_agents",
+    with patch("enterprise.app.services.drift_detector._load_agents",
                new_callable=AsyncMock, side_effect=Exception("DB error")):
         detector = DriftDetector(db_session_factory_mock, interval_hours=6)
         await detector.run_once()
@@ -69,11 +69,11 @@ async def test_run_once_sets_status_degraded_on_exception(db_session_factory_moc
 
 @pytest.mark.asyncio
 async def test_stop_cancels_task(db_session_factory_mock):
-    with patch("app.services.drift_detector._load_agents", new_callable=AsyncMock,
+    with patch("enterprise.app.services.drift_detector._load_agents", new_callable=AsyncMock,
                return_value=[]), \
-         patch("app.services.drift_detector._load_policies", new_callable=AsyncMock,
+         patch("enterprise.app.services.drift_detector._load_policies", new_callable=AsyncMock,
                return_value=[]), \
-         patch("app.services.drift_detector._reconcile", new_callable=AsyncMock), \
+         patch("enterprise.app.services.drift_detector._reconcile", new_callable=AsyncMock), \
          patch("asyncio.sleep", new_callable=AsyncMock):
         detector = DriftDetector(db_session_factory_mock, interval_hours=6)
         detector.start()
