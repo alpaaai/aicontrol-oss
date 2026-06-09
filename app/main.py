@@ -20,13 +20,13 @@ from app.routers.slack_actions import router as slack_router
 from app.routers.tokens import router as tokens_router
 from app.routers.license import router as license_router
 from app.routers.billing import router as billing_router
-from app.routers.warnings import router as warnings_router
+from enterprise.app.routers.warnings import router as warnings_router
 from app.routers.users import router as users_router
 from app.routers.setup import router as setup_router
 from app.routers.org_settings import router as org_settings_router
 from enterprise.compliance.router import router as compliance_router
 from app.routers.demo import router as demo_router
-from app.services.drift_detector import DriftDetector
+from enterprise.app.services.drift_detector import DriftDetector
 from app.services.opa_health_watcher import OpaHealthWatcher
 from app.services.policy_loader import load_all, push_rego_to_opa
 

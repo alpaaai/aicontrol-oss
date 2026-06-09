@@ -12,7 +12,7 @@ def test_policy_warning_model_importable():
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
-from app.services.drift_detector import AgentSnapshot, PolicySnapshot, detect_drift
+from enterprise.app.services.drift_detector import AgentSnapshot, PolicySnapshot, detect_drift
 
 
 def _agent(name, tools):
