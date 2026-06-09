@@ -1,0 +1,35 @@
+name: Mirror OSS
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  mirror:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Strip enterprise directory
+        run: |
+          rm -rf enterprise/
+
+      - name: Swap README for OSS version
+        run: |
+          mv README-OSS.md README.md
+
+      - name: Push to OSS mirror
+        uses: cpina/github-action-push-to-another-repository@v1.7.2
+        env:
+          SSH_DEPLOY_KEY: ${{ secrets.OSS_MIRROR_DEPLOY_KEY }}
+        with:
+          source-directory: '.'
+          destination-github-username: 'alpaaai'
+          destination-repository-name: 'aicontrol-oss'
+          target-branch: main
+          commit-message: 'sync: ${{ github.sha }}'
+          create-target-branch-if-needed: true

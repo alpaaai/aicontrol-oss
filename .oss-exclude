@@ -1,0 +1,6 @@
+# Files excluded from the OSS mirror (github.com/alpaaai/aicontrol-oss)
+# The GitHub Action mirror-oss.yml strips these before every push to main.
+#
+# This file is documentation only — the Action uses rm -rf directly.
+
+enterprise/     # Compliance export, license gate, enterprise-only features
