@@ -1,153 +1,110 @@
-# AIControl — The Control Plane for AI Agents
+# AIControl — Runtime Governance for AI Agents
 
-[![CI](https://github.com/alpaaai/aicontrol/actions/workflows/release.yml/badge.svg)](https://github.com/alpaaai/aicontrol/actions)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-
-> Intercepts every AI agent tool call before execution. Evaluates against OPA policies.
-> Logs everything to an append-only audit trail. Self-hosted — your data never leaves
-> your environment.
+![License](https://img.shields.io/badge/license-MIT-blue)
+![Docker](https://img.shields.io/badge/docker-ready-brightgreen)
+![Python](https://img.shields.io/badge/python-3.14-blue)
 
 ---
 
-## How It Works
-
-```
-  AI Agent
-     │
-     ▼
-POST /intercept ──► OPA Policy Evaluation ──► allow / deny / review
-     │                      │
-     │              audit_events (append-only)
-     │                      │
-     ▼                      ▼
-  Agent gets         React Dashboard
-  decision           (port 3000)
-```
-
-One API call in your agent's tool execution path.
-Policies evaluated in under 10ms. Every decision logged — no exceptions.
+AI agents are now handling purchasing decisions, customer refunds, clinical documentation,
+and infrastructure changes. Security teams have one question: what stops them from doing
+something they shouldn't. AIControl sits between your agents and their tools — every call
+evaluated against policy before execution, every decision logged, nothing escalated without
+a human sign-off.
 
 ---
 
-## Quick Start
+- **OPA-based policy enforcement** — every tool call evaluated before execution
+- **Immutable audit trail** — every decision logged with full parameters and policy attribution
+- **Human-in-the-loop review queue** — escalate to a human reviewer when policy requires it
+- **Self-hosted, one command** — runs on your infrastructure, no cloud dependency
+
+---
+
+## Quick start
 
 ```bash
-git clone https://github.com/alpaaai/aicontrol
-cd aicontrol
-cp .env.example .env          # set POSTGRES_PASSWORD, optional SLACK_BOT_TOKEN
-bash install.sh               # pull images, run migrations, seed demo agents + tokens
-bash scripts/quickstart.sh    # seed demo data, run lending scenario, open dashboard
+git clone https://github.com/alpaaai/aicontrol-oss
+cd aicontrol-oss
+bash install.sh
+# Dashboard → http://localhost:3000
+# API       → http://localhost:8001
 ```
 
-**First-time setup:** Open `http://localhost:3000` — the setup wizard runs automatically on first launch. Set your organisation name, timezone, and root admin email + password. After setup, login with those credentials.
+`install.sh` generates a `.env` with real secrets, pulls images, runs
+database migrations, and seeds demo agents — a bare `docker compose up`
+skips all of that (it also won't start the API or dashboard at all, since
+those live in `docker-compose.app.yml`, not the default compose file).
 
-**Dashboard:** http://localhost:3000
-**API docs:** http://localhost:8001/docs
-**Health:** http://localhost:8001/health
-
----
-
-## Plans
-
-| Feature | Community | Business | Enterprise |
-|---------|-----------|----------|------------|
-| OPA policy enforcement (deterministic) | ✅ | ✅ | ✅ |
-| Per-agent approved_tools enforcement | ✅ | ✅ | ✅ |
-| Rate-based policies (session + rolling window) | ✅ | ✅ | ✅ |
-| Append-only audit log (7-day retention) | ✅ | — | — |
-| Append-only audit log (1-year retention) | — | ✅ | ✅ |
-| React dashboard | ✅ | ✅ | ✅ |
-| First-run setup wizard | ✅ | ✅ | ✅ |
-| User management (invite, deactivate, reset password) | ✅ | ✅ | ✅ |
-| Policy library (18 pre-built templates) | ✅ | ✅ | ✅ |
-| Baseline activation wizard | ✅ | ✅ | ✅ |
-| HITL review queue (in-dashboard) | ✅ | ✅ | ✅ |
-| Slack HITL notifications | — | ✅ | ✅ |
-| Audit log CSV export | — | — | ✅ |
-| OPA health-watch + observability dashboard | — | — | ✅ |
-| Policy drift detection + warning feed | — | — | ✅ |
-| Compliance report export (PDF — SOC 2, HIPAA, GLBA) | — | — | ✅ |
-
-**Business:** $49/month + $15 per million intercepts. Contact: hello@aictl.io
-**Enterprise:** $149/month + $25.25 per million intercepts. Contact: hello@aictl.io
-
-To enable Business or Enterprise features, add `AICONTROL_LICENSE_KEY=your-key` to `.env` and restart:
+Want 30 days of realistic historical activity in the dashboard instead of
+a blank audit log? After `install.sh` finishes:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.app.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.demo.yml up demo-seed
 ```
-
-License is read from the API at runtime — no frontend rebuild required.
 
 ---
 
-## Components
+## How it works
 
-| Component | Image | Port |
-|-----------|-------|------|
-| API (FastAPI) | `ghcr.io/alpaaai/aicontrol-api:latest` | 8001 |
-| React Dashboard | `ghcr.io/alpaaai/aicontrol-frontend:latest` | 3000 |
-| OPA (policy engine) | `openpolicyagent/opa:latest-debug` | 8181 |
-| PostgreSQL 15 | `postgres:15` | 5432 |
-
-Two Docker Compose files:
-- `docker-compose.yml` — infrastructure (Postgres + OPA)
-- `docker-compose.app.yml` — application (API + React dashboard)
+```
+Your Agent ──► POST /intercept ──► OPA Policy Engine ──► allow / deny / review
+                                           │
+                                  Immutable Audit Log
+                                     (PostgreSQL)
+                                           │
+                              HITL Review Queue (Slack / Teams)
+```
 
 ---
 
 ## Integration
 
 ```python
-import httpx
+from aicontrol import control
 
-response = httpx.post(
-    "http://aicontrol:8001/intercept",
-    headers={"Authorization": f"Bearer {AICONTROL_TOKEN}"},
-    json={
-        "session_id": session_id,
-        "agent_id": agent_id,
-        "agent_name": "my-agent",
-        "tool_name": tool_name,
-        "tool_parameters": tool_parameters,
-        "sequence_number": seq,
-    }
-)
-decision = response.json()["decision"]  # "allow" | "deny" | "review"
+@control
+def create_purchase_order(vendor_id: str, amount: float) -> dict:
+    # AIControl evaluates this call against your policies before it runs
+    ...
 ```
 
-Framework wrappers: LangChain, CrewAI, OpenAI Agents SDK, AutoGen, MCP.
-See [aictl.io/docs/integration](https://aictl.io/docs/integration).
+Set `AICONTROL_URL`, `AICONTROL_TOKEN`, and `AICONTROL_AGENT_ID` in your environment.
+That's the entire integration.
 
 ---
 
-## Scripts Reference
+## Policy example
 
-| Script | Purpose |
-|--------|---------|
-| `bash install.sh` | First-time setup — pull images, run migrations, seed demo agents, issue tokens |
-| `bash scripts/quickstart.sh` | Demo-ready — seed V2 demo data, run lending scenario, open browser |
-| `bash verify.sh` | Health checks — verify all components are running |
-| `bash diagnose.sh` | Debug output — attach to support requests |
-| `python scripts/seed.py` | Seed demo agents and policies (idempotent) |
-| `python scripts/seed_library_policies.py` | Seed 18 pre-built policy library templates (idempotent) |
-| `python scripts/demo_reset.py` | Reset audit log for a clean demo run |
-| `python scripts/demos/run_demo.py --scenario lending` | Run an industry demo scenario |
-| `python scripts/onboard_agent.py --name "agent-name" --desc "desc"` | Register agent + issue token in one step |
-| `python scripts/issue_token.py --role agent --desc "desc"` | Issue a new API token |
-| `python scripts/revoke_token.py --id TOKEN_UUID` | Revoke a token |
-| `python scripts/issue_license.py --company "Acme" --plan enterprise --days 365` | Generate an offline license key (requires private key) |
-| `python scripts/reset_password.py --email admin@company.com` | CLI password reset for locked-out users (admin escape hatch) |
+```yaml
+- name: require_approval_large_purchase_order
+  description: "Purchase orders above $50,000 require human approval before submission"
+  rule_type: tool_denylist
+  condition:
+    tool_name: submit_purchase_order
+    numeric_conditions:
+      - parameter: amount
+        operator: gt
+        value: 50000
+    on_exceed: review
+  active: true
+  compliance_tags: ["SOC2", "internal-controls"]
+```
 
----
-
-## Documentation
-
-**[aictl.io/docs](https://aictl.io/docs)**
+Policies are YAML, enforced by OPA, pushed live without restart.
 
 ---
 
-## License
+## Enterprise edition
 
-MIT — community edition.
-Enterprise features require a license key. Contact hello@aictl.io.
+AIControl Community is MIT-licensed and fully self-hostable.
+AIControl Enterprise adds the compliance evidence package, RBAC, and dedicated support.
+[Learn more at aictl.io](https://aictl.io)
+
+---
+
+## Links
+
+- Documentation: https://aictl.io/docs
+- Issues: https://github.com/alpaaai/aicontrol-oss/issues
+- Design Partner Program: https://aictl.io/design-partners
