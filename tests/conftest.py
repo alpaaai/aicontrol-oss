@@ -99,6 +99,21 @@ async def _cleanup_test_agents():
         await session.commit()
 
 
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _cleanup_test_admission_scans():
+    """Session setup + teardown: remove admission_scans rows created by
+    test_admission_scans_api.py (target_ref='/some/skill') so they don't
+    accumulate across pytest runs."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        await session.execute(text("DELETE FROM admission_scans WHERE target_ref = '/some/skill'"))
+        await session.commit()
+    yield
+    async with async_session_factory() as session:
+        await session.execute(text("DELETE FROM admission_scans WHERE target_ref = '/some/skill'"))
+        await session.commit()
+
+
 @pytest_asyncio.fixture(scope="session")
 async def _seed_and_token_setup():
     """Session-scoped: seed demo agents + issue admin and agent tokens once."""
