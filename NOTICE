@@ -1,0 +1,26 @@
+AIControl
+Copyright (c) 2026 AIControl
+
+This product includes software developed by third parties, licensed
+separately from AIControl's own MIT license (see LICENSE). Their licenses
+and copyright notices are reproduced below and are governed by the terms
+of their respective licenses.
+
+--------------------------------------------------------------------------
+cisco-ai-skill-scanner
+--------------------------------------------------------------------------
+Source:  https://github.com/cisco-ai-defense/skill-scanner
+Package: cisco-ai-skill-scanner (PyPI)
+License: Apache License, Version 2.0
+
+AIControl invokes this package as an isolated subprocess (never imported
+in-process) to run its default deterministic analyzers only — see
+app/services/scanners/skill_scanner_adapter.py. The optional LLM/cloud
+analysis modes (--use-llm, --use-aidefense, --use-virustotal) are never
+enabled by AIControl.
+
+The upstream project's own LICENSE file is an abbreviated short-form
+notice rather than the full Apache License 2.0 text. The full license
+text is reproduced here for completeness: third_party_licenses/APACHE-2.0.txt
+
+Copyright (c) Cisco Systems, Inc. and its affiliates.
