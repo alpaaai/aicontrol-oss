@@ -21,15 +21,25 @@ from app.routers.slack_actions import router as slack_router
 from app.routers.tokens import router as tokens_router
 from app.routers.license import router as license_router
 from app.routers.billing import router as billing_router
-from enterprise.app.routers.warnings import router as warnings_router
 from app.routers.users import router as users_router
 from app.routers.setup import router as setup_router
 from app.routers.org_settings import router as org_settings_router
-from enterprise.compliance.router import router as compliance_router
 from app.routers.demo import router as demo_router
-from enterprise.app.services.drift_detector import DriftDetector
 from app.services.opa_health_watcher import OpaHealthWatcher
 from app.services.policy_loader import load_all, push_rego_to_opa
+
+# enterprise/ is proprietary and physically absent from the public OSS
+# mirror (.github/workflows/mirror-oss.yml runs `rm -rf enterprise/` before
+# pushing to github.com/alpaaai/aicontrol-oss) — these imports must stay
+# optional so every OSS deployment can still boot.
+try:
+    from enterprise.app.routers.warnings import router as warnings_router
+    from enterprise.compliance.router import router as compliance_router
+    from enterprise.app.services.drift_detector import DriftDetector
+except ImportError:
+    warnings_router = None
+    compliance_router = None
+    DriftDetector = None
 
 configure_logging(env=_settings.app_env)
 logger = get_logger("main")
@@ -50,8 +60,8 @@ async def lifespan(app: FastAPI):
     opa_watcher.start()
     app.state.opa_watcher = opa_watcher
 
-    # DriftDetector — enterprise only
-    if _settings.AICONTROL_LICENSE_KEY:
+    # DriftDetector — enterprise only, and only importable when enterprise/ is present
+    if _settings.AICONTROL_LICENSE_KEY and DriftDetector is not None:
         drift_detector = DriftDetector(
             session_factory=async_session_factory,
             interval_hours=_settings.drift_scan_interval_hours,
@@ -104,11 +114,13 @@ app.include_router(sessions_router)
 app.include_router(slack_router)
 app.include_router(tokens_router)
 app.include_router(billing_router)
-app.include_router(warnings_router)
 app.include_router(users_router)
 app.include_router(org_settings_router)
-app.include_router(compliance_router)
 app.include_router(demo_router)
+if warnings_router is not None:
+    app.include_router(warnings_router)
+if compliance_router is not None:
+    app.include_router(compliance_router)
 
 
 @app.get("/health")

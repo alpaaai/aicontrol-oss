@@ -1,6 +1,6 @@
 # AIControl — The Control Plane for AI Agents
 
-[![CI](https://github.com/alpaaai/aicontrol/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/alpaaai/aicontrol/actions)
+[![CI](https://github.com/alpaaai/aicontrol/actions/workflows/release.yml/badge.svg)](https://github.com/alpaaai/aicontrol/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > Intercepts every AI agent tool call before execution. Evaluates against OPA policies.

@@ -26,10 +26,21 @@ a human sign-off.
 ```bash
 git clone https://github.com/alpaaai/aicontrol-oss
 cd aicontrol-oss
-cp _env.example .env
-docker compose up
+bash install.sh
 # Dashboard → http://localhost:3000
 # API       → http://localhost:8001
+```
+
+`install.sh` generates a `.env` with real secrets, pulls images, runs
+database migrations, and seeds demo agents — a bare `docker compose up`
+skips all of that (it also won't start the API or dashboard at all, since
+those live in `docker-compose.app.yml`, not the default compose file).
+
+Want 30 days of realistic historical activity in the dashboard instead of
+a blank audit log? After `install.sh` finishes:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.demo.yml up demo-seed
 ```
 
 ---
