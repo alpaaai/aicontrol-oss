@@ -25,6 +25,9 @@ async def write_event(
     policy_name: Optional[str] = None,
     tool_response: Optional[dict] = None,
     risk_delta: int = 0,
+    input_tokens: Optional[int] = None,
+    output_tokens: Optional[int] = None,
+    cost_usd: Optional[float] = None,
 ) -> uuid.UUID:
     """Persist one audit event. Returns the new event's UUID."""
     event_id = uuid.uuid4()
@@ -43,6 +46,9 @@ async def write_event(
         sequence_number=sequence_number,
         duration_ms=duration_ms,
         risk_delta=risk_delta,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=cost_usd,
     )
     session.add(event)
     await session.flush()

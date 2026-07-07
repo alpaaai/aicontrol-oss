@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import UUID, Boolean, ForeignKey, Integer, String, Text, TIMESTAMP
+from sqlalchemy import UUID, Boolean, ForeignKey, Integer, Numeric, String, Text, TIMESTAMP
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 from sqlalchemy.sql import func
@@ -93,6 +93,9 @@ class AuditEvent(Base):
     decision_reason: Mapped[Optional[str]] = mapped_column(Text)
     risk_delta: Mapped[Optional[int]] = mapped_column(Integer, server_default="0")
     duration_ms: Mapped[Optional[int]] = mapped_column(Integer)
+    input_tokens: Mapped[Optional[int]] = mapped_column(Integer)
+    output_tokens: Mapped[Optional[int]] = mapped_column(Integer)
+    cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6))
     created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, server_default=func.now())
 
     session: Mapped[Optional["Session"]] = relationship(back_populates="audit_events")

@@ -330,3 +330,55 @@ async def test_ensure_session_noop_when_exists():
     mock_db.flush.assert_not_called()
 
 
+@pytest.mark.asyncio
+async def test_intercept_passes_token_fields_to_write_event():
+    """POST /intercept must forward input_tokens/output_tokens/cost_usd to write_event."""
+    from app.main import app
+
+    write_event_mock = AsyncMock(return_value=uuid.uuid4())
+    payload = make_payload()
+    payload["input_tokens"] = 200
+    payload["output_tokens"] = 80
+    payload["cost_usd"] = 0.0125
+
+    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+        return_value={"decision": "allow", "reason": "default_allow"}
+    )), patch("app.routers.intercept.write_event", new=write_event_mock), patch(
+        "app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])
+    ), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/intercept", json=payload)
+
+    assert response.status_code == 200
+    call_kwargs = write_event_mock.call_args.kwargs
+    assert call_kwargs["input_tokens"] == 200
+    assert call_kwargs["output_tokens"] == 80
+    assert call_kwargs["cost_usd"] == 0.0125
+
+
+@pytest.mark.asyncio
+async def test_intercept_token_fields_optional():
+    """POST /intercept must still work when token fields are omitted (backward compatible)."""
+    from app.main import app
+
+    write_event_mock = AsyncMock(return_value=uuid.uuid4())
+
+    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+        return_value={"decision": "allow", "reason": "default_allow"}
+    )), patch("app.routers.intercept.write_event", new=write_event_mock), patch(
+        "app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])
+    ), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/intercept", json=make_payload())
+
+    assert response.status_code == 200
+    call_kwargs = write_event_mock.call_args.kwargs
+    assert call_kwargs["input_tokens"] is None
+    assert call_kwargs["output_tokens"] is None
+    assert call_kwargs["cost_usd"] is None
+
+
