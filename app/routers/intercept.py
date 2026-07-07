@@ -35,6 +35,9 @@ class InterceptRequest(BaseModel):
     tool_name: str
     tool_parameters: dict[str, Any] = {}
     sequence_number: int
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    cost_usd: Optional[float] = None
 
 
 class InterceptResponse(BaseModel):
@@ -188,6 +191,9 @@ async def intercept(
         risk_delta=RISK_SCORE_DELTA.get(opa_result["decision"], 0),
         policy_name=fired_policy_name,
         policy_id=uuid.UUID(fired_policy_id) if fired_policy_id else None,
+        input_tokens=request.input_tokens,
+        output_tokens=request.output_tokens,
+        cost_usd=request.cost_usd,
     )
 
     review_id: Optional[uuid.UUID] = None

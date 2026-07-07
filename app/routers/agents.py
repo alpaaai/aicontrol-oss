@@ -1,14 +1,15 @@
-"""Agent registration CRUD — admin only."""
+"""Agent registration CRUD — admin only, except /register (agent or admin — see below)."""
+import json
 import uuid
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import case, func, select, update
+from sqlalchemy import case, func, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import require_admin
+from app.core.auth import require_admin, require_agent
 from app.core.logging import get_logger
 from app.models.database import get_db
 from app.models.schemas import Agent, APIToken, AuditEvent
@@ -82,6 +83,49 @@ class ApprovedToolsResponse(BaseModel):
 
     agent_id: uuid.UUID
     approved_tools: list[str]
+
+
+class AgentRegisterRequest(BaseModel):
+    name: str
+    owner: str = "sdk-auto-registered"
+    framework: Optional[str] = None
+    approved_tools: list[str] = []
+
+
+@router.post("/register", response_model=AgentResponse)
+async def register_agent(
+    body: AgentRegisterRequest,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+    _token: dict = Depends(require_agent),
+) -> AgentResponse:
+    """Zero-friction SDK self-registration: idempotent get-or-create by name.
+
+    Open to agent-role tokens (not admin-only) so instrument() can register
+    an agent on first call with no separate onboarding step. Returns 201 for
+    a freshly created agent, 200 when one with this name already existed.
+    """
+    new_id = uuid.uuid4()
+    result = await db.execute(
+        text("""
+            INSERT INTO agents (id, name, owner, status, framework, approved_tools)
+            VALUES (:id, :name, :owner, 'active', :framework, CAST(:tools AS jsonb))
+            ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+            RETURNING id, (xmax = 0) AS inserted
+        """),
+        {
+            "id": str(new_id),
+            "name": body.name,
+            "owner": body.owner,
+            "framework": body.framework,
+            "tools": json.dumps(body.approved_tools),
+        },
+    )
+    row = result.one()
+    await db.commit()
+    response.status_code = 201 if row.inserted else 200
+    logger.info("agent_self_registered", agent_id=str(row.id), name=body.name, created=row.inserted)
+    return await db.get(Agent, row.id)
 
 
 @router.get("", response_model=list[AgentListItem])
