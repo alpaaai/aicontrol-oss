@@ -143,3 +143,19 @@ class APIToken(Base):
         nullable=True,
         default=None,
     )
+
+
+class AdmissionScan(Base):
+    __tablename__ = "admission_scans"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    agent_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("agents.id"))
+    target_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    target_ref: Mapped[str] = mapped_column(Text, nullable=False)
+    scanner_name: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="pending")
+    findings: Mapped[list] = mapped_column(JSONB, nullable=False, server_default="[]")
+    severity_summary: Mapped[dict] = mapped_column(JSONB, nullable=False, server_default="{}")
+    started_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, server_default=func.now())
