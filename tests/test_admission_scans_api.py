@@ -18,6 +18,26 @@ def _auth(role: str = "admin"):
 
 
 @pytest.mark.asyncio
+async def test_no_accumulated_test_admission_scans():
+    """Zero target_ref='/some/skill' rows should exist at session start.
+
+    Fails when the cleanup fixture is missing, proving that this file's
+    other tests leak rows into the DB across pytest runs (the router
+    writes through the real get_db dependency — only auth is mocked).
+    """
+    from sqlalchemy import text
+    from app.models.database import async_session_factory
+    async with async_session_factory() as db:
+        count = (await db.execute(
+            text("SELECT COUNT(*) FROM admission_scans WHERE target_ref = '/some/skill'")
+        )).scalar()
+    assert count == 0, (
+        f"{count} admission_scans pollution rows found. "
+        "Add _cleanup_test_admission_scans fixture to conftest.py."
+    )
+
+
+@pytest.mark.asyncio
 async def test_create_admission_scan_requires_admin():
     with _auth(role="agent") as app:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

@@ -16,6 +16,7 @@ import { SessionsPage } from "./pages/sessions/SessionsPage";
 import { SessionDetailPage } from "./pages/sessions/SessionDetailPage";
 import { PoliciesPage } from "./pages/policies/PoliciesPage";
 import { AgentsPage } from "./pages/agents/AgentsPage";
+import { AdmissionScansPage } from "./pages/admission/AdmissionScansPage";
 import { TokensPage } from "./pages/tokens/TokensPage";
 import { ReviewQueuePage } from "./pages/reviews/ReviewQueuePage";
 import { HealthPage } from "./pages/system/HealthPage";
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="sessions/:id"  element={<SessionDetailPage />} />
           <Route path="policies"      element={<PoliciesPage />} />
           <Route path="agents"        element={<AgentsPage />} />
+          <Route path="admission-scans" element={<AdmissionScansPage />} />
           <Route path="tokens"        element={<TokensPage />} />
           <Route path="reviews"       element={<ReviewQueuePage />} />
           <Route path="health"        element={<HealthPage />} />

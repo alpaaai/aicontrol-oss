@@ -5,7 +5,7 @@ import {
   Shield, Bot, Key, CheckSquare, Activity,
   Brain, Lightbulb, FileCheck, LogOut, Settings, CreditCard,
   Layers, ShieldCheck, ClipboardList, BarChart3, Sparkles,
-  ChevronRight, HeartPulse, SlidersHorizontal,
+  ChevronRight, HeartPulse, SlidersHorizontal, ScanSearch,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
@@ -14,7 +14,7 @@ import { useOrgSettings } from "../../context/OrgSettingsContext";
 
 const SECTION_PATHS: Record<string, string[]> = {
   activity:     ["/overview", "/audit-log", "/metrics", "/sessions", "/activity-log"],
-  governance:   ["/policies", "/agents", "/tokens"],
+  governance:   ["/policies", "/agents", "/tokens", "/admission-scans"],
   reviews:      ["/reviews"],
   reports:      ["/reports"],
   intelligence: ["/intelligence", "/policy-suggestions"],
@@ -168,6 +168,7 @@ export function Sidebar() {
             <NavItem to="/policies" icon={<Shield {...iconProps} />} label="Policies" />
             <NavItem to="/agents"   icon={<Bot {...iconProps} />}    label="Agents" />
             <NavItem to="/tokens"   icon={<Key {...iconProps} />}    label="API tokens" />
+            <NavItem to="/admission-scans" icon={<ScanSearch {...iconProps} />} label="Admission scans" />
           </div>
         )}
 
