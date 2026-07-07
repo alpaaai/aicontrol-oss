@@ -10,8 +10,16 @@ from alembic import context
 from app.models.database import Base
 import app.models.schemas
 import app.models.policy_warning
-import enterprise.compliance.models
 import app.models.user
+
+# enterprise/ is proprietary and physically absent from the public OSS
+# mirror — only needed here for `alembic revision --autogenerate` to see
+# enterprise ORM models when diffing; `upgrade`/`downgrade` replay frozen
+# SQL and don't need it, so this must stay optional.
+try:
+    import enterprise.compliance.models
+except ImportError:
+    pass
 
 config = context.config
 

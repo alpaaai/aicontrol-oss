@@ -17,6 +17,24 @@ jobs:
       - name: Strip enterprise directory
         run: |
           rm -rf enterprise/
+          mkdir -p enterprise
+          touch enterprise/__init__.py
+
+      - name: Remove private-repo-only CI workflows
+        run: |
+          rm -f .github/workflows/release.yml
+          rm -f .github/workflows/mirror-oss.yml
+
+      - name: Remove tests that import the stripped enterprise/ package
+        run: |
+          rm -f tests/test_compliance_aggregator.py
+          rm -f tests/test_compliance_md_builder.py
+          rm -f tests/test_compliance_pdf_converter.py
+          rm -f tests/test_compliance_prompt_builder.py
+          rm -f tests/test_compliance_router.py
+          rm -f tests/test_compliance_storage.py
+          rm -f tests/test_drift_detection.py
+          rm -f tests/test_drift_scheduler.py
 
       - name: Swap README for OSS version
         run: |

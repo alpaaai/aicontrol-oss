@@ -138,7 +138,15 @@ ADMIN_OUTPUT=$(docker compose -f docker-compose.yml -f docker-compose.app.yml \
   --role admin --desc "Initial admin token")
 echo "$ADMIN_OUTPUT"
 ADMIN_JWT=$(echo "$ADMIN_OUTPUT" | grep -oE 'eyJ[A-Za-z0-9._-]+')
-sed -i '' "s|^ADMIN_TOKEN=.*|ADMIN_TOKEN=${ADMIN_JWT}|" .env
+# python3 (not `sed -i ''`, which is BSD/macOS-only syntax and fails on Linux's GNU sed)
+python3 -c "
+import re
+with open('.env') as f:
+    content = f.read()
+content = re.sub(r'^ADMIN_TOKEN=.*$', 'ADMIN_TOKEN=${ADMIN_JWT}', content, flags=re.MULTILINE)
+with open('.env', 'w') as f:
+    f.write(content)
+"
 echo -e "${GREEN}[done]${NC} Admin token written to .env."
 
 # Issue agent-scoped demo tokens

@@ -10,6 +10,7 @@ services:
       - sh
       - -c
       - |
+        alembic upgrade head &&
         python3 scripts/seed.py &&
         python3 scripts/seed_library_policies.py &&
         python3 scripts/demo_seed_synthetic.py
