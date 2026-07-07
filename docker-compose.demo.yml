@@ -1,0 +1,22 @@
+services:
+  demo-seed:
+    image: ghcr.io/alpaaai/aicontrol-api:latest
+    restart: "no"
+    env_file: .env
+    depends_on:
+      api:
+        condition: service_healthy
+    command:
+      - sh
+      - -c
+      - |
+        python3 scripts/seed.py &&
+        python3 scripts/seed_library_policies.py &&
+        python3 scripts/demo_seed_synthetic.py
+    networks:
+      - aicontrol
+
+networks:
+  aicontrol:
+    external: true
+    name: aicontrol

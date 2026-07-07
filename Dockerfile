@@ -2,6 +2,7 @@
 FROM python:3.14-slim AS base
 
 WORKDIR /app
+ENV PYTHONPATH=/app
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -19,6 +20,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ app/
+COPY enterprise/ enterprise/
 COPY alembic.ini .
 COPY migrations/ migrations/
 COPY policies/ policies/
