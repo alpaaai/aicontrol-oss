@@ -1,7 +1,7 @@
 # AIControl — The Control Plane for AI Agents
 
 [![CI](https://github.com/alpaaai/aicontrol/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/alpaaai/aicontrol/actions)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 > Intercepts every AI agent tool call before execution. Evaluates against OPA policies.
 > Logs everything to an append-only audit trail. Self-hosted — your data never leaves
@@ -149,5 +149,5 @@ See [aictl.io/docs/integration](https://aictl.io/docs/integration).
 
 ## License
 
-Apache 2.0 — community edition.
+MIT — community edition.
 Enterprise features require a license key. Contact hello@aictl.io.
