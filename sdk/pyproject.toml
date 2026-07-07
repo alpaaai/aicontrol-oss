@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "aicontrol-sdk"
+version = "0.1.0"
+description = "AIControl agent governance SDK — instrument() auto-patch and @control decorator"
+requires-python = ">=3.10"
+dependencies = [
+    "httpx>=0.27",
+]
+
+[project.optional-dependencies]
+anthropic = ["claude-agent-sdk>=0.2"]
+openai = ["openai-agents>=0.17"]
+google-adk = ["google-adk>=2.0"]
+dev = ["pytest", "pytest-asyncio", "claude-agent-sdk>=0.2", "openai-agents>=0.17", "google-adk>=2.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/aicontrol_sdk"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
