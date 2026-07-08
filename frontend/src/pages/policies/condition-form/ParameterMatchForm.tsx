@@ -110,19 +110,16 @@ function ValueTagInput({
   onAdd: (v: string) => void;
   onRemove: (v: string) => void;
 }) {
-  let draft = "";
   return (
     <div className="space-y-1.5">
       <input
         placeholder={placeholder}
         className={`w-full ${inputCls}`}
-        onChange={(e) => { draft = e.target.value; }}
         onKeyDown={(e) => {
           if (e.key === "Enter") {
             e.preventDefault();
             onAdd((e.target as HTMLInputElement).value);
             (e.target as HTMLInputElement).value = "";
-            draft = "";
           }
         }}
       />
