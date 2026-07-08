@@ -22,11 +22,7 @@ services:
       - aicontrol
 
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_API_URL: ${VITE_API_URL:-http://localhost:8001}
+    image: ghcr.io/alpaaai/aicontrol-frontend:latest
     restart: unless-stopped
     ports:
       - "3000:3000"
@@ -40,10 +36,6 @@ services:
       retries: 10
     networks:
       - aicontrol
-
-volumes:
-  reports_data:
-    external: true
 
 networks:
   aicontrol:
