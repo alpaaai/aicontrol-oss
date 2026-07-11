@@ -22,7 +22,13 @@ from jose import jwt, JWTError, ExpiredSignatureError
 # Run: python scripts/generate_keypair.py
 # Save the private key to your password manager; paste the public key here.
 PUBLIC_KEY = """-----BEGIN PUBLIC KEY-----
-PASTE_YOUR_GENERATED_PUBLIC_KEY_HERE
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAti30klWFWyb6JmOk/iQG
+IWtbhSnuJWnNn42UnUeZ8h0+MpNKzQwo+kjowadG0MN9Y6SQX+R2+gh/zvU+MYlH
+Dfr5y3p7HlIb6Y/ptaRUXaDTrU50UNtQJOpR87uKRE5krXEr1xdC9z0Ev6Z18bOb
+rid6dH2sdFyjHoLHcLyXD1jaw7/PesAY9xz1OxCvjtz/624bIVONJ6FCYnevXbFs
+PoZf9VBEWJWQJOjNvQ9XFAGUz9SY8dSg1FtYG809Ki9EHmodQdIwlvLez0pFqBND
+Z5dhx+ScHJTIMF0M/+B2qN1iysKWtVcOWd8zegElY+OEyj4+CifxndvCe/XKfc/t
+bwIDAQAB
 -----END PUBLIC KEY-----"""
 
 ISSUER = "aictl.io"

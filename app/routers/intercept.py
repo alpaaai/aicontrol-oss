@@ -14,9 +14,12 @@ from app.core.logging import get_logger
 from app.models.database import get_db
 from app.models.schemas import Agent, Policy, Session
 from app.services.audit_writer import write_event
+from app.services.budget_alert_service import maybe_alert_budget_threshold
 from app.services.hitl_service import create_hitl_review, post_slack_review
 from app.services.opa_client import evaluate
 from app.services.rate_limit_service import build_call_counts
+from app.services.token_budget_service import build_token_budgets
+from app.services.wal import default_wal_writer as wal_writer
 
 router = APIRouter()
 logger = get_logger("intercept")
@@ -90,10 +93,9 @@ async def ensure_session(
         await db.flush()
 
 
-
 @router.post("/intercept", response_model=InterceptResponse)
 async def intercept(
-    request: InterceptRequest,
+    body: InterceptRequest,
     db: AsyncSession = Depends(get_db),
     token: dict = Depends(require_agent),
 ) -> InterceptResponse:
@@ -103,7 +105,7 @@ async def intercept(
     """
     # Enforce agent-scoped token binding: agent tokens may only intercept for their own agent_id
     if token.get("role") == "agent" and token.get("agent_id") is not None:
-        if str(token["agent_id"]) != str(request.agent_id):
+        if str(token["agent_id"]) != str(body.agent_id):
             raise HTTPException(
                 status_code=403,
                 detail="Token is scoped to a different agent",
@@ -115,28 +117,29 @@ async def intercept(
     # Case-sensitive match: tool_name is never normalized upstream.
     # approved_tools = [] means unrestricted (backward compatible).
     # Agent not found in DB also means unrestricted (backward compatible).
-    agent_result = await db.execute(select(Agent).where(Agent.id == request.agent_id))
+    agent_result = await db.execute(select(Agent).where(Agent.id == body.agent_id))
     agent = agent_result.scalar_one_or_none()
     if agent is not None and agent.approved_tools:
-        if request.tool_name not in agent.approved_tools:
+        if body.tool_name not in agent.approved_tools:
             early_duration_ms = int((time.monotonic() - start) * 1000)
-            enriched_early = enrich_parameters(request.tool_name, request.tool_parameters)
-            await ensure_session(db, request.session_id, request.agent_id)
-            early_event_id = await write_event(
-                session=db,
-                session_id=request.session_id,
-                agent_id=request.agent_id,
-                agent_name=request.agent_name,
-                tool_name=request.tool_name,
-                tool_parameters=enriched_early,
-                decision="deny",
-                decision_reason="tool_not_approved_for_agent",
-                sequence_number=request.sequence_number,
-                duration_ms=early_duration_ms,
-                risk_delta=RISK_SCORE_DELTA["deny"],
-                policy_name="approved_tools",
-                policy_id=None,
-            )
+            enriched_early = enrich_parameters(body.tool_name, body.tool_parameters)
+            await ensure_session(db, body.session_id, body.agent_id)
+            early_event_id = wal_writer.append({
+                "session_id": str(body.session_id),
+                "agent_id": str(body.agent_id),
+                "agent_name": body.agent_name,
+                "tool_name": body.tool_name,
+                "tool_parameters": enriched_early,
+                "decision": "deny",
+                "decision_reason": "tool_not_approved_for_agent",
+                "sequence_number": body.sequence_number,
+                "duration_ms": early_duration_ms,
+                "risk_delta": RISK_SCORE_DELTA["deny"],
+                "policy_name": "approved_tools",
+                "policy_id": None,
+                "bypass": False,
+                "enforced": True,
+            })
             return InterceptResponse(
                 decision="deny",
                 reason="tool_not_approved_for_agent",
@@ -150,85 +153,137 @@ async def intercept(
     # Step 3b: build call_counts for rate-limit policy evaluation
     call_counts = await build_call_counts(
         db=db,
-        agent_id=str(request.agent_id),
-        session_id=str(request.session_id),
-        tool_name=request.tool_name,
+        agent_id=str(body.agent_id),
+        session_id=str(body.session_id),
+        tool_name=body.tool_name,
         active_policies=policies,
     )
 
+    cumulative_tokens, cumulative_cost_usd = await build_token_budgets(
+        db=db,
+        agent_id=str(body.agent_id),
+        session_id=str(body.session_id),
+        tool_name=body.tool_name,
+        active_policies=policies,
+    )
+    import asyncio
+    asyncio.create_task(maybe_alert_budget_threshold(
+        cumulative_tokens=cumulative_tokens, cumulative_cost_usd=cumulative_cost_usd,
+        active_policies=policies, tool_name=body.tool_name,
+    ))
+
     # Evaluate via OPA
     opa_result = await evaluate(
-        tool_name=request.tool_name,
-        tool_parameters=request.tool_parameters,
+        tool_name=body.tool_name,
+        tool_parameters=body.tool_parameters,
         policies=policies,
         call_counts=call_counts,
+        cumulative_tokens=cumulative_tokens,
+        cumulative_cost_usd=cumulative_cost_usd,
     )
 
     duration_ms = int((time.monotonic() - start) * 1000)
 
     # Enrich parameters (e.g. extract domain from HTTP tool URLs)
-    enriched_parameters = enrich_parameters(request.tool_name, request.tool_parameters)
+    enriched_parameters = enrich_parameters(body.tool_name, body.tool_parameters)
 
     # OPA returns which policy fired directly — no reverse-engineering needed
     fired_policy_id: Optional[str] = opa_result.get("fired_policy_id") or None
     fired_policy_name: Optional[str] = opa_result.get("fired_policy_name") or None
 
     # Ensure session row exists (auto-create if agent didn't pre-register)
-    await ensure_session(db, request.session_id, request.agent_id)
+    await ensure_session(db, body.session_id, body.agent_id)
 
-    # Write immutable audit event
-    event_id = await write_event(
-        session=db,
-        session_id=request.session_id,
-        agent_id=request.agent_id,
-        agent_name=request.agent_name,
-        tool_name=request.tool_name,
-        tool_parameters=enriched_parameters,
-        decision=opa_result["decision"],
-        decision_reason=opa_result["reason"],
-        sequence_number=request.sequence_number,
-        duration_ms=duration_ms,
-        risk_delta=RISK_SCORE_DELTA.get(opa_result["decision"], 0),
-        policy_name=fired_policy_name,
-        policy_id=uuid.UUID(fired_policy_id) if fired_policy_id else None,
-        input_tokens=request.input_tokens,
-        output_tokens=request.output_tokens,
-        cost_usd=request.cost_usd,
-    )
+    true_decision = opa_result["decision"]
+    true_reason = opa_result["reason"]
+    is_observe_mode = agent is not None and agent.governance_mode == "observe"
+    enforced_decision = "allow" if is_observe_mode else true_decision
+
+    if opa_result.get("bypass"):
+        logger.critical(
+            "opa_bypass_event",
+            tool_name=body.tool_name,
+            agent_id=str(body.agent_id),
+            decision=true_decision,
+            reason=true_reason,
+        )
 
     review_id: Optional[uuid.UUID] = None
-    if opa_result["decision"] == "review":
+    # The "review" path creates a HITLReview row with a real FK to
+    # audit_events.id — that row must already exist in Postgres, so this
+    # path writes synchronously rather than through the async WAL. allow/deny
+    # (the hot-path majority) write through the WAL instead.
+    if true_decision == "review" and not is_observe_mode:
+        event_id = await write_event(
+            session=db,
+            session_id=body.session_id,
+            agent_id=body.agent_id,
+            agent_name=body.agent_name,
+            tool_name=body.tool_name,
+            tool_parameters=enriched_parameters,
+            decision=true_decision,
+            decision_reason=true_reason,
+            sequence_number=body.sequence_number,
+            duration_ms=duration_ms,
+            risk_delta=RISK_SCORE_DELTA.get(true_decision, 0),
+            policy_name=fired_policy_name,
+            policy_id=uuid.UUID(fired_policy_id) if fired_policy_id else None,
+            input_tokens=body.input_tokens,
+            output_tokens=body.output_tokens,
+            cost_usd=body.cost_usd,
+        )
         review_id = await create_hitl_review(
             session=db,
             audit_event_id=event_id,
-            session_id=request.session_id,
+            session_id=body.session_id,
         )
         import asyncio
         asyncio.create_task(
             post_slack_review(
                 review_id=review_id,
                 audit_event_id=event_id,
-                agent_name=request.agent_name,
-                tool_name=request.tool_name,
-                tool_parameters=request.tool_parameters,
-                decision_reason=opa_result["reason"],
+                agent_name=body.agent_name,
+                tool_name=body.tool_name,
+                tool_parameters=body.tool_parameters,
+                decision_reason=true_reason,
             )
         )
+    else:
+        event_id = wal_writer.append({
+            "session_id": str(body.session_id),
+            "agent_id": str(body.agent_id),
+            "agent_name": body.agent_name,
+            "tool_name": body.tool_name,
+            "tool_parameters": enriched_parameters,
+            "tool_response": None,
+            "policy_id": fired_policy_id or None,
+            "policy_name": fired_policy_name or None,
+            "decision": true_decision,
+            "decision_reason": true_reason,
+            "sequence_number": body.sequence_number,
+            "duration_ms": duration_ms,
+            "risk_delta": RISK_SCORE_DELTA.get(true_decision, 0),
+            "input_tokens": body.input_tokens,
+            "output_tokens": body.output_tokens,
+            "cost_usd": body.cost_usd,
+            "bypass": opa_result.get("bypass", False),
+            "enforced": not is_observe_mode,
+        })
 
     logger.info(
         "tool_intercepted",
-        tool_name=request.tool_name,
-        decision=opa_result["decision"],
-        agent_name=request.agent_name,
+        tool_name=body.tool_name,
+        decision=enforced_decision,
+        agent_name=body.agent_name,
         duration_ms=duration_ms,
-        session_id=str(request.session_id),
+        session_id=str(body.session_id),
     )
 
     return InterceptResponse(
-        decision=opa_result["decision"],
-        reason=opa_result["reason"],
+        decision=enforced_decision,
+        reason=true_reason,
         audit_event_id=event_id,
-        review_id=review_id if opa_result["decision"] == "review" else None,
+        review_id=review_id,
         policy_id=fired_policy_id,
         policy_name=fired_policy_name,
     )

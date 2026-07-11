@@ -39,6 +39,20 @@ try:
 except Exception:
     pass  # dotenv not available or .env not found — rely on existing env
 
+# Tests must never share a WAL directory with a live dev server (e.g. one
+# started manually via `uvicorn app.main:app --reload` for local testing).
+# Both processes bind app.services.wal.default_wal_writer to the same file
+# path by default, and pytest fixtures that call WalWriter.reset_for_tests()
+# unlink that file + its checkpoint out from under the live server: the
+# server's in-memory _next_seq doesn't reset, so its next append restarts
+# the recreated file's wal_seq numbering below the shipper's stale
+# in-memory checkpoint, permanently orphaning those entries — they're
+# silently never shipped to Postgres. Set before any app.* import so the
+# module-level default_wal_writer singleton binds to an isolated path.
+os.environ["WAL_DIR"] = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "..", ".pytest_wal"
+)
+
 
 @pytest.fixture(autouse=True)
 def reset_config_and_db_engine():

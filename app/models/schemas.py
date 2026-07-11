@@ -24,6 +24,7 @@ class Agent(Base):
     approved_by: Mapped[Optional[str]] = mapped_column(String(100))
     approved_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, server_default="{}")
+    governance_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="govern")
     created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, server_default=func.now())
 
     @validates("status")
@@ -31,6 +32,13 @@ class Agent(Base):
         allowed = {"active", "suspended"}
         if value not in allowed:
             raise ValueError(f"Agent status must be one of {allowed}, got {value!r}")
+        return value
+
+    @validates("governance_mode")
+    def _validate_governance_mode(self, _key: str, value: str) -> str:
+        allowed = {"observe", "govern"}
+        if value not in allowed:
+            raise ValueError(f"governance_mode must be one of {allowed}, got {value!r}")
         return value
 
     sessions: Mapped[list["Session"]] = relationship(back_populates="agent")
@@ -96,6 +104,8 @@ class AuditEvent(Base):
     input_tokens: Mapped[Optional[int]] = mapped_column(Integer)
     output_tokens: Mapped[Optional[int]] = mapped_column(Integer)
     cost_usd: Mapped[Optional[float]] = mapped_column(Numeric(10, 6))
+    bypass: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    enforced: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, server_default=func.now())
 
     session: Mapped[Optional["Session"]] = relationship(back_populates="audit_events")

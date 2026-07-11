@@ -14,9 +14,16 @@ a human sign-off.
 
 ---
 
-- **OPA-based policy enforcement** — every tool call evaluated before execution
+- **OPA-based policy enforcement** — five rule types (tool denylist, tool pattern, rate limit,
+  parameter match, numeric conditions), evaluated before every tool call
+- **Per-agent tool allowlists** — restrict each agent to its own `approved_tools`, enforced
+  independently of policy
+- **Admission-time skill/tool scanning** — scan a skill or tool for known-risky patterns
+  before it's ever enrolled, via the built-in scanner integration (see below)
 - **Immutable audit trail** — every decision logged with full parameters and policy attribution
 - **Human-in-the-loop review queue** — escalate to a human reviewer when policy requires it
+- **React dashboard** — first-run setup wizard, user management, a policy library of
+  pre-built templates, and a no-JSON policy editor
 - **Self-hosted, one command** — runs on your infrastructure, no cloud dependency
 
 ---
@@ -31,13 +38,17 @@ bash install.sh
 # API       → http://localhost:8001
 ```
 
-`install.sh` generates a `.env` with real secrets, pulls images, runs
-database migrations, and seeds demo agents — a bare `docker compose up`
-skips all of that (it also won't start the API or dashboard at all, since
-those live in `docker-compose.app.yml`, not the default compose file).
+`install.sh` walks you through generating a `.env` with real secrets, pulls the prebuilt
+images, runs database migrations, and seeds demo agents — a bare `docker compose up` skips
+all of that (it also won't start the API or dashboard at all, since those live in
+`docker-compose.app.yml`, not the default compose file).
 
-Want 30 days of realistic historical activity in the dashboard instead of
-a blank audit log? After `install.sh` finishes:
+**First run:** open `http://localhost:3000` — the setup wizard runs automatically. Set your
+organisation name, timezone, and root admin email + password, then log in with those
+credentials.
+
+Want 30 days of realistic historical activity in the dashboard instead of a blank audit log?
+After `install.sh` finishes:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.demo.yml up demo-seed
@@ -53,53 +64,99 @@ Your Agent ──► POST /intercept ──► OPA Policy Engine ──► allow
                                   Immutable Audit Log
                                      (PostgreSQL)
                                            │
-                              HITL Review Queue (Slack / Teams)
+                                  HITL Review Queue
 ```
 
 ---
 
 ## Integration
 
-```python
-from aicontrol import control
+**Python — the official SDK (recommended):**
 
-@control
-def create_purchase_order(vendor_id: str, amount: float) -> dict:
-    # AIControl evaluates this call against your policies before it runs
-    ...
+```bash
+pip install "./sdk[anthropic]"   # or [openai], [google-adk] — installs from source
 ```
 
-Set `AICONTROL_URL`, `AICONTROL_TOKEN`, and `AICONTROL_AGENT_ID` in your environment.
-That's the entire integration.
+```python
+from aicontrol_sdk import instrument
+
+await instrument(agent_name="my-agent", url="http://localhost:8001", token="...")
+# every tool call made through the detected framework (Anthropic Claude Agent SDK,
+# OpenAI Agents SDK, or Google ADK) is now intercepted by AIControl before it executes.
+```
+
+Or use the framework-agnostic decorator on any callable:
+
+```python
+from aicontrol_sdk import control, PolicyDeniedError
+
+@control("query_database")
+async def query_database(table: str, limit: int = 100):
+    return db.query(f"SELECT * FROM {table} LIMIT {limit}")
+
+try:
+    await query_database(table="customers")
+except PolicyDeniedError as e:
+    print(f"Blocked: {e.reason}")
+```
+
+`aicontrol-sdk` isn't published to PyPI yet — install it straight from the cloned repo, or
+`pip install git+https://github.com/alpaaai/aicontrol-oss#subdirectory=sdk`. See
+[`sdk/README.md`](sdk/README.md) for the full configuration reference.
+
+**Any other language:** call `POST /intercept` directly — see
+[aictl.io/docs/integration](https://aictl.io/docs/integration).
+
+---
+
+## Admission-time scanning
+
+Before you enroll a new skill or tool, scan it:
+
+```bash
+curl -X POST http://localhost:8001/admission-scans \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"target_type": "skill", "target_ref": "/path/to/skill", "scanners": ["skill_scanner"]}'
+```
+
+Findings (with severity) show up in the response and in the dashboard's **Admission scans**
+page. The default scanner runs
+[Cisco's open-source `skill-scanner`](https://github.com/cisco-ai-defense/skill-scanner)
+(Apache-2.0) as an isolated subprocess, deterministic analyzers only — no LLM calls, no
+cloud calls, ever. See [`NOTICE`](NOTICE) for full attribution.
 
 ---
 
 ## Policy example
 
-```yaml
-- name: require_approval_large_purchase_order
-  description: "Purchase orders above $50,000 require human approval before submission"
-  rule_type: tool_denylist
-  condition:
-    tool_name: submit_purchase_order
-    numeric_conditions:
-      - parameter: amount
-        operator: gt
-        value: 50000
-    on_exceed: review
-  active: true
-  compliance_tags: ["SOC2", "internal-controls"]
+```json
+{
+  "name": "block_large_disbursements",
+  "description": "Block loan disbursements above $10,000 without review",
+  "rule_type": "tool_denylist",
+  "condition": {
+    "blocked_tools": ["initiate_transfer", "disburse_loan_funds"],
+    "numeric_conditions": [
+      { "parameter": "amount", "operator": "gt", "value": 10000 }
+    ]
+  },
+  "action": "deny",
+  "severity": "critical",
+  "compliance_frameworks": ["SOC2", "OCC"]
+}
 ```
 
-Policies are YAML, enforced by OPA, pushed live without restart.
+Policies are pushed to OPA immediately through the API or dashboard — no restart required.
+See [aictl.io/docs/policies](https://aictl.io/docs/policies) for all five rule types.
 
 ---
 
 ## Enterprise edition
 
-AIControl Community is MIT-licensed and fully self-hostable.
-AIControl Enterprise adds the compliance evidence package, RBAC, and dedicated support.
-[Learn more at aictl.io](https://aictl.io)
+AIControl Community is MIT-licensed, free, and fully self-hostable — no seat limits, no
+usage limits. AIControl Enterprise adds audit log CSV export, policy drift detection, and
+compliance report generation. [Learn more at aictl.io](https://aictl.io)
 
 ---
 
@@ -107,4 +164,3 @@ AIControl Enterprise adds the compliance evidence package, RBAC, and dedicated s
 
 - Documentation: https://aictl.io/docs
 - Issues: https://github.com/alpaaai/aicontrol-oss/issues
-- Design Partner Program: https://aictl.io/design-partners

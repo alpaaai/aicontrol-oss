@@ -3,11 +3,22 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 
 
+def _all_paths(routes):
+    """Flatten app.routes, descending into FastAPI's _IncludedRouter wrappers."""
+    paths = []
+    for r in routes:
+        if hasattr(r, "path"):
+            paths.append(r.path)
+        elif hasattr(r, "original_router"):
+            paths.extend(_all_paths(r.original_router.routes))
+    return paths
+
+
 @pytest.mark.asyncio
 async def test_intercept_route_exists():
     """POST /intercept route must be registered on the app."""
     from app.main import app
-    routes = [r.path for r in app.routes]
+    routes = _all_paths(app.routes)
     assert "/intercept" in routes
 
 

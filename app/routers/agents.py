@@ -56,6 +56,7 @@ class AgentResponse(BaseModel):
     model_version: Optional[str]
     approved_tools: list
     approved_by: Optional[str]
+    governance_mode: str
 
 
 class AgentListItem(BaseModel):
