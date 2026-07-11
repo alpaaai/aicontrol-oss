@@ -31,7 +31,7 @@ jinja2
 
 # Auth
 python-jose[cryptography]
-cryptography>=42.0.0
+cryptography>=49.0.0
 
 # AI-native features
 litellm
