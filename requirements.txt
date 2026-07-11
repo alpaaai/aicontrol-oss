@@ -42,3 +42,4 @@ python-multipart
 structlog
 rich
 pyyaml
+agent-governance-toolkit-core==4.1.0

@@ -11,6 +11,7 @@ from app.models.database import Base
 import app.models.schemas
 import app.models.policy_warning
 import app.models.user
+import app.models.mcp_server
 
 # enterprise/ is proprietary and physically absent from the public OSS
 # mirror — only needed here for `alembic revision --autogenerate` to see

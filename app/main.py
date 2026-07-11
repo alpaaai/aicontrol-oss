@@ -25,8 +25,11 @@ from app.routers.users import router as users_router
 from app.routers.setup import router as setup_router
 from app.routers.org_settings import router as org_settings_router
 from app.routers.demo import router as demo_router
+from app.services.opa_client import warmup as warmup_opa_client
 from app.services.opa_health_watcher import OpaHealthWatcher
 from app.services.policy_loader import load_all, push_rego_to_opa
+from app.services.wal import default_wal_writer
+from app.services.wal_shipper import WalShipper
 
 # enterprise/ is proprietary and physically absent from the public OSS
 # mirror (.github/workflows/mirror-oss.yml runs `rm -rf enterprise/` before
@@ -34,10 +37,12 @@ from app.services.policy_loader import load_all, push_rego_to_opa
 # optional so every OSS deployment can still boot.
 try:
     from enterprise.app.routers.warnings import router as warnings_router
+    from enterprise.app.routers.mcp_servers import router as mcp_servers_router
     from enterprise.compliance.router import router as compliance_router
     from enterprise.app.services.drift_detector import DriftDetector
 except ImportError:
     warnings_router = None
+    mcp_servers_router = None
     compliance_router = None
     DriftDetector = None
 
@@ -52,6 +57,8 @@ async def lifespan(app: FastAPI):
     async with async_session_factory() as session:
         await load_all(session)
 
+    await warmup_opa_client()
+
     _http_client = httpx.AsyncClient()
     opa_watcher = OpaHealthWatcher(
         push_fn=push_rego_to_opa,
@@ -59,6 +66,10 @@ async def lifespan(app: FastAPI):
     )
     opa_watcher.start()
     app.state.opa_watcher = opa_watcher
+
+    wal_shipper = WalShipper(wal_path=default_wal_writer.wal_path, session_factory=async_session_factory)
+    await wal_shipper.replay_and_start()
+    app.state.wal_shipper = wal_shipper
 
     # DriftDetector — enterprise only, and only importable when enterprise/ is present
     if _settings.AICONTROL_LICENSE_KEY and DriftDetector is not None:
@@ -77,6 +88,7 @@ async def lifespan(app: FastAPI):
 
     if app.state.drift_detector is not None:
         await app.state.drift_detector.stop()
+    await app.state.wal_shipper.stop()
     await opa_watcher.stop()  # task fully cancelled before client closes
     await _http_client.aclose()
     logger.info("aicontrol_stopping")
@@ -119,6 +131,8 @@ app.include_router(org_settings_router)
 app.include_router(demo_router)
 if warnings_router is not None:
     app.include_router(warnings_router)
+if mcp_servers_router is not None:
+    app.include_router(mcp_servers_router)
 if compliance_router is not None:
     app.include_router(compliance_router)
 

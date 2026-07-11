@@ -12,18 +12,17 @@ dist/
 postgres_data/
 *.log
 .env
+data/wal/
+.pytest_wal/
 
-# Internal plans and specs — not for public repo
-docs/superpowers/
+# Internal plans and specs — not for public repo. Entire folder is
+# internal-only (plans, specs, strategy/GTM docs); nothing under docs/
+# should ever be tracked.
+docs/
 
 # Internal docs — strategy, GTM, dev tooling
 PROJECT_CONTEXT.md
 CLAUDE.md
-docs/01-aicontrol-overview.md
-docs/03-aicontrol-vision.md
-docs/04-aicontrol-battle-card.md
-docs/demo-scenarios-v2.md
 .claude/
 scripts/prospecting/.env
 scripts/prospecting/state.json
-docs/state/

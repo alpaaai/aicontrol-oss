@@ -6,7 +6,17 @@ import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 import httpx
 
+import app.services.opa_client as opa_client_module
 from app.services.opa_client import evaluate
+
+
+@pytest.fixture(autouse=True)
+def _reset_persistent_client():
+    """opa_client._client is a persistent module-level singleton — reset it
+    around every test so mocked clients from one test never leak into another."""
+    opa_client_module._client = None
+    yield
+    opa_client_module._client = None
 
 
 @pytest.mark.asyncio
@@ -18,8 +28,6 @@ async def test_evaluate_fail_closed_on_connect_error():
 
         with patch("app.services.opa_client.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(
                 side_effect=httpx.ConnectError("Connection refused")
             )
@@ -45,8 +53,6 @@ async def test_evaluate_fail_open_on_connect_error():
 
         with patch("app.services.opa_client.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(
                 side_effect=httpx.ConnectError("Connection refused")
             )
@@ -72,8 +78,6 @@ async def test_evaluate_fail_closed_on_timeout():
 
         with patch("app.services.opa_client.httpx.AsyncClient") as mock_client_cls:
             mock_client = AsyncMock()
-            mock_client.__aenter__ = AsyncMock(return_value=mock_client)
-            mock_client.__aexit__ = AsyncMock(return_value=False)
             mock_client.post = AsyncMock(
                 side_effect=httpx.TimeoutException("Timeout")
             )

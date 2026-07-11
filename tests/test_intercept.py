@@ -75,15 +75,18 @@ async def test_intercept_returns_decision():
 
 @pytest.mark.asyncio
 async def test_intercept_returns_audit_event_id():
-    """POST /intercept response must include audit_event_id."""
+    """POST /intercept response must include audit_event_id. Allow decisions
+    write through the WAL (WalWriter.append), not the direct write_event —
+    only the review path still calls write_event synchronously."""
     from app.main import app
     event_id = uuid.uuid4()
+    wal_mock = MagicMock()
+    wal_mock.append.return_value = event_id
 
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
-    )), patch("app.routers.intercept.write_event", new=AsyncMock(
-        return_value=event_id
-    )), patch("app.routers.intercept.get_active_policies", new=AsyncMock(
+    )), patch("app.routers.intercept.wal_writer", new=wal_mock
+    ), patch("app.routers.intercept.get_active_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
     )), _mock_auth():
@@ -137,18 +140,21 @@ async def test_intercept_fires_hitl_on_review_decision():
 
 @pytest.mark.asyncio
 async def test_allow_decision_persists_parameters():
-    """Allow decisions must pass tool_parameters to write_event."""
+    """Allow decisions must pass tool_parameters to WalWriter.append."""
     from app.main import app
     captured = {}
 
-    async def capture_write_event(**kwargs):
-        captured.update(kwargs)
+    def capture_append(event):
+        captured.update(event)
         return uuid.uuid4()
+
+    wal_mock = MagicMock()
+    wal_mock.append.side_effect = capture_append
 
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch(
-        "app.routers.intercept.write_event", new=AsyncMock(side_effect=capture_write_event)
+        "app.routers.intercept.wal_writer", new=wal_mock
     ), patch("app.routers.intercept.get_active_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
@@ -177,14 +183,17 @@ async def test_http_tool_captures_domain():
     from app.main import app
     captured = {}
 
-    async def capture_write_event(**kwargs):
-        captured.update(kwargs)
+    def capture_append(event):
+        captured.update(event)
         return uuid.uuid4()
+
+    wal_mock = MagicMock()
+    wal_mock.append.side_effect = capture_append
 
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "tool_denylisted"}
     )), patch(
-        "app.routers.intercept.write_event", new=AsyncMock(side_effect=capture_write_event)
+        "app.routers.intercept.wal_writer", new=wal_mock
     ), patch("app.routers.intercept.get_active_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
@@ -212,14 +221,17 @@ async def test_http_tool_captures_domain():
 
 @pytest.mark.asyncio
 async def test_deny_writes_policy_name():
-    """Deny decisions must pass policy_name to write_event when a matching policy exists."""
+    """Deny decisions must pass policy_name to WalWriter.append when a matching policy exists."""
     from app.main import app
     captured = {}
     policy_id = uuid.uuid4()
 
-    async def capture_write_event(**kwargs):
-        captured.update(kwargs)
+    def capture_append(event):
+        captured.update(event)
         return uuid.uuid4()
+
+    wal_mock = MagicMock()
+    wal_mock.append.side_effect = capture_append
 
     policies = [
         {
@@ -235,7 +247,7 @@ async def test_deny_writes_policy_name():
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "tool_denylisted", "fired_policy_id": str(policy_id), "fired_policy_name": "block_dangerous_tool"}
     )), patch(
-        "app.routers.intercept.write_event", new=AsyncMock(side_effect=capture_write_event)
+        "app.routers.intercept.wal_writer", new=wal_mock
     ), patch("app.routers.intercept.get_active_policies", new=AsyncMock(
         return_value=policies
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
@@ -332,10 +344,12 @@ async def test_ensure_session_noop_when_exists():
 
 @pytest.mark.asyncio
 async def test_intercept_passes_token_fields_to_write_event():
-    """POST /intercept must forward input_tokens/output_tokens/cost_usd to write_event."""
+    """POST /intercept must forward input_tokens/output_tokens/cost_usd to
+    WalWriter.append for allow/deny decisions."""
     from app.main import app
 
-    write_event_mock = AsyncMock(return_value=uuid.uuid4())
+    wal_mock = MagicMock()
+    wal_mock.append.return_value = uuid.uuid4()
     payload = make_payload()
     payload["input_tokens"] = 200
     payload["output_tokens"] = 80
@@ -343,7 +357,7 @@ async def test_intercept_passes_token_fields_to_write_event():
 
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
-    )), patch("app.routers.intercept.write_event", new=write_event_mock), patch(
+    )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
         "app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])
     ), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
         async with AsyncClient(
@@ -352,10 +366,10 @@ async def test_intercept_passes_token_fields_to_write_event():
             response = await client.post("/intercept", json=payload)
 
     assert response.status_code == 200
-    call_kwargs = write_event_mock.call_args.kwargs
-    assert call_kwargs["input_tokens"] == 200
-    assert call_kwargs["output_tokens"] == 80
-    assert call_kwargs["cost_usd"] == 0.0125
+    event = wal_mock.append.call_args.args[0]
+    assert event["input_tokens"] == 200
+    assert event["output_tokens"] == 80
+    assert event["cost_usd"] == 0.0125
 
 
 @pytest.mark.asyncio
@@ -363,11 +377,12 @@ async def test_intercept_token_fields_optional():
     """POST /intercept must still work when token fields are omitted (backward compatible)."""
     from app.main import app
 
-    write_event_mock = AsyncMock(return_value=uuid.uuid4())
+    wal_mock = MagicMock()
+    wal_mock.append.return_value = uuid.uuid4()
 
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
-    )), patch("app.routers.intercept.write_event", new=write_event_mock), patch(
+    )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
         "app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])
     ), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
         async with AsyncClient(
@@ -376,9 +391,9 @@ async def test_intercept_token_fields_optional():
             response = await client.post("/intercept", json=make_payload())
 
     assert response.status_code == 200
-    call_kwargs = write_event_mock.call_args.kwargs
-    assert call_kwargs["input_tokens"] is None
-    assert call_kwargs["output_tokens"] is None
-    assert call_kwargs["cost_usd"] is None
+    event = wal_mock.append.call_args.args[0]
+    assert event["input_tokens"] is None
+    assert event["output_tokens"] is None
+    assert event["cost_usd"] is None
 
 

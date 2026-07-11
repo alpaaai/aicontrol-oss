@@ -53,6 +53,24 @@ def validate_tool_denylist_condition(condition: dict) -> list[str]:
     return []
 
 
+def validate_token_budget_condition(condition: dict) -> list[str]:
+    """blocked_tools presence is already covered by validate_tool_denylist_condition,
+    which always runs first for tool_denylist policies — not duplicated here."""
+    errors = []
+    tb = condition.get("token_budget", {})
+    if not tb.get("max_tokens") and not tb.get("max_cost_usd"):
+        errors.append("token_budget condition requires 'max_tokens' or 'max_cost_usd'")
+    window = tb.get("window")
+    if window not in VALID_WINDOWS:
+        errors.append(
+            f"token_budget.window must be one of: {', '.join(sorted(VALID_WINDOWS))}"
+        )
+    on_exceed = tb.get("on_exceed", "deny")
+    if on_exceed not in VALID_ON_EXCEED:
+        errors.append("token_budget.on_exceed must be 'deny' or 'review'")
+    return errors
+
+
 def validate_parameter_match_condition(condition: dict) -> list[str]:
     pm = condition.get("parameter_match", {})
     if not pm or not isinstance(pm, dict):
@@ -107,7 +125,10 @@ def validate_numeric_conditions_condition(condition: dict) -> list[str]:
 
 def validate_condition(rule_type: str, condition: dict) -> list[str]:
     if rule_type == "tool_denylist":
-        return validate_tool_denylist_condition(condition)
+        errors = validate_tool_denylist_condition(condition)
+        if condition.get("token_budget"):
+            errors += validate_token_budget_condition(condition)
+        return errors
     if rule_type == "parameter_match":
         return validate_parameter_match_condition(condition)
     if rule_type == "rate_limit":

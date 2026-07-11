@@ -3,7 +3,7 @@ import uuid
 import pytest
 import pytest_asyncio
 from contextlib import contextmanager
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
 
@@ -106,12 +106,15 @@ async def test_b_tool_not_in_approved_list_denied_before_opa(p1_1_agents):
     mock_evaluate = AsyncMock(return_value={"decision": "allow", "reason": "default_allow"})
     captured: dict = {}
 
-    async def capture_write_event(**kwargs):
-        captured.update(kwargs)
+    def capture_append(event):
+        captured.update(event)
         return uuid.uuid4()
 
+    wal_mock = MagicMock()
+    wal_mock.append.side_effect = capture_append
+
     with patch("app.routers.intercept.evaluate", new=mock_evaluate), \
-         patch("app.routers.intercept.write_event", new=AsyncMock(side_effect=capture_write_event)), \
+         patch("app.routers.intercept.wal_writer", new=wal_mock), \
          patch("app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])), \
          patch("app.routers.intercept.ensure_session", new=AsyncMock()), \
          _mock_auth():

@@ -1,6 +1,29 @@
 """Tests for /demo endpoints: status, seed, reset."""
 import pytest
 import pytest_asyncio
+from sqlalchemy import text
+
+
+@pytest_asyncio.fixture(scope="module", loop_scope="session", autouse=True)
+async def _restore_demo_agent_baseline():
+    """/demo/seed and /demo/reset upsert DEMO_AGENTS (app/routers/demo.py), whose
+    approved_tools lists are narrower than the conftest-seeded baseline in
+    scripts.seed.AGENTS (e.g. agent 030 goes from unrestricted `[]` to a fixed
+    6-tool list). These are the same fixed agent IDs other test files use, so
+    without restoring the baseline afterward, later tests see the wrong
+    approved_tools and get spurious tool_not_approved_for_agent denies.
+    """
+    yield
+    from app.models.database import async_session_factory
+    from scripts.seed import AGENTS
+
+    async with async_session_factory() as session:
+        for agent in AGENTS:
+            await session.execute(
+                text("UPDATE agents SET approved_tools = CAST(:tools AS jsonb) WHERE id = :id"),
+                {"id": agent["id"], "tools": agent["tools"]},
+            )
+        await session.commit()
 
 
 @pytest.mark.asyncio

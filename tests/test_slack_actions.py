@@ -5,11 +5,22 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from httpx import AsyncClient, ASGITransport
 
 
+def _all_paths(routes):
+    """Flatten app.routes, descending into FastAPI's _IncludedRouter wrappers."""
+    paths = []
+    for r in routes:
+        if hasattr(r, "path"):
+            paths.append(r.path)
+        elif hasattr(r, "original_router"):
+            paths.extend(_all_paths(r.original_router.routes))
+    return paths
+
+
 @pytest.mark.asyncio
 async def test_slack_actions_route_exists():
     """POST /slack/actions route must be registered."""
     from app.main import app
-    routes = [r.path for r in app.routes]
+    routes = _all_paths(app.routes)
     assert "/slack/actions" in routes
 
 

@@ -3,4 +3,6 @@
 #
 # This file is documentation only — the Action uses rm -rf directly.
 
-enterprise/     # Compliance export, license gate, enterprise-only features
+enterprise/          # Compliance export, license gate, enterprise-only features
+docs/                # Internal plans, specs, strategy/GTM docs
+scripts/prospecting/ # Internal sales prospecting agent — stays in the private repo only

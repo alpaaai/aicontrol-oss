@@ -4,6 +4,7 @@ Uses ASGITransport (in-process) so the worktree's intercept.py is tested directl
 Seeds audit_events in the DB to simulate prior tool calls, then asserts that
 call N+1 is denied with the correct reason and policy_id.
 """
+import json
 import uuid
 from contextlib import contextmanager
 
@@ -16,7 +17,7 @@ from sqlalchemy import text
 RATE_TEST_AGENT_ID = uuid.UUID("d1111111-1111-1111-1111-111111111111")
 RATE_TEST_SESSION_A = uuid.UUID("d2222222-2222-2222-2222-222222222222")
 RATE_TEST_SESSION_B = uuid.UUID("d3333333-3333-3333-3333-333333333333")
-RATE_TOOL = "query_credit_bureau"
+RATE_TOOL = "query_test_rate_limit_tool"  # dedicated, not covered by any seed policy
 RATE_POLICY_NAME = "test_rate_limit_credit_query"
 
 
@@ -52,13 +53,13 @@ async def rate_limit_setup():
     await push_rego_to_opa()
 
     async with async_session_factory() as session:
-        # Seed test agent with query_credit_bureau in approved_tools
+        # Seed test agent with RATE_TOOL in approved_tools
         await session.execute(text("""
             INSERT INTO agents (id, name, owner, status, approved_tools)
             VALUES (:id, 'rate-test-agent', 'test@test.com', 'active',
-                    '["query_credit_bureau"]'::jsonb)
+                    CAST(:tools AS jsonb))
             ON CONFLICT (id) DO NOTHING
-        """), {"id": str(RATE_TEST_AGENT_ID)})
+        """), {"id": str(RATE_TEST_AGENT_ID), "tools": json.dumps([RATE_TOOL])})
         await session.commit()
 
     # Create rate_limit policy via API (so it gets a proper UUID we can assert on)
@@ -145,6 +146,7 @@ async def _seed_audit_events(session_id: uuid.UUID, count: int) -> None:
 
 async def _clear_audit_events(session_id: uuid.UUID) -> None:
     from app.models.database import async_session_factory
+    from app.services.wal import default_wal_writer
 
     async with async_session_factory() as session:
         await session.execute(
@@ -152,6 +154,11 @@ async def _clear_audit_events(session_id: uuid.UUID) -> None:
             {"sid": str(session_id)},
         )
         await session.commit()
+    # ASGITransport-based /intercept calls in this file write through the WAL
+    # but no live shipper runs in this process to ship/checkpoint them —
+    # reset so a leftover unshipped entry from one test doesn't inflate
+    # count_unshipped_for_session_tool for the next test reusing this session.
+    default_wal_writer.reset_for_tests()
 
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
@@ -179,7 +186,7 @@ async def test_call_11_denied_with_rate_limit_reason(rate_limit_setup):
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["decision"] == "deny"
-        assert body["reason"].startswith("rate_limit_exceeded:query_credit_bureau:10:session")
+        assert body["reason"].startswith(f"rate_limit_exceeded:{RATE_TOOL}:10:session")
         # policy_id is whichever rate_limit policy fires first — assert it's present and non-null
         assert body["policy_id"] is not None
         assert body["policy_name"] is not None

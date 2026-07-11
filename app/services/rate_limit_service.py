@@ -4,6 +4,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.wal import count_unshipped_for_session_tool, default_wal_writer
+
 WINDOW_INTERVALS: dict[str, timedelta] = {
     "5m":  timedelta(minutes=5),
     "60m": timedelta(hours=1),
@@ -32,6 +34,11 @@ async def count_tool_calls_in_window(
             ),
             {"session_id": session_id, "tool_name": tool_name},
         )
+        postgres_count = result.scalar_one()
+        pending_count = count_unshipped_for_session_tool(
+            default_wal_writer.wal_path, session_id, tool_name
+        )
+        return postgres_count + pending_count
     else:
         since = datetime.now(timezone.utc) - WINDOW_INTERVALS[window]
         result = await db.execute(

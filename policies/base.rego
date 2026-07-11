@@ -141,6 +141,7 @@ is_blacklisted if {
     not policy.condition.all_of
     not policy.condition.any_of
     not policy.condition.time_conditions
+    not policy.condition.token_budget
 }
 
 # Helper: true if tool matches AND parameter condition matches (parameter-level violation)
@@ -320,6 +321,48 @@ rate_limit_reason := reason if {
     )
 }
 
+# ── Token/cost budget helpers ──────────────────────────────────────────────────
+
+# Helper: true if a tool_denylist policy's token_budget threshold is met
+token_budget_policy(policy) if {
+    policy.condition.token_budget.max_tokens
+    tool_matches(policy)
+    actual := input.cumulative_tokens[input.tool_name]
+    actual >= policy.condition.token_budget.max_tokens
+}
+
+token_budget_policy(policy) if {
+    policy.condition.token_budget.max_cost_usd
+    tool_matches(policy)
+    actual := input.cumulative_cost_usd[input.tool_name]
+    actual >= policy.condition.token_budget.max_cost_usd
+}
+
+is_token_budget_exceeded_deny if {
+    some policy in input.policies
+    token_budget_policy(policy)
+    on_exceed := object.get(policy.condition.token_budget, "on_exceed", "deny")
+    on_exceed == "deny"
+}
+
+is_token_budget_exceeded_review if {
+    some policy in input.policies
+    token_budget_policy(policy)
+    on_exceed := object.get(policy.condition.token_budget, "on_exceed", "deny")
+    on_exceed == "review"
+}
+
+token_budget_reason := reason if {
+    some policy in input.policies
+    token_budget_policy(policy)
+    threshold := object.get(policy.condition.token_budget, "max_tokens", object.get(policy.condition.token_budget, "max_cost_usd", 0))
+    window := policy.condition.token_budget.window
+    reason := sprintf(
+        "token_budget_exceeded:%s:%v:%s",
+        [input.tool_name, threshold, window]
+    )
+}
+
 # ── Standalone parameter_match rule_type ──────────────────────────────────────
 # Evaluates policies with rule_type == "parameter_match".
 # Semantics: OR across all keys — any matching key fires the policy.
@@ -413,15 +456,29 @@ reason := rate_limit_reason if {
     is_rate_exceeded_deny
 }
 
+# Deny: token/cost budget exceeded
+decision := "deny" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    is_token_budget_exceeded_deny
+}
+reason := token_budget_reason if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    is_token_budget_exceeded_deny
+}
+
 # Deny: parameter-level violation (tool_denylist + parameter_match condition)
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     is_parameter_violation
 }
 reason := violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     is_parameter_violation
 }
 
@@ -429,12 +486,14 @@ reason := violation_detail if {
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     is_numeric_violation
 }
 reason := numeric_violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     is_numeric_violation
 }
@@ -443,6 +502,7 @@ reason := numeric_violation_detail if {
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     is_compound_violation
@@ -450,6 +510,7 @@ decision := "deny" if {
 reason := compound_violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     is_compound_violation
@@ -459,6 +520,7 @@ reason := compound_violation_detail if {
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -467,6 +529,7 @@ decision := "deny" if {
 reason := time_violation_detail if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -477,6 +540,7 @@ reason := time_violation_detail if {
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -486,6 +550,7 @@ decision := "deny" if {
 reason := "standalone_parameter_match_deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -497,6 +562,7 @@ reason := "standalone_parameter_match_deny" if {
 decision := "deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -507,6 +573,7 @@ decision := "deny" if {
 reason := "standalone_numeric_conditions_deny" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -519,6 +586,7 @@ reason := "standalone_numeric_conditions_deny" if {
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -530,6 +598,7 @@ decision := "review" if {
 reason := rate_limit_reason if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -539,10 +608,11 @@ reason := rate_limit_reason if {
     is_rate_exceeded_review
 }
 
-# Review: tool_pattern match
+# Review: token/cost budget exceeded (soft limit)
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -550,11 +620,41 @@ decision := "review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    is_token_budget_exceeded_review
+}
+reason := token_budget_reason if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    is_token_budget_exceeded_review
+}
+
+# Review: tool_pattern match
+decision := "review" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     needs_review
 }
 reason := "requires_human_review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -562,6 +662,7 @@ reason := "requires_human_review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     needs_review
 }
 
@@ -569,6 +670,7 @@ reason := "requires_human_review" if {
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -576,12 +678,14 @@ decision := "review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     needs_review_numeric
 }
 reason := "requires_human_review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -589,6 +693,7 @@ reason := "requires_human_review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     needs_review_numeric
 }
@@ -597,6 +702,7 @@ reason := "requires_human_review" if {
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -604,6 +710,7 @@ decision := "review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     not needs_review_numeric
     is_standalone_param_review
@@ -611,6 +718,7 @@ decision := "review" if {
 reason := "requires_human_review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -618,6 +726,7 @@ reason := "requires_human_review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     not needs_review_numeric
     is_standalone_param_review
@@ -627,6 +736,7 @@ reason := "requires_human_review" if {
 decision := "review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -634,6 +744,7 @@ decision := "review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     not needs_review_numeric
     not is_standalone_param_review
@@ -642,6 +753,7 @@ decision := "review" if {
 reason := "requires_human_review" if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -649,6 +761,7 @@ reason := "requires_human_review" if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     not needs_review_numeric
     not is_standalone_param_review
@@ -681,7 +794,7 @@ _review_policy_fires(p) if {
 # 1. Blacklist deny
 fired_policy_id := min(ids) if {
     is_blacklisted
-    ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); not p.condition.parameter_match; not p.condition.numeric_conditions; not p.condition.all_of; not p.condition.any_of; not p.condition.time_conditions}
+    ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); not p.condition.parameter_match; not p.condition.numeric_conditions; not p.condition.all_of; not p.condition.any_of; not p.condition.time_conditions; not p.condition.token_budget}
     count(ids) > 0
 }
 
@@ -693,29 +806,41 @@ fired_policy_id := min(ids) if {
     count(ids) > 0
 }
 
-# 3. Parameter violation deny
+# 3. Token/cost budget deny
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    is_token_budget_exceeded_deny
+    ids := {p.id | some p in input.policies; token_budget_policy(p); object.get(p.condition.token_budget, "on_exceed", "deny") == "deny"}
+    count(ids) > 0
+}
+
+# 4. Parameter violation deny
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     is_parameter_violation
     ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); p.condition.parameter_match; params_match(p)}
     count(ids) > 0
 }
 
-# 4. Numeric violation deny
+# 5. Numeric violation deny
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     is_numeric_violation
     ids := {p.id | some p in input.policies; p.rule_type == "tool_denylist"; p.action == "deny"; tool_matches(p); p.condition.numeric_conditions; numeric_conditions_match(p)}
     count(ids) > 0
 }
 
-# 5. Compound violation deny
+# 6. Compound violation deny
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     is_compound_violation
@@ -723,10 +848,11 @@ fired_policy_id := min(ids) if {
     count(ids) > 0
 }
 
-# 6. Time violation deny
+# 7. Time violation deny
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -735,10 +861,11 @@ fired_policy_id := min(ids) if {
     count(ids) > 0
 }
 
-# 7. Rate-limit review
+# 8. Rate-limit review
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -748,23 +875,41 @@ fired_policy_id := min(ids) if {
     count(ids) > 0
 }
 
-# 8. Pattern review or numeric-condition review
+# 9. Token/cost budget review
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
     not is_time_violation
     not is_rate_exceeded_review
+    is_token_budget_exceeded_review
+    ids := {p.id | some p in input.policies; token_budget_policy(p); object.get(p.condition.token_budget, "on_exceed", "deny") == "review"}
+    count(ids) > 0
+}
+
+# 10. Pattern review or numeric-condition review
+fired_policy_id := min(ids) if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     ids := {p.id | some p in input.policies; _review_policy_fires(p)}
     count(ids) > 0
 }
 
-# 9. Standalone parameter_match deny
+# 11. Standalone parameter_match deny
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -779,10 +924,11 @@ fired_policy_id := min(ids) if {
     count(ids) > 0
 }
 
-# 10. Standalone numeric_conditions deny
+# 12. Standalone numeric_conditions deny
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -798,10 +944,11 @@ fired_policy_id := min(ids) if {
     count(ids) > 0
 }
 
-# 11. Standalone parameter_match review
+# 13. Standalone parameter_match review
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -809,6 +956,7 @@ fired_policy_id := min(ids) if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     not needs_review_numeric
     is_standalone_param_review
@@ -821,10 +969,11 @@ fired_policy_id := min(ids) if {
     count(ids) > 0
 }
 
-# 12. Standalone numeric_conditions review
+# 14. Standalone numeric_conditions review
 fired_policy_id := min(ids) if {
     not is_blacklisted
     not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
     not is_parameter_violation
     not is_numeric_violation
     not is_compound_violation
@@ -832,6 +981,7 @@ fired_policy_id := min(ids) if {
     not is_standalone_param_deny
     not is_standalone_numeric_deny
     not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
     not needs_review
     not needs_review_numeric
     not is_standalone_param_review
