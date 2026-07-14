@@ -12,7 +12,7 @@ policies:
     action: deny
     active: true
     severity: critical
-    compliance_tags: ["SOC2"]
+    compliance_frameworks: ["SOC2"]
 
   - name: require_review_for_external_calls
     description: Flag any tool that makes external HTTP requests for human review
@@ -44,7 +44,7 @@ policies:
     action: deny
     active: true
     severity: critical
-    compliance_tags: ["GLBA", "OCC", "SOC2"]
+    compliance_frameworks: ["GLBA", "OCC", "SOC2"]
 
   - name: block_unapproved_outbound_http
     description: "Block outbound HTTP to unapproved external domains — manufacturing demo"
@@ -56,7 +56,7 @@ policies:
     action: deny
     active: true
     severity: critical
-    compliance_tags: ["SOC2", "ISO27001"]
+    compliance_frameworks: ["SOC2", "ISO27001"]
 
   - name: deny_cross_encounter_phi_access
     description: "Block PHI access to patients outside authorized encounter cohort"
@@ -69,7 +69,7 @@ policies:
     action: deny
     active: true
     severity: critical
-    compliance_tags: ["HIPAA", "SOC2"]
+    compliance_frameworks: ["HIPAA", "SOC2"]
 
   - name: deny_bulk_account_lookup
     description: "Block wildcard account_id in customer account queries — support demo"
@@ -82,7 +82,7 @@ policies:
     action: deny
     active: true
     severity: critical
-    compliance_tags: ["GDPR", "SOC2", "CCPA"]
+    compliance_frameworks: ["GDPR", "SOC2", "CCPA"]
 
   - name: block_http_post_in_itsm
     description: "Block all outbound HTTP POST from incident response agent — ITSM demo"
@@ -93,7 +93,7 @@ policies:
     action: deny
     active: true
     severity: critical
-    compliance_tags: ["SOC2", "NIST_CSF"]
+    compliance_frameworks: ["SOC2", "NIST_CSF"]
 
   - name: deny_unscoped_crm_query
     description: "Block unfiltered account queries from CRM agent — RevOps demo"
@@ -106,7 +106,7 @@ policies:
     action: deny
     active: true
     severity: high
-    compliance_tags: ["GDPR", "SOC2", "CCPA"]
+    compliance_frameworks: ["GDPR", "SOC2", "CCPA"]
 
   # ── Example policies (inactive — activate per customer) ────────────────────
 
@@ -121,7 +121,7 @@ policies:
           value: 500000
     action: review
     severity: high
-    compliance_tags: ["SOC2", "GLBA"]
+    compliance_frameworks: ["SOC2", "GLBA"]
     active: false
 
   - name: example_bulk_revenue_export_deny
@@ -138,7 +138,7 @@ policies:
               value: 1000
     action: deny
     severity: critical
-    compliance_tags: ["GDPR", "SOC2"]
+    compliance_frameworks: ["GDPR", "SOC2"]
     active: false
 
   - name: example_no_weekend_production_changes
@@ -150,7 +150,7 @@ policies:
         deny_days: [5, 6]
     action: deny
     severity: high
-    compliance_tags: ["SOC2"]
+    compliance_frameworks: ["SOC2"]
     active: false
 
   - name: example_phi_access_all_variants
@@ -163,7 +163,7 @@ policies:
         patient_id: "PT-2024-09*"
     action: deny
     severity: critical
-    compliance_tags: ["HIPAA"]
+    compliance_frameworks: ["HIPAA"]
     active: false
 
 # ── Insurance demo policies ───────────────────────────────────────────────────
@@ -180,7 +180,7 @@ policies:
     action: review
     severity: high
     active: true
-    compliance_tags: ["SOC2", "NAIC", "EU_AI_ACT"]
+    compliance_frameworks: ["SOC2", "NAIC", "EU_AI_ACT"]
 
   - name: deny_unscoped_claims_query
     description: "Block wildcard insured_id in claims database queries — prevents bulk data access via prompt injection"
@@ -192,7 +192,7 @@ policies:
     action: deny
     severity: critical
     active: true
-    compliance_tags: ["SOC2", "NAIC", "GDPR"]
+    compliance_frameworks: ["SOC2", "NAIC", "GDPR"]
 
   - name: deny_bulk_credit_query_rate
     description: "Deny more than 2 credit bureau queries per session — bulk data collection via repeated single queries"
@@ -207,4 +207,4 @@ policies:
     action: deny
     active: true
     severity: high
-    compliance_tags: ["FCRA", "GLBA", "SOC2"]
+    compliance_frameworks: ["FCRA", "GLBA", "SOC2"]

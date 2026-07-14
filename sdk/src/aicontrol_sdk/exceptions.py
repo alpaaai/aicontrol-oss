@@ -25,3 +25,13 @@ class AIControlUnavailableError(Exception):
     def __init__(self, cause: Optional[BaseException] = None):
         self.cause = cause
         super().__init__(f"AIControl unavailable: {cause}")
+
+
+class UnknownDecisionError(Exception):
+    """Raised when AIControl returns a decision value this SDK version doesn't
+    recognize (typo, case mismatch, or a future decision type) -- fails closed
+    rather than silently treating it as an implicit allow."""
+
+    def __init__(self, decision: str):
+        self.decision = decision
+        super().__init__(f"Unrecognized decision value from AIControl: {decision!r}")

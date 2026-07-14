@@ -48,12 +48,16 @@ params_match(policy) if {
     }
 }
 
-# Helper: evaluate a single numeric operator
-numeric_op_passes("gt", actual, threshold) if { actual > threshold }
-numeric_op_passes("gte", actual, threshold) if { actual >= threshold }
-numeric_op_passes("lt", actual, threshold) if { actual < threshold }
-numeric_op_passes("lte", actual, threshold) if { actual <= threshold }
-numeric_op_passes("eq", actual, threshold) if { actual == threshold }
+# Helper: evaluate a single numeric operator.
+# to_number() coerces stringified numerals ("500000") to actual numbers before
+# comparing -- without it, Rego's cross-type ordering ranks any string above
+# any number regardless of value, making gt/gte always fire and lt/lte never
+# fire whenever a tool parameter arrives JSON-encoded as a string.
+numeric_op_passes("gt", actual, threshold) if { to_number(actual) > threshold }
+numeric_op_passes("gte", actual, threshold) if { to_number(actual) >= threshold }
+numeric_op_passes("lt", actual, threshold) if { to_number(actual) < threshold }
+numeric_op_passes("lte", actual, threshold) if { to_number(actual) <= threshold }
+numeric_op_passes("eq", actual, threshold) if { to_number(actual) == threshold }
 
 # Helper: true when ALL numeric_conditions in a policy pass (AND logic)
 numeric_conditions_match(policy) if {
@@ -221,9 +225,36 @@ hour_is_denied(policy) if {
     input.current_time.hour < policy.condition.time_conditions.deny_hours.to
 }
 
-# Per-policy time violation check (day or hour triggers the violation)
-policy_time_violation(policy) if { day_is_denied(policy) }
-policy_time_violation(policy) if { hour_is_denied(policy) }
+# Helper: true if the policy specifies deny_days at all
+_has_deny_days(policy) if { policy.condition.time_conditions.deny_days }
+
+# Helper: true if the policy specifies deny_hours at all
+_has_deny_hours(policy) if { policy.condition.time_conditions.deny_hours }
+
+# Per-policy time violation check.
+# - Both deny_days AND deny_hours specified: require BOTH to match (scoping
+#   intent, e.g. "weekends, 9-5") -- previously this was OR, so a policy meant
+#   to scope to specific hours on specific days instead denied on any matching
+#   day regardless of hour, and during the matching hour on any day.
+# - Only one specified: that one alone determines the violation.
+policy_time_violation(policy) if {
+    _has_deny_days(policy)
+    _has_deny_hours(policy)
+    day_is_denied(policy)
+    hour_is_denied(policy)
+}
+
+policy_time_violation(policy) if {
+    _has_deny_days(policy)
+    not _has_deny_hours(policy)
+    day_is_denied(policy)
+}
+
+policy_time_violation(policy) if {
+    _has_deny_hours(policy)
+    not _has_deny_days(policy)
+    hour_is_denied(policy)
+}
 
 # Helper: true if tool matches AND a time condition fires
 is_time_violation if {
@@ -417,11 +448,11 @@ is_standalone_param_review if {
 # Semantics: OR across all fields — any matching field fires the policy.
 # Condition format: {numeric_conditions: {field: {op: ">"|">="|"<"|"<="|"==", value: N}}}
 
-_snum_op_passes(">",  actual, threshold) if { actual > threshold }
-_snum_op_passes(">=", actual, threshold) if { actual >= threshold }
-_snum_op_passes("<",  actual, threshold) if { actual < threshold }
-_snum_op_passes("<=", actual, threshold) if { actual <= threshold }
-_snum_op_passes("==", actual, threshold) if { actual == threshold }
+_snum_op_passes(">",  actual, threshold) if { to_number(actual) > threshold }
+_snum_op_passes(">=", actual, threshold) if { to_number(actual) >= threshold }
+_snum_op_passes("<",  actual, threshold) if { to_number(actual) < threshold }
+_snum_op_passes("<=", actual, threshold) if { to_number(actual) <= threshold }
+_snum_op_passes("==", actual, threshold) if { to_number(actual) == threshold }
 
 standalone_numeric_matches(policy) if {
     some field, spec in policy.condition.numeric_conditions

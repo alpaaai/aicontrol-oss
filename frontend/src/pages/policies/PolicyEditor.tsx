@@ -235,6 +235,10 @@ export function PolicyEditor({ open, policy, onClose, onSaved }: Props) {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!name.trim()) {
+      setError("Policy name is required");
+      return;
+    }
     setSaving(true);
     setError("");
     const body: CreatePolicyBody = {
@@ -318,6 +322,8 @@ export function PolicyEditor({ open, policy, onClose, onSaved }: Props) {
             value={name}
             onChange={(e) => setName(e.target.value)}
             placeholder="Policy name"
+            required
+            minLength={1}
             className="text-sm text-ac-text-primary bg-transparent outline-none border-b border-transparent hover:border-ac-border focus:border-ac-primary transition-colors w-72"
           />
         </div>
@@ -357,7 +363,10 @@ export function PolicyEditor({ open, policy, onClose, onSaved }: Props) {
                     type="number"
                     min={1}
                     value={priority}
-                    onChange={(e) => setPriority(Number(e.target.value) || 100)}
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      setPriority(raw === "" ? 100 : Number(raw));
+                    }}
                     className={inputCls}
                     title="Lower number = evaluated first"
                   />

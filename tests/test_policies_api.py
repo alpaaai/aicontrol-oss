@@ -417,3 +417,96 @@ async def test_activate_baseline_requires_admin():
                 "/policies/activate-baseline", json={"mode": "standard"}
             )
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_create_policy_rejects_unsupported_numeric_operator():
+    """A tool_denylist policy with numeric_conditions operator 'neq' (not
+    implemented by base.rego's numeric_op_passes) must be rejected at
+    creation, not silently accepted as a policy that will never fire."""
+    from app.main import app
+    payload = {
+        "name": f"test_reject_neq_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_denylist",
+        "condition": {
+            "blocked_tools": ["some_tool"],
+            "numeric_conditions": [
+                {"parameter": "amount", "operator": "neq", "value": 100}
+            ],
+        },
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+    assert "operator" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_policy_rejects_malformed_time_conditions():
+    """A tool_denylist policy with deny_hours using 'start'/'end' instead of
+    the real 'from'/'to' keys base.rego expects must be rejected at
+    creation."""
+    from app.main import app
+    payload = {
+        "name": f"test_reject_badtime_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_denylist",
+        "condition": {
+            "blocked_tools": ["some_tool"],
+            "time_conditions": {"deny_hours": {"start": 9, "end": 17}},
+        },
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+    assert "time_conditions" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_policy_accepts_valid_numeric_and_time_conditions():
+    """Sanity check: correctly-shaped numeric_conditions/time_conditions
+    must still be accepted."""
+    from app.main import app
+    payload = {
+        "name": f"test_accept_valid_nt_{uuid.uuid4().hex[:6]}",
+        "rule_type": "tool_denylist",
+        "condition": {
+            "blocked_tools": ["some_other_tool"],
+            "numeric_conditions": [
+                {"parameter": "amount", "operator": "gt", "value": 100}
+            ],
+            "time_conditions": {"deny_days": [5, 6], "deny_hours": {"from": 9, "to": 17}},
+        },
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_policy_rejects_blank_name():
+    """POST /policies with an empty name must be rejected, not silently accepted."""
+    from app.main import app
+    payload = {
+        "name": "",
+        "rule_type": "tool_denylist",
+        "condition": {"blocked_tools": ["some_tool"]},
+        "action": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422

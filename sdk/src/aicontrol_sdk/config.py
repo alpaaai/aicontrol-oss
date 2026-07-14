@@ -1,6 +1,6 @@
 """Env-only SDK configuration."""
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal, Optional
 
 FailMode = Literal["allow", "deny"]
@@ -9,7 +9,7 @@ FailMode = Literal["allow", "deny"]
 @dataclass
 class Config:
     url: str
-    token: str
+    token: str = field(repr=False)
     agent_id: Optional[str] = None
     agent_name: Optional[str] = None
     fail_mode: FailMode = "deny"

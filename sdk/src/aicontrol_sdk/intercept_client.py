@@ -5,7 +5,9 @@ from typing import Any, Optional
 import httpx
 
 from aicontrol_sdk.config import Config
-from aicontrol_sdk.exceptions import AIControlUnavailableError, PolicyDeniedError, ReviewPendingError
+from aicontrol_sdk.exceptions import (
+    AIControlUnavailableError, PolicyDeniedError, ReviewPendingError, UnknownDecisionError,
+)
 
 
 class InterceptClient:
@@ -49,20 +51,22 @@ class InterceptClient:
                 headers={"Authorization": f"Bearer {self._config.token}"},
                 json=body,
             )
+            response.raise_for_status()
         except httpx.HTTPError as exc:
             if self._config.fail_mode == "allow":
                 return {"decision": "allow", "reason": "aicontrol_unavailable_fail_open"}
             raise AIControlUnavailableError(cause=exc) from exc
 
-        response.raise_for_status()
         result = response.json()
 
-        if result["decision"] == "deny":
+        decision = result["decision"]
+        if decision == "allow":
+            return result
+        if decision == "deny":
             raise PolicyDeniedError(reason=result["reason"], policy_name=result.get("policy_name"))
-        if result["decision"] == "review":
+        if decision == "review":
             raise ReviewPendingError(review_id=result["review_id"])
-
-        return result
+        raise UnknownDecisionError(decision=decision)
 
     async def aclose(self) -> None:
         await self._client.aclose()

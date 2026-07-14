@@ -2,7 +2,7 @@
 import json
 import uuid
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -26,6 +26,7 @@ class AgentCreate(BaseModel):
     system_prompt_hash: Optional[str] = None
     approved_tools: list[str] = []
     metadata: dict[str, Any] = {}
+    governance_mode: Optional[Literal["observe", "govern"]] = None
 
 
 class AgentUpdate(BaseModel):
@@ -36,6 +37,7 @@ class AgentUpdate(BaseModel):
     approved_tools: Optional[list[str]] = None
     status: Optional[str] = None
     approved_by: Optional[str] = None
+    governance_mode: Optional[Literal["observe", "govern"]] = None
 
     @field_validator("status")
     @classmethod
@@ -221,6 +223,7 @@ async def create_agent(
         approved_tools=body.approved_tools,
         status="active",
         metadata_=body.metadata,
+        **({"governance_mode": body.governance_mode} if body.governance_mode else {}),
     )
     db.add(agent)
     await db.flush()

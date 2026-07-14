@@ -39,10 +39,14 @@ def control(tool_name: str, client: Optional[InterceptClient] = None) -> Callabl
                 counter = _session_counters.setdefault(session_id, itertools.count(1))
                 sequence_number = next(counter)
 
+            bound = inspect.signature(func).bind(*args, **kwargs)
+            bound.apply_defaults()
+            tool_parameters = dict(bound.arguments)
+
             active_client = client or _get_default_client()
             await active_client.intercept(
                 tool_name=tool_name,
-                tool_parameters=kwargs,
+                tool_parameters=tool_parameters,
                 session_id=session_id,
                 sequence_number=sequence_number,
             )

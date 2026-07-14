@@ -165,7 +165,8 @@ async def _seed_and_token_setup():
 
 @pytest_asyncio.fixture
 async def client(_seed_and_token_setup):
-    async with httpx.AsyncClient(base_url="http://localhost:8001", timeout=10.0) as c:
+    base_url = os.environ.get("AICONTROL_TEST_BASE_URL", "http://localhost:8001")
+    async with httpx.AsyncClient(base_url=base_url, timeout=10.0) as c:
         yield c
 
 

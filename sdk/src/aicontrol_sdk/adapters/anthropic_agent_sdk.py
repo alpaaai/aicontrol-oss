@@ -23,17 +23,31 @@ class AnthropicAgentSDKAdapter:
             return False
 
     def patch(self, client: InterceptClient) -> None:
-        """Register a PreToolUse HookMatcher on ClaudeAgentOptions.hooks.
-
-        Usage (in the caller's code, after instrument() has been called):
-            options.hooks.setdefault("PreToolUse", []).append(
-                get_hook_matcher()
-            )
-        Exposed as `self.build_hook_matcher(client)` since ClaudeAgentOptions
-        is constructed by the caller, not the SDK — there is no global
-        "patch every future instance" hook point in claude-agent-sdk.
-        """
+        """Monkeypatch ClaudeAgentOptions.__init__ so any options instance
+        constructed after this call automatically has AIControl's PreToolUse
+        HookMatcher registered. Callers who already add their own PreToolUse
+        hooks keep them too. Idempotent -- a second patch() call is a no-op."""
         self._client = client
+        from claude_agent_sdk import ClaudeAgentOptions
+
+        # Always wrap the TRUE original __init__ (captured once, on the first
+        # patch() call ever) rather than whatever __init__ currently is --
+        # patching a second time would otherwise wrap an already-patched
+        # __init__, stacking duplicate hooks on every subsequent instance.
+        if not hasattr(ClaudeAgentOptions, "_aicontrol_original_init"):
+            ClaudeAgentOptions._aicontrol_original_init = ClaudeAgentOptions.__init__
+
+        adapter = self
+        original_init = ClaudeAgentOptions._aicontrol_original_init
+
+        def patched_init(self_, *args, **kwargs):
+            original_init(self_, *args, **kwargs)
+            matcher = adapter.build_hook_matcher()
+            if self_.hooks is None:
+                self_.hooks = {}
+            self_.hooks.setdefault("PreToolUse", []).append(matcher)
+
+        ClaudeAgentOptions.__init__ = patched_init
 
     def build_hook_matcher(self):
         """Build a HookMatcher wired to intercept every PreToolUse event.

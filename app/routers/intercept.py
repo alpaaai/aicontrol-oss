@@ -6,7 +6,8 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_agent
@@ -86,11 +87,35 @@ async def get_active_policies(session: AsyncSession) -> list[dict]:
 async def ensure_session(
     db: AsyncSession, session_id: uuid.UUID, agent_id: uuid.UUID
 ) -> None:
-    """Create a session row if one does not already exist for this session_id."""
+    """Create a session row if one does not already exist for this session_id.
+
+    Guards against the race where two concurrent calls for a brand-new
+    session_id both see no existing row: if the INSERT loses a race to
+    another concurrent request, roll back just this savepoint and treat the
+    now-existing row as success rather than propagating the IntegrityError.
+    """
     result = await db.execute(select(Session).where(Session.id == session_id))
-    if result.scalar_one_or_none() is None:
-        db.add(Session(id=session_id, agent_id=agent_id, status="active"))
-        await db.flush()
+    if result.scalar_one_or_none() is not None:
+        return
+    try:
+        async with db.begin_nested():
+            db.add(Session(id=session_id, agent_id=agent_id, status="active"))
+            await db.flush()
+    except IntegrityError:
+        pass
+
+
+async def accumulate_session_risk(
+    db: AsyncSession, session_id: uuid.UUID, delta: int
+) -> None:
+    """Add delta to sessions.risk_score for this session. No-op if delta is 0."""
+    if delta == 0:
+        return
+    await db.execute(
+        update(Session)
+        .where(Session.id == session_id)
+        .values(risk_score=Session.risk_score + delta)
+    )
 
 
 @router.post("/intercept", response_model=InterceptResponse)
@@ -113,12 +138,14 @@ async def intercept(
 
     start = time.monotonic()
 
-    # Step 2b: approved_tools enforcement gate — runs before OPA.
+    # Step 2b: approved_tools enforcement gate — runs before OPA, but must
+    # still respect observe mode (never blocks, only records).
     # Case-sensitive match: tool_name is never normalized upstream.
     # approved_tools = [] means unrestricted (backward compatible).
     # Agent not found in DB also means unrestricted (backward compatible).
     agent_result = await db.execute(select(Agent).where(Agent.id == body.agent_id))
     agent = agent_result.scalar_one_or_none()
+    is_observe_mode = agent is not None and agent.governance_mode == "observe"
     if agent is not None and agent.approved_tools:
         if body.tool_name not in agent.approved_tools:
             early_duration_ms = int((time.monotonic() - start) * 1000)
@@ -138,10 +165,10 @@ async def intercept(
                 "policy_name": "approved_tools",
                 "policy_id": None,
                 "bypass": False,
-                "enforced": True,
+                "enforced": not is_observe_mode,
             })
             return InterceptResponse(
-                decision="deny",
+                decision="allow" if is_observe_mode else "deny",
                 reason="tool_not_approved_for_agent",
                 audit_event_id=early_event_id,
                 review_id=None,
@@ -196,7 +223,6 @@ async def intercept(
 
     true_decision = opa_result["decision"]
     true_reason = opa_result["reason"]
-    is_observe_mode = agent is not None and agent.governance_mode == "observe"
     enforced_decision = "allow" if is_observe_mode else true_decision
 
     if opa_result.get("bypass"):
@@ -237,6 +263,7 @@ async def intercept(
             audit_event_id=event_id,
             session_id=body.session_id,
         )
+        await accumulate_session_risk(db, body.session_id, RISK_SCORE_DELTA.get(true_decision, 0))
         import asyncio
         asyncio.create_task(
             post_slack_review(
@@ -269,6 +296,7 @@ async def intercept(
             "bypass": opa_result.get("bypass", False),
             "enforced": not is_observe_mode,
         })
+        await accumulate_session_risk(db, body.session_id, RISK_SCORE_DELTA.get(true_decision, 0))
 
     logger.info(
         "tool_intercepted",

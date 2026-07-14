@@ -311,6 +311,10 @@ async def test_ensure_session_creates_when_missing():
     mock_result = MagicMock()
     mock_result.scalar_one_or_none.return_value = None
     mock_db.execute.return_value = mock_result
+    nested_cm = MagicMock()
+    nested_cm.__aenter__ = AsyncMock(return_value=None)
+    nested_cm.__aexit__ = AsyncMock(return_value=None)
+    mock_db.begin_nested = MagicMock(return_value=nested_cm)
 
     await ensure_session(mock_db, session_id, agent_id)
 

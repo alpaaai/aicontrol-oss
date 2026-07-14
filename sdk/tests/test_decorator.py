@@ -73,3 +73,21 @@ async def test_control_wraps_sync_function(mock_client):
 
     result = await sync_tool(x=5)
     assert result == 10
+
+
+@pytest.mark.asyncio
+async def test_control_captures_positional_arguments(mock_client):
+    """A tool called with positional arguments must still have those arguments
+    appear in tool_parameters sent to the backend -- today only kwargs are
+    captured, so a policy inspecting tool_parameters sees an incomplete/empty
+    dict while the real call executes with the real (unseen) arguments."""
+    from aicontrol_sdk.decorator import control
+
+    @control("query_database", client=mock_client)
+    async def query_database(table: str, limit: int = 100):
+        return f"{table}:{limit}"
+
+    await query_database("customers", 50)
+
+    call_kwargs = mock_client.intercept.call_args.kwargs
+    assert call_kwargs["tool_parameters"] == {"table": "customers", "limit": 50}

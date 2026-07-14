@@ -49,3 +49,11 @@ def test_config_invalid_fail_mode_raises(monkeypatch):
     from aicontrol_sdk.config import Config
     with pytest.raises(ValueError, match="AICONTROL_FAIL_MODE"):
         Config.from_env()
+
+
+def test_config_repr_does_not_leak_token():
+    """repr(config) must not include the raw bearer token -- it can end up in
+    logs, print() calls, or exception tracebacks that capture local variables."""
+    from aicontrol_sdk.config import Config
+    config = Config(url="http://x", token="SUPER-SECRET-TOKEN", agent_id="a")
+    assert "SUPER-SECRET-TOKEN" not in repr(config)

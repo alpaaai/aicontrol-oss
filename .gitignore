@@ -14,6 +14,7 @@ postgres_data/
 .env
 data/wal/
 .pytest_wal/
+*.pem
 
 # Internal plans and specs — not for public repo. Entire folder is
 # internal-only (plans, specs, strategy/GTM docs); nothing under docs/

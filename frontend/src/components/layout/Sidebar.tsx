@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   Lock, LayoutDashboard, List, BarChart2, GitBranch,
   Shield, Bot, Key, CheckSquare, Activity,
-  Brain, Lightbulb, FileCheck, LogOut, Settings, CreditCard,
+  Brain, FileCheck, LogOut, Settings, CreditCard,
   Layers, ShieldCheck, ClipboardList, BarChart3, Sparkles,
   ChevronRight, HeartPulse, SlidersHorizontal, ScanSearch,
 } from "lucide-react";
@@ -17,7 +17,7 @@ const SECTION_PATHS: Record<string, string[]> = {
   governance:   ["/policies", "/agents", "/tokens", "/admission-scans"],
   reviews:      ["/reviews"],
   reports:      ["/reports"],
-  intelligence: ["/intelligence", "/policy-suggestions"],
+  intelligence: ["/intelligence"],
   admin:        ["/health", "/settings", "/billing"],
 };
 
@@ -214,7 +214,6 @@ export function Sidebar() {
         {openSection === "intelligence" && (
           <div className="animate-fade-up pb-1">
             <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}     label="Threat summaries" locked={!isEnterprise} />
-            <NavItem to="/policy-suggestions" icon={<Lightbulb {...iconProps} />} label="Policy insights"  locked={!isEnterprise} />
           </div>
         )}
 
