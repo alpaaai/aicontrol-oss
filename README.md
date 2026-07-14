@@ -14,17 +14,38 @@ a human sign-off.
 
 ---
 
-- **OPA-based policy enforcement** — five rule types (tool denylist, tool pattern, rate limit,
-  parameter match, numeric conditions), evaluated before every tool call
-- **Per-agent tool allowlists** — restrict each agent to its own `approved_tools`, enforced
-  independently of policy
-- **Admission-time skill/tool scanning** — scan a skill or tool for known-risky patterns
-  before it's ever enrolled, via the built-in scanner integration (see below)
-- **Immutable audit trail** — every decision logged with full parameters and policy attribution
-- **Human-in-the-loop review queue** — escalate to a human reviewer when policy requires it
-- **React dashboard** — first-run setup wizard, user management, a policy library of
-  pre-built templates, and a no-JSON policy editor
-- **Self-hosted, one command** — runs on your infrastructure, no cloud dependency
+## Features
+
+- **OPA-based policy engine** — five rule types, evaluated before every tool call and
+  pushed to OPA immediately on change (no restart):
+  - `tool_denylist` — block specific tools outright
+  - `tool_pattern` — block by name pattern, not just exact match
+  - `rate_limit` — cap how many times a tool can be called in a window
+  - `parameter_match` — condition a decision on specific argument values
+  - `numeric_conditions` — condition a decision on numeric thresholds (e.g. amount > 10000)
+- **Per-agent tool allowlists** — each agent has its own `approved_tools`, enforced
+  independently of policy, so an agent can never call outside its own scope even if a
+  policy would otherwise allow it.
+- **Admission-time scanning** — scan a skill or tool for known-risky patterns before it's
+  ever enrolled, via the built-in scanner integration (Cisco's open-source `skill-scanner`
+  — see [Admission-time scanning](#admission-time-scanning) below).
+- **Immutable audit trail** — every intercepted call writes an `audit_event` regardless of
+  the decision (allow, deny, or review) — append-only, with the full parameters and which
+  policy fired.
+- **Human-in-the-loop review queue** — policies can route a call to a human reviewer
+  instead of an automatic allow/deny; every review is created and recorded regardless of
+  plan. Viewing and resolving the queue from the dashboard's Reviews page, and viewing
+  session drill-down, both require an Enterprise license (see
+  [Enterprise edition](#enterprise-edition) below).
+- **Per-agent observe mode** — set an agent's `governance_mode` to `observe` and its
+  policy decisions are recorded exactly as if enforced, but never actually block a call —
+  useful for rolling out a new policy set risk-free before switching it to enforce.
+- **React dashboard** — first-run setup wizard, a live activity/audit feed, agent and
+  token management, a policy library of pre-built templates, and a no-JSON policy editor.
+- **Official Python SDK** — auto-instruments the Anthropic Claude Agent SDK, OpenAI Agents
+  SDK, or Google ADK with no per-call code changes, or use a framework-agnostic decorator
+  on any callable (see [Integration](#integration) below).
+- **Self-hosted, one command** — runs on your own infrastructure, no cloud dependency.
 
 ---
 
@@ -155,8 +176,9 @@ See [aictl.io/docs/policies](https://aictl.io/docs/policies) for all five rule t
 ## Enterprise edition
 
 AIControl Community is MIT-licensed, free, and fully self-hostable — no seat limits, no
-usage limits. AIControl Enterprise adds audit log CSV export, policy drift detection, and
-compliance report generation. [Learn more at aictl.io](https://aictl.io)
+usage limits. AIControl Enterprise adds the in-dashboard HITL review queue (viewing and
+resolving reviews), session view/drill-down, audit log CSV export, policy drift detection,
+and compliance report generation. [Learn more at aictl.io](https://aictl.io)
 
 ---
 

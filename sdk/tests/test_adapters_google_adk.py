@@ -1,6 +1,18 @@
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 
+# Captured once, at import time, before any test calls patch() -- the tests
+# below reset Runner.__init__ back to this pristine reference before each
+# patch() call, so one test's monkeypatching never leaks into the next.
+from google.adk.runners import Runner as _Runner
+_PRISTINE_RUNNER_INIT = _Runner.__init__
+
+
+def _reset_runner_patch_state():
+    _Runner.__init__ = _PRISTINE_RUNNER_INIT
+    if hasattr(_Runner, "_aicontrol_original_init"):
+        delattr(_Runner, "_aicontrol_original_init")
+
 
 @pytest.mark.asyncio
 async def test_google_adk_adapter_before_tool_callback_allows_returns_none():
@@ -51,3 +63,55 @@ async def test_google_adk_adapter_before_tool_callback_short_circuits_on_deny():
 
     assert result is not None
     assert "tool_denylisted" in result["error"]
+
+
+@pytest.mark.asyncio
+async def test_patch_injects_plugin_into_new_runner():
+    """After patch(), constructing a Runner() must have AIControl's plugin
+    already present in its plugins list -- today patch() only stores the
+    client and does nothing else."""
+    from google.adk.runners import Runner
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+    from aicontrol_sdk.intercept_client import InterceptClient
+    from aicontrol_sdk.config import Config
+
+    _reset_runner_patch_state()
+
+    client = InterceptClient(config=Config(url="http://x", token="t", agent_id="a"))
+    adapter = GoogleADKAdapter()
+    adapter.patch(client)
+
+    runner = Runner(app_name="test-app", agent=MagicMock(), session_service=MagicMock())
+
+    assert any(getattr(p, "name", None) == "aicontrol" for p in runner.plugin_manager.plugins)
+
+
+@pytest.mark.asyncio
+async def test_patch_preserves_callers_own_plugins():
+    """A caller-supplied plugins list must be kept alongside AIControl's
+    injected plugin, not replaced."""
+    from google.adk.runners import Runner
+    from google.adk.plugins.base_plugin import BasePlugin
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+    from aicontrol_sdk.intercept_client import InterceptClient
+    from aicontrol_sdk.config import Config
+
+    class MyPlugin(BasePlugin):
+        def __init__(self):
+            super().__init__(name="my-plugin")
+
+    _reset_runner_patch_state()
+
+    client = InterceptClient(config=Config(url="http://x", token="t", agent_id="a"))
+    adapter = GoogleADKAdapter()
+    adapter.patch(client)
+
+    my_plugin = MyPlugin()
+    runner = Runner(
+        app_name="test-app", agent=MagicMock(), session_service=MagicMock(),
+        plugins=[my_plugin],
+    )
+
+    names = [getattr(p, "name", None) for p in runner.plugin_manager.plugins]
+    assert "my-plugin" in names
+    assert "aicontrol" in names

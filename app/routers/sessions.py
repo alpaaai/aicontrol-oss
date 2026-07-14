@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, exists
 
 from app.core.auth import require_human
+from app.core.license_gate import require_enterprise_license
 from app.models.database import async_session_factory
 from app.models.schemas import Agent, AuditEvent, HITLReview, Session
 
@@ -15,6 +16,7 @@ async def list_sessions(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
     _=Depends(require_human),
+    _license=Depends(require_enterprise_license),
 ):
     event_count_sq = (
         select(func.count())
@@ -65,7 +67,11 @@ async def list_sessions(
 
 
 @router.get("/{session_id}/events")
-async def get_session_events(session_id: uuid.UUID, _=Depends(require_human)):
+async def get_session_events(
+    session_id: uuid.UUID,
+    _=Depends(require_human),
+    _license=Depends(require_enterprise_license),
+):
     async with async_session_factory() as db:
         session_row = (await db.execute(
             select(Session).where(Session.id == session_id)

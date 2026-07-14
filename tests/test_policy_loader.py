@@ -41,3 +41,13 @@ async def test_upsert_policies_calls_db():
     ]
     await upsert_policies(mock_session, policies)
     assert mock_session.execute.called
+
+
+def test_load_yaml_never_uses_compliance_tags_key():
+    """Every policy in policies.yaml must use 'compliance_frameworks' (the key
+    policy_loader.upsert_policies actually reads) -- not the unread
+    'compliance_tags' key, which silently drops compliance metadata into an
+    empty list on every API startup."""
+    from app.services.policy_loader import load_yaml
+    offenders = [p["name"] for p in load_yaml() if "compliance_tags" in p]
+    assert offenders == [], f"policies still using unread 'compliance_tags' key: {offenders}"

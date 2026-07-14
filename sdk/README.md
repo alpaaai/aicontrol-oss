@@ -44,10 +44,13 @@ except PolicyDeniedError as e:
 
 ## Framework extras
 
+`aicontrol-sdk` isn't published to PyPI yet — install from source with the extra you need:
+
 ```bash
-pip install "aicontrol-sdk[anthropic]"   # claude-agent-sdk
-pip install "aicontrol-sdk[openai]"      # openai-agents
-pip install "aicontrol-sdk[google-adk]"  # google-adk
+pip install "./sdk[anthropic]"   # claude-agent-sdk
+pip install "./sdk[openai]"      # openai-agents
+pip install "./sdk[google-adk]"  # google-adk
+# or: pip install "git+https://github.com/alpaaai/aicontrol-oss#subdirectory=sdk[anthropic]"
 ```
 
 ## Exceptions
@@ -55,3 +58,6 @@ pip install "aicontrol-sdk[google-adk]"  # google-adk
 - `PolicyDeniedError(reason, policy_name)` — raised on a `deny` decision.
 - `ReviewPendingError(review_id)` — raised on a `review` decision.
 - `AIControlUnavailableError(cause)` — raised when AIControl is unreachable and `AICONTROL_FAIL_MODE=deny`.
+- `UnknownDecisionError(decision)` — raised when AIControl returns a decision value this SDK
+  version doesn't recognize (a typo, case mismatch, or a future decision type) — fails
+  closed rather than silently treating it as an implicit allow.

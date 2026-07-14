@@ -3,7 +3,7 @@ import uuid
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -123,11 +123,71 @@ def validate_numeric_conditions_condition(condition: dict) -> list[str]:
     return errors
 
 
+TOOL_DENYLIST_NUMERIC_OPS = {"gt", "gte", "lt", "lte", "eq"}
+
+
+def validate_tool_denylist_numeric_conditions(condition: dict) -> list[str]:
+    """tool_denylist's nested numeric_conditions is a LIST of {parameter, operator,
+    value} dicts (unlike the standalone numeric_conditions rule_type's dict-of-dicts),
+    and must use the operator strings base.rego's numeric_op_passes implements."""
+    nc = condition.get("numeric_conditions")
+    if not nc:
+        return []
+    if not isinstance(nc, list):
+        return ["tool_denylist.numeric_conditions must be an array"]
+    errors: list[str] = []
+    for i, cond in enumerate(nc):
+        if not isinstance(cond, dict):
+            errors.append(f"numeric_conditions[{i}] must be an object")
+            continue
+        if not cond.get("parameter"):
+            errors.append(f"numeric_conditions[{i}] requires 'parameter'")
+        if cond.get("operator") not in TOOL_DENYLIST_NUMERIC_OPS:
+            errors.append(
+                f"numeric_conditions[{i}].operator must be one of "
+                f"{sorted(TOOL_DENYLIST_NUMERIC_OPS)}, got {cond.get('operator')!r}"
+            )
+        if "value" not in cond or not isinstance(cond.get("value"), (int, float)):
+            errors.append(f"numeric_conditions[{i}].value must be a number")
+    return errors
+
+
+def validate_tool_denylist_time_conditions(condition: dict) -> list[str]:
+    """time_conditions must use the exact keys base.rego's day_is_denied/hour_is_denied
+    read: deny_days (list of 0-6 ints) and/or deny_hours ({'from': int, 'to': int})."""
+    tc = condition.get("time_conditions")
+    if not tc:
+        return []
+    if not isinstance(tc, dict):
+        return ["tool_denylist.time_conditions must be an object"]
+    errors: list[str] = []
+    known_keys = {"deny_days", "deny_hours"}
+    unknown = set(tc.keys()) - known_keys
+    if unknown:
+        errors.append(
+            f"time_conditions has unknown key(s) {sorted(unknown)}; "
+            f"expected only {sorted(known_keys)}"
+        )
+    if "deny_days" in tc:
+        days = tc["deny_days"]
+        if not isinstance(days, list) or not all(
+            isinstance(d, int) and 0 <= d <= 6 for d in days
+        ):
+            errors.append("time_conditions.deny_days must be a list of integers 0-6")
+    if "deny_hours" in tc:
+        dh = tc["deny_hours"]
+        if not isinstance(dh, dict) or "from" not in dh or "to" not in dh:
+            errors.append("time_conditions.deny_hours must be an object with 'from' and 'to'")
+    return errors
+
+
 def validate_condition(rule_type: str, condition: dict) -> list[str]:
     if rule_type == "tool_denylist":
         errors = validate_tool_denylist_condition(condition)
         if condition.get("token_budget"):
             errors += validate_token_budget_condition(condition)
+        errors += validate_tool_denylist_numeric_conditions(condition)
+        errors += validate_tool_denylist_time_conditions(condition)
         return errors
     if rule_type == "parameter_match":
         return validate_parameter_match_condition(condition)
@@ -141,7 +201,7 @@ def validate_condition(rule_type: str, condition: dict) -> list[str]:
 
 
 class PolicyCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1)
     description: Optional[str] = None
     rule_type: str
     condition: dict[str, Any]

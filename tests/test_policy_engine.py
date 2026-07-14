@@ -139,6 +139,66 @@ async def test_numeric_multi_condition_allow_one_fails(client, agent_token):
     assert resp.json()["decision"] == "allow"
 
 
+@pytest.mark.asyncio
+async def test_numeric_gt_deny_with_stringified_number(client, agent_token, admin_token):
+    """A gt threshold must not falsely deny when the actual value is a LOW number
+    sent as a string -- Rego's string>number cross-type ordering currently makes
+    any string 'win' regardless of its numeric value."""
+    await client.post("/policies", headers=admin_token, json={
+        "name": "test_loan_limit_string_low",
+        "description": "Deny loans over 500k",
+        "rule_type": "tool_denylist",
+        "condition": {
+            "blocked_tools": ["approve_loan_string_test"],
+            "numeric_conditions": [
+                {"parameter": "loan_amount", "operator": "gt", "value": 500000}
+            ]
+        },
+        "action": "deny", "severity": "high", "active": True,
+    })
+    resp = await client.post("/intercept", headers=agent_token, json={
+        "session_id": _TEST_SESSION_ID,
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
+        "tool_name": "approve_loan_string_test",
+        "tool_parameters": {"loan_amount": "99", "applicant_id": "APP-STR-1"},
+        "sequence_number": 1,
+    })
+    assert resp.json()["decision"] == "allow", (
+        "a stringified '99' must be treated as 99, not as 'greater than 500000' "
+        "just because it's a string"
+    )
+
+
+@pytest.mark.asyncio
+async def test_numeric_lt_deny_with_stringified_number(client, agent_token, admin_token):
+    """An lt threshold must still fire when the actual value is a low number sent
+    as a string -- currently strings never satisfy lt/lte at all."""
+    await client.post("/policies", headers=admin_token, json={
+        "name": "test_credit_floor_string",
+        "description": "Deny if credit score below 600",
+        "rule_type": "tool_denylist",
+        "condition": {
+            "blocked_tools": ["approve_loan_string_test2"],
+            "numeric_conditions": [
+                {"parameter": "credit_score", "operator": "lt", "value": 600}
+            ]
+        },
+        "action": "deny", "severity": "high", "active": True,
+    })
+    resp = await client.post("/intercept", headers=agent_token, json={
+        "session_id": _TEST_SESSION_ID,
+        "agent_id": "00000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-processing-agent",
+        "tool_name": "approve_loan_string_test2",
+        "tool_parameters": {"credit_score": "550", "applicant_id": "APP-STR-2"},
+        "sequence_number": 1,
+    })
+    assert resp.json()["decision"] == "deny", (
+        "a stringified '550' must be treated as 550 (< 600), not silently allowed"
+    )
+
+
 # ── Compound AND/OR tests ─────────────────────────────────────────────────────
 
 @pytest.mark.asyncio
@@ -359,6 +419,42 @@ async def test_temporal_allow_outside_business_hours(client, agent_token):
                 "tool_parameters": {"service": "payment-processor"},
                 "sequence_number": 2,
             })
+    assert resp.json()["decision"] == "allow"
+
+
+@pytest.mark.asyncio
+async def test_time_conditions_require_and_when_both_specified(client, agent_token, admin_token):
+    """A policy with BOTH deny_days and deny_hours must only deny when the
+    current day AND hour both match -- not when either matches alone."""
+    await client.post("/policies", headers=admin_token, json={
+        "name": "test_weekend_early_hours_only",
+        "description": "Deny only Sat/Sun during 4-5am",
+        "rule_type": "tool_denylist",
+        "condition": {
+            "blocked_tools": ["scale_down_cluster"],
+            "time_conditions": {"deny_days": [5, 6], "deny_hours": {"from": 4, "to": 5}}
+        },
+        "action": "deny", "severity": "high", "active": True,
+    })
+    # Tuesday April 14 2026 04:30 UTC -- weekday() == 1, not in [5, 6], so the
+    # AND requirement must NOT be satisfied even though the hour matches.
+    tuesday_early = datetime(2026, 4, 14, 4, 30, 0, tzinfo=timezone.utc)
+    with patch("app.services.opa_client.datetime") as mock_dt:
+        mock_dt.datetime.now.return_value = tuesday_early
+        mock_dt.timezone = timezone
+        async with _asgi_client(agent_token) as asgi:
+            resp = await asgi.post("/intercept", json={
+                "session_id": _TEST_SESSION_ID,
+                "agent_id": "00000000-0000-0000-0000-000000000030",
+                "agent_name": "incident-response-agent",
+                "tool_name": "scale_down_cluster",
+                "tool_parameters": {"cluster": "payments"},
+                "sequence_number": 1,
+            })
+    assert resp.json()["decision"] == "allow", (
+        "day doesn't match deny_days, so the AND requirement must not fire "
+        "just because the hour happens to match"
+    )
     assert resp.json()["decision"] == "allow"
 
 

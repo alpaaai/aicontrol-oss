@@ -149,3 +149,41 @@ async def test_list_agents_with_human_non_admin_jwt_returns_403():
     ) as client:
         response = await client.get("/agents", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_update_agent_governance_mode():
+    """AgentUpdate must accept governance_mode -- today there is no API field
+    for it at all, making observe mode unreachable except via direct DB write."""
+    with _auth() as app:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            create_resp = await client.post("/agents", json={
+                "name": f"test-agent-{uuid.uuid4().hex[:6]}",
+                "owner": "test@example.com",
+                "approved_tools": ["read_file"],
+            })
+            agent_id = create_resp.json()["id"]
+
+            update_resp = await client.put(f"/agents/{agent_id}", json={
+                "governance_mode": "observe",
+            })
+    assert update_resp.status_code == 200
+    assert update_resp.json()["governance_mode"] == "observe"
+
+
+@pytest.mark.asyncio
+async def test_create_agent_accepts_governance_mode():
+    """AgentCreate must accept governance_mode at creation time too."""
+    with _auth() as app:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            create_resp = await client.post("/agents", json={
+                "name": f"test-agent-{uuid.uuid4().hex[:6]}",
+                "owner": "test@example.com",
+                "governance_mode": "observe",
+            })
+    assert create_resp.status_code == 201
+    assert create_resp.json()["governance_mode"] == "observe"

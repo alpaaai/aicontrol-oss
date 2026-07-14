@@ -39,12 +39,12 @@ curl -s --max-time 5 http://localhost:8181/health 2>&1 \
 
 echo ""
 echo "--- API /health ---"
-curl -s --max-time 5 http://localhost:8000/health 2>&1 \
+curl -s --max-time 5 http://localhost:8001/health 2>&1 \
   || echo "ERROR: API not reachable"
 
 echo ""
 echo "--- API /debug ---"
-curl -s --max-time 5 http://localhost:8000/debug 2>&1 | python3 -m json.tool \
+curl -s --max-time 5 http://localhost:8001/debug 2>&1 | python3 -m json.tool \
   || echo "ERROR: /debug failed"
 
 echo ""

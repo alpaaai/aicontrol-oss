@@ -13,10 +13,21 @@ SESSION_ID = "00000000-0000-0000-0000-000000000002"
 
 async def reset():
     async with async_session_factory() as session:
-        # Clear in FK-safe order
-        await session.execute(text("DELETE FROM hitl_reviews"))
-        await session.execute(text("DELETE FROM audit_events"))
-        await session.execute(text("DELETE FROM sessions"))
+        # Clear in FK-safe order, scoped to this demo agent only
+        await session.execute(
+            text("DELETE FROM hitl_reviews WHERE session_id IN "
+                 "(SELECT id FROM sessions WHERE agent_id = :id)"),
+            {"id": AGENT_ID},
+        )
+        await session.execute(
+            text("DELETE FROM audit_events WHERE session_id IN "
+                 "(SELECT id FROM sessions WHERE agent_id = :id)"),
+            {"id": AGENT_ID},
+        )
+        await session.execute(
+            text("DELETE FROM sessions WHERE agent_id = :id"),
+            {"id": AGENT_ID},
+        )
         await session.execute(
             text("DELETE FROM agents WHERE id = :id"),
             {"id": AGENT_ID}
@@ -57,4 +68,5 @@ async def reset():
     print(f"Session ID: {SESSION_ID} (created fresh on each demo run)")
 
 
-asyncio.run(reset())
+if __name__ == "__main__":
+    asyncio.run(reset())

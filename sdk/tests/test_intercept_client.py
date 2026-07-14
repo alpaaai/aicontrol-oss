@@ -107,3 +107,61 @@ async def test_intercept_fail_open_returns_synthetic_allow_on_connection_error(c
     result = await client.intercept(tool_name="t", tool_parameters={}, session_id=str(uuid.uuid4()), sequence_number=1)
     assert result["decision"] == "allow"
     assert result["reason"] == "aicontrol_unavailable_fail_open"
+
+
+@pytest.mark.asyncio
+async def test_intercept_raises_on_unknown_decision_value(config):
+    """An unrecognized decision value (typo, case mismatch, or a future decision
+    type this SDK version doesn't know about) must fail closed -- not silently
+    pass through as an implicit allow."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "decision": "DENY",  # case mismatch -- not the exact string "deny"
+            "reason": "some_reason", "audit_event_id": str(uuid.uuid4()),
+        })
+
+    from aicontrol_sdk.exceptions import UnknownDecisionError
+    client = _client_with_transport(config, handler)
+    with pytest.raises(UnknownDecisionError) as exc_info:
+        await client.intercept(tool_name="t", tool_parameters={}, session_id=str(uuid.uuid4()), sequence_number=1)
+    assert exc_info.value.decision == "DENY"
+
+
+@pytest.mark.asyncio
+async def test_intercept_allow_decision_still_returns_normally(config):
+    """Sanity check: the exact string 'allow' must still return normally, no regression."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "decision": "allow", "reason": "default_allow", "audit_event_id": str(uuid.uuid4()),
+        })
+
+    client = _client_with_transport(config, handler)
+    result = await client.intercept(tool_name="t", tool_parameters={}, session_id=str(uuid.uuid4()), sequence_number=1)
+    assert result["decision"] == "allow"
+
+
+@pytest.mark.asyncio
+async def test_intercept_fail_open_on_5xx_response(config_fail_open):
+    """A 5xx response from AIControl must be treated the same as a connection
+    error under fail_mode='allow' -- today raise_for_status() is called outside
+    the try/except that implements fail-open/closed, so it crashes instead."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="internal server error")
+
+    client = _client_with_transport(config_fail_open, handler)
+    result = await client.intercept(tool_name="t", tool_parameters={}, session_id=str(uuid.uuid4()), sequence_number=1)
+    assert result["decision"] == "allow"
+    assert result["reason"] == "aicontrol_unavailable_fail_open"
+
+
+@pytest.mark.asyncio
+async def test_intercept_fail_closed_raises_unavailable_on_5xx_response(config):
+    """Same scenario under fail_mode='deny' must raise AIControlUnavailableError
+    (the documented exception contract), not a raw httpx.HTTPStatusError."""
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(500, text="internal server error")
+
+    from aicontrol_sdk.exceptions import AIControlUnavailableError
+    client = _client_with_transport(config, handler)
+    with pytest.raises(AIControlUnavailableError):
+        await client.intercept(tool_name="t", tool_parameters={}, session_id=str(uuid.uuid4()), sequence_number=1)

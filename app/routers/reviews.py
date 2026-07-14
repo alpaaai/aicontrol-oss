@@ -8,7 +8,8 @@ from pydantic import BaseModel, ConfigDict
 from sqlalchemy import Text, cast, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import _get_verified_token, require_admin, require_human
+from app.core.auth import _get_verified_token, require_human
+from app.core.license_gate import require_enterprise_license
 from app.models.database import async_session_factory, get_db
 from app.models.schemas import AuditEvent as AuditEventModel, HITLReview
 
@@ -59,11 +60,13 @@ async def list_reviews(
     status: Optional[str] = Query(None, description="Filter by status: pending, approved, denied"),
     limit: int = Query(50, le=200),
     offset: int = Query(0),
-    token: dict = Depends(require_admin),
+    token: dict = Depends(require_human),
+    _license=Depends(require_enterprise_license),
     db: AsyncSession = Depends(get_db),
 ) -> list[ReviewResponse]:
     """
-    List reviews. Admin only.
+    List reviews. Requires a human JWT (matches PATCH /reviews/{id}) and an
+    Enterprise license.
     Optionally filter by status. Ordered by created_at desc.
     """
     q = (
@@ -111,6 +114,7 @@ async def action_review(
     review_id: UUID,
     body: ReviewActionBody,
     _=Depends(require_human),
+    _license=Depends(require_enterprise_license),
 ):
     async with async_session_factory() as session:
         review = (await session.execute(
@@ -118,6 +122,8 @@ async def action_review(
         )).scalar_one_or_none()
         if not review:
             raise HTTPException(status_code=404, detail="Review not found")
+        if review.status != "pending":
+            raise HTTPException(status_code=409, detail="Review already resolved")
         review.status = "approved" if body.action == "approve" else "denied"
         review.review_note = body.note
         review.reviewed_at = datetime.utcnow()
