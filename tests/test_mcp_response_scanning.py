@@ -35,7 +35,10 @@ def test_upstream_contract_scan_response_shape():
 
 
 def test_extract_response_text_joins_content_array():
-    from enterprise.mcp_gateway.main import _extract_response_text
+    """Moved to app/services/response_scanner.py (WS-E) -- shared between
+    this gateway and the direct /intercept path, no longer a gateway-private
+    helper."""
+    from app.services.response_scanner import extract_response_text
 
     mcp_response = {
         "content": [
@@ -44,13 +47,13 @@ def test_extract_response_text_joins_content_array():
         ],
         "isError": False,
     }
-    assert _extract_response_text(mcp_response) == "first part second part"
+    assert extract_response_text(mcp_response) == "first part second part"
 
 
 def test_extract_response_text_handles_empty_content():
-    from enterprise.mcp_gateway.main import _extract_response_text
-    assert _extract_response_text({"content": [], "isError": False}) == ""
-    assert _extract_response_text({}) == ""
+    from app.services.response_scanner import extract_response_text
+    assert extract_response_text({"content": [], "isError": False}) == ""
+    assert extract_response_text({}) == ""
 
 
 @pytest_asyncio.fixture(loop_scope="session")

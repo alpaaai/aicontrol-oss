@@ -79,6 +79,20 @@ class OpenAIAgentsSDKAdapter:
                     sequence_number=next(counter),
                 )
 
+            async def on_tool_end(self_, context, agent, tool, result: object) -> None:
+                """on_tool_end has no blocking return value (pure lifecycle
+                notification, same limitation as on_tool_start's own
+                docstring already notes) -- a flagged response cannot be
+                suppressed here, only detected and audited. Raising would
+                abort the whole run, which is too blunt for an advisory
+                scan; this reports and logs only."""
+                await client.report_response(
+                    tool_name=getattr(tool, "name", str(tool)),
+                    tool_response=result,
+                    session_id=session_id,
+                    sequence_number=0,
+                )
+
         return AIControlHooks()
 
     def extract_usage(self, response: Any) -> dict:

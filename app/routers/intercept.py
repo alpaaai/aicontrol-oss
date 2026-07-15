@@ -19,7 +19,8 @@ from app.services.budget_alert_service import maybe_alert_budget_threshold
 from app.services.hitl_service import create_hitl_review, post_slack_review
 from app.services.opa_client import evaluate
 from app.services.rate_limit_service import build_call_counts
-from app.services.token_budget_service import build_token_budgets
+from app.services.response_scanner import scan_tool_response
+from app.services.token_budget_service import build_aggregate_budgets, build_token_budgets
 from app.services.wal import default_wal_writer as wal_writer
 
 router = APIRouter()
@@ -193,6 +194,9 @@ async def intercept(
         tool_name=body.tool_name,
         active_policies=policies,
     )
+    agent_cumulative, org_cumulative = await build_aggregate_budgets(
+        db=db, agent_id=str(body.agent_id), active_policies=policies,
+    )
     import asyncio
     asyncio.create_task(maybe_alert_budget_threshold(
         cumulative_tokens=cumulative_tokens, cumulative_cost_usd=cumulative_cost_usd,
@@ -207,6 +211,10 @@ async def intercept(
         call_counts=call_counts,
         cumulative_tokens=cumulative_tokens,
         cumulative_cost_usd=cumulative_cost_usd,
+        agent_cumulative_tokens=agent_cumulative.get("tokens", 0),
+        agent_cumulative_cost_usd=agent_cumulative.get("cost_usd", 0),
+        org_cumulative_tokens=org_cumulative.get("tokens", 0),
+        org_cumulative_cost_usd=org_cumulative.get("cost_usd", 0),
     )
 
     duration_ms = int((time.monotonic() - start) * 1000)
@@ -315,3 +323,56 @@ async def intercept(
         policy_id=fired_policy_id,
         policy_name=fired_policy_name,
     )
+
+
+class ReportResponseRequest(BaseModel):
+    session_id: uuid.UUID
+    agent_id: uuid.UUID
+    agent_name: str
+    tool_name: str
+    tool_response: Any = None
+    sequence_number: int
+
+
+class ReportResponseResponse(BaseModel):
+    decision: str
+    reason: str
+    audit_event_id: uuid.UUID
+
+
+@router.post("/intercept/report-response", response_model=ReportResponseResponse)
+async def report_response(
+    body: ReportResponseRequest,
+    db: AsyncSession = Depends(get_db),
+    token: dict = Depends(require_agent),
+) -> ReportResponseResponse:
+    """Post-tool-call round-trip: the SDK calls this after the real tool
+    executes, reporting its output back for scanning. /intercept itself
+    only ever ran pre-tool-call -- this is the first time the direct SDK
+    path sees a tool's actual response."""
+    from app.core.config import settings
+
+    if token.get("role") == "agent" and token.get("agent_id") is not None:
+        if str(token["agent_id"]) != str(body.agent_id):
+            raise HTTPException(status_code=403, detail="Token is scoped to a different agent")
+
+    scan_result = scan_tool_response(body.tool_response, body.tool_name)
+
+    if not scan_result.is_safe:
+        decision = "deny" if settings.MCP_RESPONSE_SCAN_POLICY == "block" else "allow"
+        reason = f"response_scan_flagged:{','.join(t.category for t in scan_result.threats)}"
+        logger.warning("intercept_response_scan_flagged", tool_name=body.tool_name, agent_name=body.agent_name)
+    else:
+        decision, reason = "allow", "response_scan_clean"
+
+    await ensure_session(db, body.session_id, body.agent_id)
+    event_id = wal_writer.append({
+        "session_id": str(body.session_id), "agent_id": str(body.agent_id), "agent_name": body.agent_name,
+        "tool_name": body.tool_name, "tool_parameters": {}, "tool_response": None,
+        "decision": decision, "decision_reason": reason,
+        "sequence_number": body.sequence_number, "duration_ms": 0,
+        "risk_delta": RISK_SCORE_DELTA.get(decision, 0),
+        "bypass": False, "enforced": True,
+    })
+
+    return ReportResponseResponse(decision=decision, reason=reason, audit_event_id=event_id)

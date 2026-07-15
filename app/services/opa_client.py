@@ -58,6 +58,10 @@ async def evaluate(
     call_counts: dict[str, int] | None = None,
     cumulative_tokens: dict[str, float] | None = None,
     cumulative_cost_usd: dict[str, float] | None = None,
+    agent_cumulative_tokens: float = 0,
+    agent_cumulative_cost_usd: float = 0,
+    org_cumulative_tokens: float = 0,
+    org_cumulative_cost_usd: float = 0,
     timeout_s: float | None = None,
 ) -> dict[str, str]:
     """
@@ -83,6 +87,10 @@ async def evaluate(
             "call_counts": call_counts if call_counts is not None else {},
             "cumulative_tokens": cumulative_tokens if cumulative_tokens is not None else {},
             "cumulative_cost_usd": cumulative_cost_usd if cumulative_cost_usd is not None else {},
+            "agent_cumulative_tokens": agent_cumulative_tokens,
+            "agent_cumulative_cost_usd": agent_cumulative_cost_usd,
+            "org_cumulative_tokens": org_cumulative_tokens,
+            "org_cumulative_cost_usd": org_cumulative_cost_usd,
         }
     }
     try:

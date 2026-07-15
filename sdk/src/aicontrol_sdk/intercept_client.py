@@ -68,5 +68,34 @@ class InterceptClient:
             raise ReviewPendingError(review_id=result["review_id"])
         raise UnknownDecisionError(decision=decision)
 
+    async def report_response(
+        self, tool_name: str, tool_response: Any, session_id: str, sequence_number: int,
+    ) -> dict:
+        """POST /intercept/report-response -- reports a tool's actual output
+        back after it executes, for response scanning
+        (agent_os.mcp_response_scanner via app/services/response_scanner.py).
+        Advisory: never raises on a scan error or connection failure, since
+        the tool has already executed by the time this is called -- there
+        is nothing left to block by raising here (unlike intercept(), which
+        runs before the tool executes and can legitimately abort it)."""
+        body: dict[str, Any] = {
+            "session_id": session_id,
+            "agent_id": self._config.agent_id,
+            "agent_name": self._config.agent_name,
+            "tool_name": tool_name,
+            "tool_response": tool_response,
+            "sequence_number": sequence_number,
+        }
+        try:
+            response = await self._client.post(
+                "/intercept/report-response",
+                headers={"Authorization": f"Bearer {self._config.token}"},
+                json=body,
+            )
+            response.raise_for_status()
+            return response.json()
+        except httpx.HTTPError:
+            return {"decision": "allow", "reason": "report_response_unavailable"}
+
     async def aclose(self) -> None:
         await self._client.aclose()
