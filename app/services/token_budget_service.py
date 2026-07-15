@@ -62,3 +62,33 @@ async def build_token_budgets(
             )
 
     return cumulative_tokens, cumulative_cost_usd
+
+
+async def build_aggregate_budgets(
+    db: AsyncSession, agent_id: str, active_policies: list[dict],
+) -> tuple[dict[str, float], dict[str, float]]:
+    """Sum tokens/cost across every tool call (no tool_name filter), for
+    the standalone rule_type == "budget" policy. Only queries if at least
+    one active "budget" policy exists -- avoids the extra SQL round-trip
+    on the (overwhelmingly common) case of no aggregate-budget policy."""
+    has_budget_policy = any(p.get("rule_type") == "budget" for p in active_policies)
+    if not has_budget_policy:
+        return {}, {}
+
+    agent_result = await db.execute(
+        text("SELECT COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens, "
+             "COALESCE(SUM(COALESCE(cost_usd, 0)), 0) AS cost_usd FROM audit_events WHERE agent_id = :agent_id"),
+        {"agent_id": agent_id},
+    )
+    agent_row = agent_result.one()
+
+    org_result = await db.execute(
+        text("SELECT COALESCE(SUM(COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)), 0) AS tokens, "
+             "COALESCE(SUM(COALESCE(cost_usd, 0)), 0) AS cost_usd FROM audit_events")
+    )
+    org_row = org_result.one()
+
+    return (
+        {"tokens": float(agent_row.tokens), "cost_usd": float(agent_row.cost_usd)},
+        {"tokens": float(org_row.tokens), "cost_usd": float(org_row.cost_usd)},
+    )

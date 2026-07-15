@@ -98,6 +98,36 @@ class AnthropicAgentSDKAdapter:
 
         return HookMatcher(hooks=[_hook])
 
+    def build_post_tool_hook_matcher(self):
+        """Build a HookMatcher for PostToolUse -- reports the real tool
+        response back for scanning (app/services/response_scanner.py via
+        POST /intercept/report-response), and can suppress unsafe output
+        via PostToolUseHookSpecificOutput.updatedToolOutput before it
+        re-enters the model's context.
+        """
+        from claude_agent_sdk import HookMatcher
+
+        client = self._client
+
+        async def _hook(input_data, tool_use_id, context):
+            session_id = input_data.get("session_id", "default")
+            result = await client.report_response(
+                tool_name=input_data["tool_name"],
+                tool_response=input_data.get("tool_response"),
+                session_id=session_id,
+                sequence_number=0,
+            )
+            if result.get("decision") == "deny":
+                return {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PostToolUse",
+                        "updatedToolOutput": {"error": f"Blocked by AIControl: {result.get('reason')}"},
+                    }
+                }
+            return {}
+
+        return HookMatcher(hooks=[_hook])
+
     def extract_usage(self, response: Any) -> dict:
         """ResultMessage.usage/total_cost_usd are session-level, not per-tool-call —
         no reliable per-call usage source for this adapter."""

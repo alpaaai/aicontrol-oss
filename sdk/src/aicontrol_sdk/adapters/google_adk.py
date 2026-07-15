@@ -80,6 +80,22 @@ class GoogleADKAdapter:
                     return {"error": "AIControl unavailable"}
                 return None
 
+            async def after_tool_callback(
+                self_, *, tool, tool_args: dict, tool_context, result: dict
+            ) -> Optional[dict]:
+                session_id = getattr(tool_context, "session_id", None) or getattr(
+                    tool_context, "invocation_id", "default"
+                )
+                report = await client.report_response(
+                    tool_name=getattr(tool, "name", str(tool)),
+                    tool_response=result,
+                    session_id=session_id,
+                    sequence_number=0,
+                )
+                if report.get("decision") == "deny":
+                    return {"error": f"Blocked by AIControl: {report.get('reason')}"}
+                return None
+
         return AIControlPlugin()
 
     def extract_usage(self, response: Any) -> dict:

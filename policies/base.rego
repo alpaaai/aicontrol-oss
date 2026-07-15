@@ -473,6 +473,59 @@ is_standalone_numeric_review if {
     standalone_numeric_matches(policy)
 }
 
+# ── Standalone budget rule_type ───────────────────────────────────────────────
+# Evaluates policies with rule_type == "budget". Unlike tool_denylist's
+# nested condition.token_budget (which only applies to named blocked_tools),
+# this fires regardless of which tool was called -- an aggregate cap across
+# every tool call for the agent (scope: "agent") or the whole org
+# (scope: "org") within the policy's window.
+
+_budget_scope_field(policy, "tokens") := "agent_cumulative_tokens" if {
+    policy.condition.scope == "agent"
+}
+_budget_scope_field(policy, "tokens") := "org_cumulative_tokens" if {
+    policy.condition.scope == "org"
+}
+_budget_scope_field(policy, "cost_usd") := "agent_cumulative_cost_usd" if {
+    policy.condition.scope == "agent"
+}
+_budget_scope_field(policy, "cost_usd") := "org_cumulative_cost_usd" if {
+    policy.condition.scope == "org"
+}
+
+standalone_budget_exceeded(policy) if {
+    policy.condition.max_tokens
+    field := _budget_scope_field(policy, "tokens")
+    input[field] > policy.condition.max_tokens
+}
+
+standalone_budget_exceeded(policy) if {
+    policy.condition.max_cost_usd
+    field := _budget_scope_field(policy, "cost_usd")
+    input[field] > policy.condition.max_cost_usd
+}
+
+is_standalone_budget_deny if {
+    some policy in input.policies
+    policy.rule_type == "budget"
+    policy.condition.on_exceed == "deny"
+    standalone_budget_exceeded(policy)
+}
+
+is_standalone_budget_review if {
+    some policy in input.policies
+    policy.rule_type == "budget"
+    policy.condition.on_exceed == "review"
+    standalone_budget_exceeded(policy)
+}
+
+standalone_budget_reason := reason if {
+    some policy in input.policies
+    policy.rule_type == "budget"
+    standalone_budget_exceeded(policy)
+    reason := sprintf("budget_exceeded:%s:%s", [policy.condition.scope, policy.name])
+}
+
 # Deny: global tool blacklist (highest priority)
 decision := "deny" if is_blacklisted
 reason := "tool_denylisted" if is_blacklisted
@@ -613,6 +666,32 @@ reason := "standalone_numeric_conditions_deny" if {
     is_standalone_numeric_deny
 }
 
+# Deny: standalone budget rule_type (agent/org aggregate, lowest deny priority)
+decision := "deny" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    is_standalone_budget_deny
+}
+reason := standalone_budget_reason if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    is_standalone_budget_deny
+}
+
 # Review: rate limit exceeded
 decision := "review" if {
     not is_blacklisted
@@ -624,6 +703,7 @@ decision := "review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     is_rate_exceeded_review
 }
 reason := rate_limit_reason if {
@@ -636,6 +716,7 @@ reason := rate_limit_reason if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     is_rate_exceeded_review
 }
 
@@ -650,6 +731,7 @@ decision := "review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     is_token_budget_exceeded_review
 }
@@ -663,6 +745,7 @@ reason := token_budget_reason if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     is_token_budget_exceeded_review
 }
@@ -678,6 +761,7 @@ decision := "review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     needs_review
@@ -692,6 +776,7 @@ reason := "requires_human_review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     needs_review
@@ -708,6 +793,7 @@ decision := "review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
@@ -723,6 +809,7 @@ reason := "requires_human_review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
@@ -740,6 +827,7 @@ decision := "review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
@@ -756,6 +844,7 @@ reason := "requires_human_review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
@@ -774,6 +863,7 @@ decision := "review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
@@ -791,12 +881,53 @@ reason := "requires_human_review" if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
     not needs_review_numeric
     not is_standalone_param_review
     is_standalone_numeric_review
+}
+
+# Review: standalone budget rule_type (agent/org aggregate, lowest review priority)
+decision := "review" if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_standalone_budget_deny
+    not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    not is_standalone_param_review
+    not is_standalone_numeric_review
+    is_standalone_budget_review
+}
+reason := standalone_budget_reason if {
+    not is_blacklisted
+    not is_rate_exceeded_deny
+    not is_token_budget_exceeded_deny
+    not is_parameter_violation
+    not is_numeric_violation
+    not is_compound_violation
+    not is_time_violation
+    not is_standalone_param_deny
+    not is_standalone_numeric_deny
+    not is_standalone_budget_deny
+    not is_rate_exceeded_review
+    not is_token_budget_exceeded_review
+    not needs_review
+    not needs_review_numeric
+    not is_standalone_param_review
+    not is_standalone_numeric_review
+    is_standalone_budget_review
 }
 
 # ── Fired policy attribution ───────────────────────────────────────────────────
@@ -986,6 +1117,7 @@ fired_policy_id := min(ids) if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
@@ -1011,6 +1143,7 @@ fired_policy_id := min(ids) if {
     not is_time_violation
     not is_standalone_param_deny
     not is_standalone_numeric_deny
+    not is_standalone_budget_deny
     not is_rate_exceeded_review
     not is_token_budget_exceeded_review
     not needs_review
@@ -1023,6 +1156,21 @@ fired_policy_id := min(ids) if {
         p.action == "review"
         standalone_numeric_matches(p)
     }
+    count(ids) > 0
+}
+
+# 15. Standalone budget deny
+fired_policy_id := min(ids) if {
+    is_standalone_budget_deny
+    ids := {p.id | some p in input.policies; p.rule_type == "budget"; p.condition.on_exceed == "deny"; standalone_budget_exceeded(p)}
+    count(ids) > 0
+}
+
+# 16. Standalone budget review
+fired_policy_id := min(ids) if {
+    not is_standalone_budget_deny
+    is_standalone_budget_review
+    ids := {p.id | some p in input.policies; p.rule_type == "budget"; p.condition.on_exceed == "review"; standalone_budget_exceeded(p)}
     count(ids) > 0
 }
 
