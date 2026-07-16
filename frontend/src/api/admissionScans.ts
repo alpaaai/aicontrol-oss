@@ -1,11 +1,21 @@
 import { apiClient } from "./client";
 
+export interface AdmissionScanFindingRaw {
+  description?: string;
+  remediation?: string;
+  snippet?: string | null;
+  category?: string;
+  analyzer?: string;
+  metadata?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface AdmissionScanFinding {
   severity: "info" | "low" | "medium" | "high" | "critical";
   rule_id: string;
   message: string;
   location: string | null;
-  raw: Record<string, unknown>;
+  raw: AdmissionScanFindingRaw;
 }
 
 export interface AdmissionScan {

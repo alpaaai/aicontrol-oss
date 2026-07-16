@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ChevronRight } from "lucide-react";
 import type { AdmissionScan, AdmissionScanFinding } from "@/api/admissionScans";
 
 interface Props {
@@ -28,6 +29,125 @@ function SeverityBadge({ severity }: { severity: AdmissionScanFinding["severity"
     >
       {severity.charAt(0).toUpperCase() + severity.slice(1)}
     </span>
+  );
+}
+
+const EXCLUDED_METADATA_KEYS = new Set([
+  "id",
+  "title",
+  "rule_id",
+  "snippet",
+  "analyzer",
+  "category",
+  "severity",
+  "file_path",
+  "description",
+  "line_number",
+  "remediation",
+  "metadata",
+]);
+
+function MetadataValue({ value }: { value: unknown }) {
+  if (Array.isArray(value)) return <>{value.join(", ")}</>;
+  if (value === null || value === undefined) return <>—</>;
+  if (typeof value === "object") return <>{JSON.stringify(value)}</>;
+  return <>{String(value)}</>;
+}
+
+function FindingDetail({ finding }: { finding: AdmissionScanFinding }) {
+  const [metadataOpen, setMetadataOpen] = useState(false);
+  const raw = finding.raw ?? {};
+  const description = raw.description;
+  const remediation = raw.remediation;
+  const snippet = raw.snippet;
+  const category = raw.category;
+  const analyzer = raw.analyzer;
+
+  const metadataEntries = Object.entries(raw).filter(
+    ([key, value]) => !EXCLUDED_METADATA_KEYS.has(key) && value !== null && value !== undefined
+  );
+  const nestedMetadata = raw.metadata && typeof raw.metadata === "object" ? raw.metadata : {};
+  const allMetadataEntries = [...metadataEntries, ...Object.entries(nestedMetadata)];
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 flex-wrap">
+        <SeverityBadge severity={finding.severity} />
+        {category && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-purple-50 text-purple-700 border border-purple-200">
+            {category.replace(/_/g, " ")}
+          </span>
+        )}
+        {analyzer && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+            {analyzer} analyzer
+          </span>
+        )}
+      </div>
+
+      <p className="text-[12px] font-medium text-ac-text-primary">{finding.message}</p>
+      <p className="text-[11px] text-ac-text-muted font-mono">
+        {finding.rule_id}
+        {finding.location ? ` · ${finding.location}` : ""}
+      </p>
+
+      {typeof description === "string" && description && (
+        <div>
+          <p className="text-[11px] font-semibold text-ac-text-muted uppercase tracking-wide mt-2">
+            Description
+          </p>
+          <p className="text-[12px] text-ac-text-primary mt-0.5">{description}</p>
+        </div>
+      )}
+
+      {typeof snippet === "string" && snippet && (
+        <div>
+          <p className="text-[11px] font-semibold text-ac-text-muted uppercase tracking-wide mt-2">
+            Evidence
+          </p>
+          <pre className="text-[11px] font-mono bg-gray-900 text-gray-100 rounded-lg px-3 py-2 mt-0.5 overflow-x-auto whitespace-pre-wrap break-words">
+            {snippet}
+          </pre>
+        </div>
+      )}
+
+      {typeof remediation === "string" && remediation && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mt-2">
+          <p className="text-[11px] font-semibold text-blue-700 uppercase tracking-wide">
+            Remediation
+          </p>
+          <p className="text-[12px] text-blue-900 mt-0.5">{remediation}</p>
+        </div>
+      )}
+
+      {allMetadataEntries.length > 0 && (
+        <div className="mt-2">
+          <button
+            type="button"
+            onClick={() => setMetadataOpen((o) => !o)}
+            className="flex items-center gap-1 text-[11px] font-medium text-ac-text-muted hover:text-ac-text-primary"
+          >
+            <ChevronRight
+              size={12}
+              className={`transition-transform ${metadataOpen ? "rotate-90" : ""}`}
+            />
+            Scanner metadata ({allMetadataEntries.length})
+          </button>
+          {metadataOpen && (
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-3 gap-y-1 mt-2 text-[11px] font-mono bg-gray-50 border border-ac-border rounded-lg px-3 py-2">
+              {allMetadataEntries.map(([key, value]) => (
+                <div className="contents" key={key}>
+                  <dt className="text-ac-text-muted">{key}</dt>
+                  <dd className="text-ac-text-primary break-words">
+                    <MetadataValue value={value} />
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -84,15 +204,8 @@ function AdmissionScanRow({ scan }: { scan: AdmissionScan }) {
             <p className="text-[12px] text-ac-text-muted">No findings.</p>
           ) : (
             scan.findings.map((f, i) => (
-              <div key={i} className="flex items-start gap-3 bg-white rounded-lg px-3 py-2 border border-ac-border">
-                <SeverityBadge severity={f.severity} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-medium text-ac-text-primary">{f.message}</p>
-                  <p className="text-[11px] text-ac-text-muted mt-0.5 font-mono">
-                    {f.rule_id}
-                    {f.location ? ` · ${f.location}` : ""}
-                  </p>
-                </div>
+              <div key={i} className="bg-white rounded-lg px-3 py-2 border border-ac-border">
+                <FindingDetail finding={f} />
               </div>
             ))
           )}
