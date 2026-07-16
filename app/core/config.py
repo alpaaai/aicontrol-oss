@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     # under any real load — 100ms gives ~2.5x headroom over measured p99.
     opa_decision_timeout_s: float = 0.1
     WAL_DIR: str = "./data/wal"
+    REPORTS_DIR: str = "./data/reports"
     MCP_RESPONSE_SCAN_POLICY: Literal["block", "log"] = "block"
     drift_scan_interval_hours: int = 6
     REVIEW_TIMEOUT_MINUTES: int = 60
