@@ -22,7 +22,9 @@ export function DecisionTrendChart({ data }: Props) {
         hour12: false,
       });
       acc[h] = acc[h] ?? {};
-      acc[h][d.decision] = d.count;
+      if (d.decision) {
+        acc[h][d.decision] = d.count;
+      }
       return acc;
     },
     {}
