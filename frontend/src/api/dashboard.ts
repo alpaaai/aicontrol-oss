@@ -7,7 +7,7 @@ export interface TopTool {
 
 export interface DecisionHour {
   hour: string;
-  decision: string;
+  decision: string | null;
   count: number;
 }
 

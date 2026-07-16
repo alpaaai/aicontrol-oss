@@ -75,10 +75,18 @@ async def get_summary(_=Depends(require_human)):
             .group_by("hour", AuditEvent.decision)
             .order_by("hour")
         )).all()
-        decisions_by_hour = [
-            {"hour": h.isoformat(), "decision": d, "count": c}
-            for h, d, c in hours_rows
-        ]
+        rows_by_day: dict = {}
+        for h, d, c in hours_rows:
+            rows_by_day.setdefault(h.date(), []).append({"hour": h.isoformat(), "decision": d, "count": c})
+
+        decisions_by_hour = []
+        for day_offset in range(29, -1, -1):
+            day = (now - timedelta(days=day_offset)).replace(hour=0, minute=0, second=0, microsecond=0)
+            rows_for_day = rows_by_day.get(day.date())
+            if rows_for_day:
+                decisions_by_hour.extend(rows_for_day)
+            else:
+                decisions_by_hour.append({"hour": day.isoformat(), "decision": None, "count": 0})
 
         active_warnings = (await db.execute(
             select(func.count()).select_from(PolicyWarning)
