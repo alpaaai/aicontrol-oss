@@ -11,15 +11,15 @@ const decisionVerb: Record<AuditEvent["decision"], string> = {
 };
 
 const expandedBg: Record<AuditEvent["decision"], string> = {
-  allow: "bg-green-50 border-green-100",
-  deny: "bg-red-50 border-red-100",
-  review: "bg-amber-50 border-amber-100",
+  allow: "bg-ac-allow-bg border-ac-allow/20",
+  deny: "bg-ac-deny-bg border-ac-deny/20",
+  review: "bg-ac-review-bg border-ac-review/20",
 };
 
 const expandedLabelColor: Record<AuditEvent["decision"], string> = {
-  allow: "text-green-700",
-  deny: "text-red-700",
-  review: "text-amber-700",
+  allow: "text-ac-allow",
+  deny: "text-ac-deny",
+  review: "text-ac-review",
 };
 
 function Detail({

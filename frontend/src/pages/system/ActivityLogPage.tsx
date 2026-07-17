@@ -115,13 +115,13 @@ function ActivityRow({ entry, timezone }: { entry: ActivityLogEntry; timezone: s
             {(entry.before_state || entry.after_state) && (
               <div className={`grid ${entry.before_state && entry.after_state ? 'grid-cols-2 divide-x divide-slate-100' : 'grid-cols-1'}`}>
                 {entry.before_state && (
-                  <div className="px-4 py-3 bg-red-50/40">
-                    <StateSection label="Before" state={entry.before_state} accent="text-red-400" />
+                  <div className="px-4 py-3 bg-ac-deny-bg/40">
+                    <StateSection label="Before" state={entry.before_state} accent="text-ac-deny" />
                   </div>
                 )}
                 {entry.after_state && (
-                  <div className="px-4 py-3 bg-emerald-50/40">
-                    <StateSection label="After" state={entry.after_state} accent="text-emerald-500" />
+                  <div className="px-4 py-3 bg-ac-allow-bg/40">
+                    <StateSection label="After" state={entry.after_state} accent="text-ac-allow" />
                   </div>
                 )}
               </div>
