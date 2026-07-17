@@ -115,3 +115,143 @@ async def test_patch_preserves_callers_own_plugins():
     names = [getattr(p, "name", None) for p in runner.plugin_manager.plugins]
     assert "my-plugin" in names
     assert "aicontrol" in names
+
+
+def _fake_llm_response(prompt_tokens: int, candidates_tokens: int):
+    from google.adk.models.llm_response import LlmResponse
+    from google.genai import types
+
+    usage_metadata = types.GenerateContentResponseUsageMetadata(
+        prompt_token_count=prompt_tokens,
+        candidates_token_count=candidates_tokens,
+        total_token_count=prompt_tokens + candidates_tokens,
+    )
+    return LlmResponse(usage_metadata=usage_metadata)
+
+
+@pytest.mark.asyncio
+async def test_extract_usage_reads_llm_response_usage_metadata():
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+
+    adapter = GoogleADKAdapter()
+    result = adapter.extract_usage(_fake_llm_response(800, 210))
+
+    assert result == {"input_tokens": 800, "output_tokens": 210}
+
+
+@pytest.mark.asyncio
+async def test_extract_usage_returns_empty_for_response_without_usage_metadata():
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+
+    adapter = GoogleADKAdapter()
+    assert adapter.extract_usage(object()) == {}
+
+
+@pytest.mark.asyncio
+async def test_after_model_callback_usage_attaches_to_following_tool_call():
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+
+    client = AsyncMock()
+    client.intercept = AsyncMock(return_value={"decision": "allow"})
+
+    adapter = GoogleADKAdapter()
+    adapter.patch(client)
+    plugin = adapter.build_plugin()
+
+    fake_context = MagicMock()
+    fake_context.session_id = "s1"
+
+    await plugin.after_model_callback(callback_context=fake_context, llm_response=_fake_llm_response(800, 210))
+
+    fake_tool = MagicMock()
+    fake_tool.name = "query_database"
+    await plugin.before_tool_callback(tool=fake_tool, tool_args={}, tool_context=fake_context)
+
+    call_kwargs = client.intercept.call_args.kwargs
+    assert call_kwargs["input_tokens"] == 800
+    assert call_kwargs["output_tokens"] == 210
+
+
+@pytest.mark.asyncio
+async def test_google_adk_retried_llm_calls_accumulate_not_overwrite():
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+
+    client = AsyncMock()
+    client.intercept = AsyncMock(return_value={"decision": "allow"})
+
+    adapter = GoogleADKAdapter()
+    adapter.patch(client)
+    plugin = adapter.build_plugin()
+
+    fake_context = MagicMock()
+    fake_context.session_id = "s1"
+
+    await plugin.after_model_callback(callback_context=fake_context, llm_response=_fake_llm_response(300, 50))
+    await plugin.after_model_callback(callback_context=fake_context, llm_response=_fake_llm_response(500, 160))
+
+    fake_tool = MagicMock()
+    fake_tool.name = "query_database"
+    await plugin.before_tool_callback(tool=fake_tool, tool_args={}, tool_context=fake_context)
+
+    call_kwargs = client.intercept.call_args.kwargs
+    assert call_kwargs["input_tokens"] == 800
+    assert call_kwargs["output_tokens"] == 210
+
+
+@pytest.mark.asyncio
+async def test_google_adk_parallel_tool_call_batch_attributes_usage_to_first_call_only():
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+
+    client = AsyncMock()
+    client.intercept = AsyncMock(return_value={"decision": "allow"})
+
+    adapter = GoogleADKAdapter()
+    adapter.patch(client)
+    plugin = adapter.build_plugin()
+
+    fake_context = MagicMock()
+    fake_context.session_id = "s1"
+
+    await plugin.after_model_callback(callback_context=fake_context, llm_response=_fake_llm_response(800, 210))
+
+    tool_a = MagicMock()
+    tool_a.name = "tool_a"
+    tool_b = MagicMock()
+    tool_b.name = "tool_b"
+
+    await plugin.before_tool_callback(tool=tool_a, tool_args={}, tool_context=fake_context)
+    first_call_kwargs = client.intercept.call_args.kwargs
+    await plugin.before_tool_callback(tool=tool_b, tool_args={}, tool_context=fake_context)
+    second_call_kwargs = client.intercept.call_args.kwargs
+
+    assert first_call_kwargs["input_tokens"] == 800
+    assert first_call_kwargs["output_tokens"] == 210
+    assert second_call_kwargs.get("input_tokens") is None
+    assert second_call_kwargs.get("output_tokens") is None
+
+
+@pytest.mark.asyncio
+async def test_google_adk_usage_does_not_leak_across_sessions():
+    from aicontrol_sdk.adapters.google_adk import GoogleADKAdapter
+
+    client = AsyncMock()
+    client.intercept = AsyncMock(return_value={"decision": "allow"})
+
+    adapter = GoogleADKAdapter()
+    adapter.patch(client)
+    plugin = adapter.build_plugin()
+
+    ctx_s1 = MagicMock()
+    ctx_s1.session_id = "s1"
+    ctx_s2 = MagicMock()
+    ctx_s2.session_id = "s2"
+
+    await plugin.after_model_callback(callback_context=ctx_s1, llm_response=_fake_llm_response(800, 210))
+
+    fake_tool = MagicMock()
+    fake_tool.name = "query_database"
+    await plugin.before_tool_callback(tool=fake_tool, tool_args={}, tool_context=ctx_s2)
+
+    call_kwargs = client.intercept.call_args.kwargs
+    assert call_kwargs.get("input_tokens") is None
+    assert call_kwargs.get("output_tokens") is None

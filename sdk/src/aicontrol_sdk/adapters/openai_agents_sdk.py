@@ -64,19 +64,49 @@ class OpenAIAgentsSDKAdapter:
         agents.Runner.run_streamed = classmethod(patched_run_streamed)
 
     def build_hooks(self, session_id: str):
-        """Build a RunHooks instance to pass as `Runner.run(..., hooks=...)`."""
+        """Build a RunHooks instance to pass as `Runner.run(..., hooks=...)`.
+
+        Usage accumulator is closed over here (not a module/instance-level
+        dict keyed by session_id) so it is automatically scoped to this one
+        run and can never leak into a concurrent run's usage -- build_hooks()
+        is called fresh per Runner.run()/run_sync()/run_streamed() call."""
         from agents.lifecycle import RunHooksBase
 
         client = self._client
         counter = itertools.count(1)
+        usage_accumulator = {"input_tokens": 0, "output_tokens": 0}
 
         class AIControlHooks(RunHooksBase):
+            async def on_llm_end(self_, context, agent, response) -> None:
+                """Fires once per LLM call (not once per run). Accumulates
+                rather than overwrites: on_llm_end can fire more than once
+                before the next tool call (e.g. the SDK retrying a failed
+                model call internally), and a retried call's real spend
+                must not be discarded."""
+                usage = self.extract_usage(response)
+                usage_accumulator["input_tokens"] += usage.get("input_tokens", 0)
+                usage_accumulator["output_tokens"] += usage.get("output_tokens", 0)
+
             async def on_tool_start(self_, context, agent, tool) -> None:
+                """Reads and resets the accumulator: usage from the LLM call
+                that decided on this tool attaches here. When one LLM call
+                produces multiple parallel tool calls, only the first
+                on_tool_start in that batch sees non-zero usage -- the
+                accumulator is already drained by the time the second one
+                fires, since there was no second LLM call to refill it.
+                This is a deliberate simplification (usage isn't split or
+                repeated across a parallel batch), not an oversight."""
+                input_tokens = usage_accumulator["input_tokens"] or None
+                output_tokens = usage_accumulator["output_tokens"] or None
+                usage_accumulator["input_tokens"] = 0
+                usage_accumulator["output_tokens"] = 0
                 await client.intercept(
                     tool_name=getattr(tool, "name", str(tool)),
                     tool_parameters=getattr(context, "tool_arguments", {}) or {},
                     session_id=session_id,
                     sequence_number=next(counter),
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
                 )
 
             async def on_tool_end(self_, context, agent, tool, result: object) -> None:
@@ -96,5 +126,10 @@ class OpenAIAgentsSDKAdapter:
         return AIControlHooks()
 
     def extract_usage(self, response: Any) -> dict:
-        """Usage is tracked at the RunResult level in this SDK, not per tool call."""
-        return {}
+        """Pulls real per-call token counts off a ModelResponse.usage
+        (agents.usage.Usage), as handed to on_llm_end. Called internally by
+        build_hooks()'s on_llm_end -- not part of the public patch() flow."""
+        usage = getattr(response, "usage", None)
+        if usage is None:
+            return {}
+        return {"input_tokens": usage.input_tokens, "output_tokens": usage.output_tokens}
