@@ -35,7 +35,7 @@ export function TokensPage() {
         </button>
       </div>
 
-      <div className="bg-ac-card border border-ac-border rounded-[10px] p-5 flex items-start gap-3">
+      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-5 flex items-start gap-3">
         <Info size={16} className="text-ac-text-muted shrink-0 mt-0.5" />
         <div>
           <p className="text-[13px] font-medium text-ac-text-primary mb-1">
@@ -72,7 +72,7 @@ export function TokensPage() {
           </label>
         </div>
 
-        <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+        <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
           <div
             className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted uppercase tracking-wide border-b border-ac-border bg-gray-50"
             style={{ gridTemplateColumns: "1fr 80px 160px 80px 140px" }}

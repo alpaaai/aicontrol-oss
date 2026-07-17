@@ -10,7 +10,7 @@ export function SkeletonRow() {
 
 export function SkeletonCard() {
   return (
-    <div className="rounded-[10px] border border-ac-border bg-ac-card p-5 animate-pulse">
+    <div className="rounded-lg border border-ac-border bg-ac-card shadow-ac-card p-5 animate-pulse">
       <div className="h-3 bg-gray-100 rounded w-24 mb-3" />
       <div className="h-7 bg-gray-200 rounded w-16" />
     </div>

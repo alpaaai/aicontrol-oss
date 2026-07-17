@@ -11,7 +11,8 @@
     margin: 0;
     background-color: #F8F9FA;
     color: #111827;
-    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-family: "Geist", system-ui, sans-serif;
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -21,8 +22,13 @@
   }
 
   h1, h2, h3 {
-    font-family: "Bricolage Grotesque", system-ui, sans-serif;
-    letter-spacing: -0.025em;
+    font-family: "Geist", system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  h1 {
+    letter-spacing: -0.03em;
   }
 }
 

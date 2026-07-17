@@ -60,13 +60,13 @@ function LiveFeedRow({ event, index }: { event: AuditEvent; index: number }) {
 
   return (
     <div
-      className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden animate-row-in"
+      className="bg-ac-card border border-ac-border rounded-lg overflow-hidden animate-row-in"
       style={{ animationDelay: `${index * 30}ms` }}
     >
       {/* Main row */}
       <div
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+        className="flex items-center gap-4 px-4 py-3 cursor-pointer hover:bg-ac-peacock-50 transition-colors"
       >
         <div className="flex-1 min-w-0">
           <p className="text-[13px] font-medium text-ac-text-primary truncate">{readable}</p>
@@ -141,7 +141,7 @@ export function LiveFeedTable() {
       {loading && !data ? (
         <div className="space-y-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="h-[58px] bg-gray-50 rounded-[10px] animate-pulse" />
+            <div key={i} className="h-[58px] bg-gray-50 rounded-lg animate-pulse" />
           ))}
         </div>
       ) : (

@@ -7,16 +7,21 @@ interface StatCardProps {
   live?: boolean;
   index?: number;
   accentColor?: string;
+  featured?: boolean;
 }
 
-export function StatCard({ label, value, delta, deltaPositive, onDeltaClick, live, index = 0, accentColor }: StatCardProps) {
+export function StatCard({ label, value, delta, deltaPositive, onDeltaClick, live, index = 0, accentColor, featured }: StatCardProps) {
   return (
     <div
-      className="bg-ac-card border border-ac-border rounded-[10px] p-4 flex-1 min-w-[140px] animate-fade-up transition-shadow duration-200 hover:shadow-md relative overflow-hidden"
+      className="bg-ac-card border border-ac-border rounded-lg p-4 flex-1 min-w-[140px] animate-fade-up transition-shadow duration-200 shadow-ac-card hover:shadow-ac-card-lg relative overflow-hidden"
       style={{ animationDelay: `${index * 70}ms` }}
     >
-      {/* Colored left-border accent */}
-      {accentColor && (
+      {/* Gradient top-edge accent — reserved for the flagship metric card */}
+      {featured && (
+        <div className="absolute left-0 right-0 top-0 h-[3px] bg-ac-gradient-feather" />
+      )}
+      {/* Colored left-border accent — semantic status cards */}
+      {!featured && accentColor && (
         <div
           className="absolute left-0 top-3 bottom-3 w-[3px] rounded-r-full"
           style={{ background: accentColor }}

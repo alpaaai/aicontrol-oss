@@ -24,7 +24,7 @@ export function MetricsPage() {
       <div className="flex gap-4 flex-wrap">
         <StatCard
           index={0}
-          accentColor="#3B5BDB"
+          featured
           label="Intercepts (7 days)"
           value={loading ? "—" : (data?.intercepts_7d.toLocaleString() ?? "—")}
         />
@@ -36,19 +36,19 @@ export function MetricsPage() {
         />
         <StatCard
           index={2}
-          accentColor="#1D9E75"
+          accentColor="#0F7A54"
           label="Active agents"
           value={loading ? "—" : (data?.active_agents ?? "—")}
         />
         <StatCard
           index={3}
-          accentColor="#BA7517"
+          accentColor="#8F5710"
           label="Active policies"
           value={loading ? "—" : (data?.active_policies ?? "—")}
         />
         <StatCard
           index={4}
-          accentColor="#1D9E75"
+          accentColor="#0F7A54"
           label="Policy hit rate (7d)"
           value={metricsLoading ? "—" : `${metrics?.policy_hit_rate ?? 0}%`}
         />
@@ -74,7 +74,7 @@ export function MetricsPage() {
       )}
 
       {metrics && metrics.top_agents_by_deny_rate.length > 0 && (
-        <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+        <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
           <div className="px-4 py-3 border-b border-ac-border">
             <p className="text-[13px] font-semibold text-ac-text-primary">
               Top agents by deny rate (7d)

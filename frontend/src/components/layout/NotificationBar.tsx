@@ -72,7 +72,7 @@ export function NotificationBar() {
   }
 
   return (
-    <div className="border-b border-gray-200 bg-white">
+    <div className="border-b border-ac-border bg-ac-card">
       {visible.map(n => (
         <div key={n.id}
           className={`flex items-center gap-2 px-6 py-2 text-[12px] border-b ${colors[n.type]}`}>

@@ -33,14 +33,14 @@ export function OverviewPage() {
           <>
             <StatCard
               index={0}
-              accentColor="#3B5BDB"
+              featured
               label="Intercepts today"
               value={data?.intercepts_today.toLocaleString() ?? "—"}
               live
             />
             <StatCard
               index={1}
-              accentColor={data && data.deny_rate_today < 5 ? "#1D9E75" : "#E24B4A"}
+              accentColor={data && data.deny_rate_today < 5 ? "#0F7A54" : "#C22E28"}
               label="Deny rate"
               value={`${data?.deny_rate_today ?? 0}%`}
               deltaPositive={data ? data.deny_rate_today < 5 : undefined}
@@ -61,7 +61,7 @@ export function OverviewPage() {
             />
             <StatCard
               index={3}
-              accentColor={data?.pending_reviews === 0 ? "#1D9E75" : "#BA7517"}
+              accentColor={data?.pending_reviews === 0 ? "#0F7A54" : "#8F5710"}
               label="Pending reviews"
               value={data?.pending_reviews ?? "—"}
               deltaPositive={data ? data.pending_reviews === 0 : undefined}
@@ -76,7 +76,7 @@ export function OverviewPage() {
             {data && data.active_warnings > 0 && (
               <StatCard
                 index={4}
-                accentColor="#BA7517"
+                accentColor="#8F5710"
                 label="Active warnings"
                 value={data.active_warnings}
                 delta="Policy drift detected"
@@ -87,7 +87,7 @@ export function OverviewPage() {
             {data && data.high_risk_sessions > 0 && (
               <StatCard
                 index={5}
-                accentColor="#E24B4A"
+                accentColor="#C22E28"
                 label="High-risk sessions"
                 value={data.high_risk_sessions}
                 delta="risk > 50, last hour"

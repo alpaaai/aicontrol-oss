@@ -45,7 +45,7 @@ function NavItem({ to, icon, label, locked, badge }: NavItemProps) {
       className={({ isActive }) =>
         "flex items-center gap-2.5 px-4 py-[7px] text-[13px] relative transition-all duration-150 group " +
         (isActive
-          ? "bg-[#3B5BDB1A] text-[#7C9FFF] font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:bg-ac-primary before:rounded-r"
+          ? "bg-[#0284A81A] text-[#6CC3D6] font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:bg-ac-gradient-feather before:rounded-r"
           : "text-white/55 hover:bg-white/5 hover:text-white/80 hover:translate-x-0.5")
       }
     >
@@ -121,15 +121,15 @@ export function Sidebar() {
       {/* Subtle radial glow behind logo area */}
       <div
         className="pointer-events-none absolute top-0 left-0 w-[200px] h-[120px] opacity-20"
-        style={{ background: "radial-gradient(ellipse at 30% 20%, #3B5BDB 0%, transparent 70%)" }}
+        style={{ background: "radial-gradient(ellipse at 30% 20%, #0284A8 0%, transparent 70%)" }}
         aria-hidden
       />
 
       {/* Logo */}
       <div className="flex items-center gap-2 px-4 py-4 border-b border-white/[0.07] relative z-10">
         <div
-          className="w-[26px] h-[26px] bg-ac-primary rounded-[6px] flex items-center justify-center shrink-0"
-          style={{ boxShadow: "0 0 12px rgba(59,91,219,0.55), 0 0 4px rgba(59,91,219,0.3)" }}
+          className="w-[26px] h-[26px] bg-ac-gradient-feather rounded-[6px] flex items-center justify-center shrink-0"
+          style={{ boxShadow: "0 0 12px rgba(2,132,168,0.55), 0 0 4px rgba(2,132,168,0.3)" }}
         >
           <div className="w-[10px] h-[10px] bg-white/90 rounded-[2px]" />
         </div>
@@ -239,7 +239,7 @@ export function Sidebar() {
         <div className="flex items-center gap-2">
           <div
             className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-            style={{ boxShadow: "0 0 8px rgba(59,91,219,0.4)" }}
+            style={{ boxShadow: "0 0 8px rgba(2,132,168,0.4)" }}
           >
             {user?.email?.[0]?.toUpperCase() ?? "A"}
           </div>

@@ -8,7 +8,7 @@ interface EnterpriseLockProps {
 
 export function EnterpriseLock({ title, description, children }: EnterpriseLockProps) {
   return (
-    <div className="relative rounded-[10px] border border-ac-border bg-ac-card overflow-hidden">
+    <div className="relative rounded-lg border border-ac-border bg-ac-card shadow-ac-card overflow-hidden">
       {/* Blurred preview */}
       <div className="blur-sm pointer-events-none select-none opacity-40 p-5">
         {children ?? (

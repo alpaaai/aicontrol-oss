@@ -378,7 +378,7 @@ function OrgSection({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-[10px] px-4 mt-4">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mt-4">
       <div className="flex items-center justify-between py-2.5 border-b border-gray-50">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide">Organization</p>
         {isAdmin && !editing && (
@@ -480,7 +480,7 @@ function UsersSection({ currentUserId }: { currentUserId: string | undefined }) 
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-[10px] px-4 mt-4">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mt-4">
       <div className="flex items-center justify-between py-2.5 border-b border-gray-50">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide">
           Users {!loading && `(${users.length})`}
@@ -616,7 +616,7 @@ export function SettingsPage() {
       </div>
 
       {/* License */}
-      <div className="bg-white border border-gray-200 rounded-[10px] px-4 mb-4">
+      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mb-4">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           License
         </p>
@@ -639,7 +639,7 @@ export function SettingsPage() {
       </div>
 
       {/* Auth */}
-      <div className="bg-white border border-gray-200 rounded-[10px] px-4 mb-4">
+      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mb-4">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           Authentication
         </p>
@@ -648,7 +648,7 @@ export function SettingsPage() {
       </div>
 
       {/* Current user */}
-      <div className="bg-white border border-gray-200 rounded-[10px] px-4 mb-4">
+      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mb-4">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           Current session
         </p>
