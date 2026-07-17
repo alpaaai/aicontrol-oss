@@ -128,6 +128,31 @@ async def _cleanup_test_admission_scans():
         await session.commit()
 
 
+_PYTEST_FIXTURE_TOKEN_DESCRIPTIONS = ("pytest-admin-fixture", "pytest-agent-fixture")
+
+
+async def _delete_pytest_fixture_tokens(session):
+    await session.execute(
+        text("DELETE FROM api_tokens WHERE description = ANY(:descs)"),
+        {"descs": list(_PYTEST_FIXTURE_TOKEN_DESCRIPTIONS)},
+    )
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _cleanup_pytest_fixture_tokens():
+    """Session setup + teardown: remove pytest-*-fixture api_tokens rows so they
+    don't accumulate across pytest runs. Runs cleanup both before (removes
+    prior-run leaks) and after (removes this-run creations)."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        await _delete_pytest_fixture_tokens(session)
+        await session.commit()
+    yield
+    async with async_session_factory() as session:
+        await _delete_pytest_fixture_tokens(session)
+        await session.commit()
+
+
 @pytest_asyncio.fixture(scope="session")
 async def _seed_and_token_setup():
     """Session-scoped: seed demo agents + issue admin and agent tokens once."""
@@ -198,19 +223,39 @@ def human_admin_token():
     return jwt.encode(payload, settings.secret_key, algorithm="HS256")
 
 
-@pytest_asyncio.fixture(scope="session")
-async def seed_admin_user():
-    """Ensure admin@aicontrol.dev exists in users table for OTP auth tests."""
-    from app.models.database import async_session_factory
+async def _ensure_admin_user(session):
+    """Insert admin@aicontrol.dev if missing. Returns True if this call created it."""
     from app.models.user import User, UserRole
     from sqlalchemy import select
+    result = await session.execute(
+        select(User).where(User.email == "admin@aicontrol.dev")
+    )
+    if result.scalar_one_or_none():
+        return False
+    session.add(User(email="admin@aicontrol.dev", role=UserRole.admin, name="Admin"))
+    await session.commit()
+    return True
+
+
+async def _remove_admin_user_if_created(session, created):
+    if created:
+        await session.execute(text("DELETE FROM users WHERE email = 'admin@aicontrol.dev'"))
+
+
+@pytest_asyncio.fixture(scope="session")
+async def seed_admin_user():
+    """Ensure admin@aicontrol.dev exists in users table for OTP auth tests.
+    Removes the row on teardown if this fixture is the one that created it,
+    so it doesn't linger as permanent test data."""
+    from app.models.database import async_session_factory
     async with async_session_factory() as session:
-        result = await session.execute(
-            select(User).where(User.email == "admin@aicontrol.dev")
-        )
-        if not result.scalar_one_or_none():
-            session.add(User(email="admin@aicontrol.dev", role=UserRole.admin, name="Admin"))
-            await session.commit()
+        created = await _ensure_admin_user(session)
+
+    yield
+
+    async with async_session_factory() as session:
+        await _remove_admin_user_if_created(session, created)
+        await session.commit()
 
 
 @pytest_asyncio.fixture(scope="session")
