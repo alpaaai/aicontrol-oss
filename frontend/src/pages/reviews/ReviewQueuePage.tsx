@@ -18,7 +18,7 @@ function ReviewQueueContent() {
       <div className="flex items-center gap-2 mb-4">
         <h3 className="text-[14px] font-medium text-gray-700">Pending Reviews</h3>
         {reviews.length > 0 && (
-          <span className="bg-red-50 text-red-600 text-[11px] font-medium px-2 py-0.5 rounded-full">
+          <span className="bg-ac-deny-bg text-ac-deny text-[11px] font-medium px-2 py-0.5 rounded-full">
             {reviews.length}
           </span>
         )}
@@ -62,7 +62,7 @@ function ResolvedReviews() {
         <div className="mt-2 bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
           {data.map(r => (
             <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 text-[13px]">
-              <span className={`text-[12px] font-medium ${r.status === 'approved' ? 'text-green-600' : 'text-red-500'}`}>
+              <span className={`text-[12px] font-medium ${r.status === 'approved' ? 'text-ac-allow' : 'text-ac-deny'}`}>
                 {r.status}
               </span>
               <span className="font-mono text-[12px] text-gray-600">
