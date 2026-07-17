@@ -22,7 +22,7 @@ function SessionsTable() {
   }
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
       <div
         className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted uppercase
                    tracking-wide border-b border-ac-border bg-gray-50"
@@ -39,7 +39,7 @@ function SessionsTable() {
           key={s.id}
           onClick={() => navigate(`/sessions/${s.id}`)}
           className="grid gap-3 px-4 py-2.5 text-[13px] border-b border-gray-50
-                     hover:bg-gray-50 cursor-pointer transition-colors"
+                     hover:bg-ac-peacock-50 cursor-pointer transition-colors"
           style={{ gridTemplateColumns: "1fr 140px 70px 80px 160px" }}
         >
           <div>

@@ -1,7 +1,9 @@
 .worktrees/
 plans/
 venv/
+venv
 .venv/
+.venv
 .env
 __pycache__/
 *.pyc

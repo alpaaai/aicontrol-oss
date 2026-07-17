@@ -37,7 +37,7 @@ function HealthContent() {
         { label: 'Drift Detector',    value: data?.drift_detector_status ?? 'unknown' },
       ].map(item => (
         <div key={item.label}
-          className="flex items-center justify-between bg-white border border-gray-200 rounded-[10px] px-4 py-3">
+          className="flex items-center justify-between bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 py-3">
           <span className="text-[13px] text-gray-700">{item.label}</span>
           {item.value === 'enterprise_only'
             ? <span className="text-[12px] text-purple-600">Enterprise only</span>

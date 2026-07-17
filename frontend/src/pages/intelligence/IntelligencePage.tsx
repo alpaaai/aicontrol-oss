@@ -10,7 +10,7 @@ interface IntelligenceCardProps {
 
 function IntelligenceCard({ icon, title, description, badge, children }: IntelligenceCardProps) {
   return (
-    <div className="bg-white border border-gray-200 rounded-[10px] p-5 relative overflow-hidden">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-5 relative overflow-hidden">
       {/* Lock overlay — P2 removes this when wiring real component */}
       <div className="absolute inset-0 bg-white/60 backdrop-blur-[1px] flex items-center justify-center z-10">
         <div className="bg-purple-50 border border-purple-200/30 rounded-lg px-4 py-3 text-center">

@@ -11,7 +11,7 @@ export function Layout() {
         <div
           className="pointer-events-none absolute top-0 right-0 w-[600px] h-[400px] opacity-30"
           style={{
-            background: "radial-gradient(ellipse at top right, #EEF2FF 0%, transparent 70%)",
+            background: "radial-gradient(ellipse at top right, #E3F4F8 0%, transparent 70%)",
           }}
           aria-hidden
         />
