@@ -44,7 +44,7 @@ export function ReviewRow({ review, onActioned }: Props) {
   }
 
   return (
-    <div className={`p-4 border-b border-gray-50 ${overdue ? 'bg-red-50/30' : ''}`}>
+    <div className={`p-4 border-b border-gray-50 ${overdue ? 'bg-ac-deny-bg/30' : ''}`}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           {(review.tool_name || review.tool_parameters) && (
@@ -64,7 +64,7 @@ export function ReviewRow({ review, onActioned }: Props) {
               Session: {review.session_id ? review.session_id.slice(0, 8) + '…' : '—'}
             </span>
             {overdue && (
-              <span className="flex items-center gap-1 text-[10px] text-red-500 font-medium">
+              <span className="flex items-center gap-1 text-[10px] text-ac-deny font-medium">
                 <Clock size={10} /> Overdue
               </span>
             )}
@@ -80,7 +80,7 @@ export function ReviewRow({ review, onActioned }: Props) {
           <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
             <span>{timeAgo(review.created_at)}</span>
             {review.response_deadline && (
-              <span className={`${overdue ? 'text-red-500 font-medium' : 'text-gray-400'}`}>
+              <span className={`${overdue ? 'text-ac-deny font-medium' : 'text-gray-400'}`}>
                 Due {new Date(review.response_deadline).toLocaleString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -92,8 +92,8 @@ export function ReviewRow({ review, onActioned }: Props) {
             )}
             <span
               className={`font-medium ${
-                review.status === 'pending' ? 'text-amber-500' :
-                review.status === 'approved' ? 'text-green-600' : 'text-red-500'
+                review.status === 'pending' ? 'text-ac-review' :
+                review.status === 'approved' ? 'text-ac-allow' : 'text-ac-deny'
               }`}
             >
               {review.status}
@@ -118,14 +118,14 @@ export function ReviewRow({ review, onActioned }: Props) {
           </button>
           <button
             onClick={() => handleAction('approve')} disabled={approving || denying}
-            className="flex items-center gap-1 text-[12px] bg-green-600 text-white rounded-md px-3 py-1.5 font-medium
+            className="flex items-center gap-1 text-[12px] bg-ac-allow text-white rounded-md px-3 py-1.5 font-medium
                        hover:opacity-90 disabled:opacity-50 transition-opacity">
             <CheckCircle size={12} />
             {approving ? 'Approving…' : 'Approve'}
           </button>
           <button
             onClick={() => handleAction('deny')} disabled={approving || denying}
-            className="flex items-center gap-1 text-[12px] bg-red-600 text-white rounded-md px-3 py-1.5 font-medium
+            className="flex items-center gap-1 text-[12px] bg-ac-deny text-white rounded-md px-3 py-1.5 font-medium
                        hover:opacity-90 disabled:opacity-50 transition-opacity">
             <XCircle size={12} />
             {denying ? 'Denying…' : 'Deny'}
