@@ -45,7 +45,7 @@ export function SessionDetailPage() {
       {data && (
         <>
           {data.trigger_context && (
-            <div className="bg-ac-card border border-ac-border rounded-[10px] px-4 py-3">
+            <div className="bg-ac-card border border-ac-border rounded-lg px-4 py-3">
               <span className="text-[11px] font-medium text-ac-text-muted uppercase tracking-wide">
                 Trigger
               </span>
@@ -54,7 +54,7 @@ export function SessionDetailPage() {
               </p>
             </div>
           )}
-          <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+          <div className="bg-ac-card border border-ac-border rounded-lg overflow-hidden">
           {data.events.map((event) => (
             <div
               key={event.id}

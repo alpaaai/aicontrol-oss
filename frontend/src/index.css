@@ -2,6 +2,44 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --ac-primary:        #0284A8;
+  --ac-primary-lt:     #4FB8D4;
+  --ac-primary-bg:     #E3F4F8;
+  --ac-allow:          #0F7A54;
+  --ac-allow-bg:       #E6F7EF;
+  --ac-deny:           #C22E28;
+  --ac-deny-bg:        #FCE9E8;
+  --ac-review:         #8F5710;
+  --ac-review-bg:      #FBEEDA;
+  --ac-enterprise:     #534AB7;
+  --ac-enterprise-bg:  #EEEDFE;
+  --ac-surface:        #F8F9FA;
+  --ac-card:           #FFFFFF;
+  --ac-border:         #DDE9EC;
+  --ac-text-primary:   #111827;
+  --ac-text-muted:     #6B7280;
+}
+
+[data-theme="dark"] {
+  --ac-primary:        #0284A8;
+  --ac-primary-lt:     #4FB8D4;
+  --ac-primary-bg:     #054A5C;
+  --ac-allow:          #34D399;
+  --ac-allow-bg:       #0F3D2E;
+  --ac-deny:           #F87171;
+  --ac-deny-bg:        #3D1917;
+  --ac-review:         #FBBF24;
+  --ac-review-bg:      #3D2E0A;
+  --ac-enterprise:     #A78BFA;
+  --ac-enterprise-bg:  #2E2650;
+  --ac-surface:        #0A1418;
+  --ac-card:           #132229;
+  --ac-border:         #1A2B33;
+  --ac-text-primary:   #E7EEF0;
+  --ac-text-muted:     #93A5AB;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -9,12 +47,13 @@
 
   body {
     margin: 0;
-    background-color: #F8F9FA;
-    color: #111827;
+    background-color: var(--ac-surface);
+    color: var(--ac-text-primary);
     font-family: "Geist", system-ui, sans-serif;
     font-weight: 400;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   #root {
@@ -29,6 +68,25 @@
 
   h1 {
     letter-spacing: -0.03em;
+  }
+}
+
+/*
+ * Dark-mode overrides for literal Tailwind gray/white utilities.
+ * Most surfaces route through the ac-* CSS vars above and flip for free;
+ * these classes are the ones written as raw grays across page-level forms,
+ * tables, and dialogs that predate the token system. Overriding them here
+ * (rather than adding dark: to every call site) keeps the dark-mode diff
+ * proportional to the fact that light mode is the only mode those files
+ * were built against.
+ */
+[data-theme="dark"] {
+  .bg-white { background-color: var(--ac-card); }
+  .bg-gray-50, .bg-gray-100 { background-color: var(--ac-border); }
+  .text-gray-900, .text-gray-800, .text-gray-700 { color: var(--ac-text-primary); }
+  .text-gray-600, .text-gray-500, .text-gray-400 { color: var(--ac-text-muted); }
+  .border-gray-50, .border-gray-100, .border-gray-200, .border-gray-300 {
+    border-color: var(--ac-border);
   }
 }
 

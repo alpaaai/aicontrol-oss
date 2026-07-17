@@ -105,7 +105,7 @@ export function ReviewRow({ review, onActioned }: Props) {
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Add a note (optional)"
-              className="mt-2 w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-blue-500/20"
+              className="mt-2 w-full border border-ac-border rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-ac-primary/20"
             />
           )}
         </div>
@@ -113,7 +113,7 @@ export function ReviewRow({ review, onActioned }: Props) {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => setShowNote(!showNote)}
-            className="text-[11px] text-gray-400 hover:text-gray-600 border border-gray-200 rounded-md px-2 py-1">
+            className="text-[11px] text-gray-400 hover:text-gray-600 border border-ac-border rounded-md px-2 py-1">
             {showNote ? 'Hide' : 'Note'}
           </button>
           <button

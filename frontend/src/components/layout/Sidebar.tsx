@@ -6,11 +6,13 @@ import {
   Brain, FileCheck, LogOut, Settings, CreditCard,
   Layers, ShieldCheck, ClipboardList, BarChart3, Sparkles,
   ChevronRight, HeartPulse, SlidersHorizontal, ScanSearch,
+  Sun, Moon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
 import { getSummary } from "../../api/dashboard";
 import { useOrgSettings } from "../../context/OrgSettingsContext";
+import { useTheme } from "../../context/ThemeContext";
 
 const SECTION_PATHS: Record<string, string[]> = {
   activity:     ["/overview", "/audit-log", "/metrics", "/sessions", "/activity-log"],
@@ -92,6 +94,7 @@ export function Sidebar() {
   const { user, logout } = useAuth();
   const { isEnterprise } = useLicense();
   const { orgName } = useOrgSettings();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const iconProps = { size: 14, strokeWidth: 1.75 };
   const [openSection, setOpenSection] = useState<string | null>(null);
@@ -247,6 +250,14 @@ export function Sidebar() {
             <p className="text-[12px] text-white/50 truncate">{user?.email}</p>
             <p className="text-[10px] text-white/25">{user?.role}</p>
           </div>
+          <button
+            data-testid="theme-toggle-btn"
+            onClick={toggleTheme}
+            className="text-white/30 hover:text-white/70 transition-colors duration-150 shrink-0"
+            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+          >
+            {theme === "dark" ? <Sun size={14} strokeWidth={1.75} /> : <Moon size={14} strokeWidth={1.75} />}
+          </button>
           <button
             data-testid="logout-btn"
             onClick={logout}

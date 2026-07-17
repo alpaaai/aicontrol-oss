@@ -89,7 +89,7 @@ export function SetupPage() {
       {/* Left panel */}
       <div
         className="hidden lg:flex lg:w-[52%] flex-col justify-between p-12 relative overflow-hidden noise"
-        style={{ background: "#0B0E17" }}
+        style={{ background: "#0A1418" }}
       >
         <div
           className="pointer-events-none absolute inset-0"
@@ -217,7 +217,7 @@ export function SetupPage() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full bg-ac-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#3251C5] active:bg-[#2B48B0] transition-colors shadow-sm"
+                  className="w-full bg-ac-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#06647F] active:bg-[#054A5C] transition-colors shadow-sm"
                 >
                   Continue
                 </button>
@@ -281,7 +281,7 @@ export function SetupPage() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-full bg-ac-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#3251C5] active:bg-[#2B48B0] transition-colors disabled:opacity-50 shadow-sm"
+                  className="w-full bg-ac-primary text-white rounded-lg py-2.5 text-sm font-medium hover:bg-[#06647F] active:bg-[#054A5C] transition-colors disabled:opacity-50 shadow-sm"
                 >
                   {loading ? "Setting up…" : "Finish setup"}
                 </button>

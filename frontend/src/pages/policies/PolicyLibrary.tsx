@@ -35,7 +35,7 @@ function PolicyCard({
   const [previewOpen, setPreviewOpen] = useState(false);
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] p-4 space-y-3 hover:border-ac-primary/30 transition-colors">
+    <div className="bg-ac-card border border-ac-border rounded-lg p-4 space-y-3 hover:border-ac-primary/30 transition-colors">
       <div className="flex items-start justify-between gap-2">
         <div>
           <p className="font-medium text-[13px] text-ac-text-primary leading-snug">
@@ -103,7 +103,7 @@ export function PolicyLibrary({ policies, loading, onActivate }: Props) {
     return (
       <div className="grid grid-cols-2 gap-3">
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-32 bg-gray-50 rounded-[10px] animate-pulse" />
+          <div key={i} className="h-32 bg-gray-50 rounded-lg animate-pulse" />
         ))}
       </div>
     );

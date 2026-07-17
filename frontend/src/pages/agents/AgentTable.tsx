@@ -16,7 +16,7 @@ function stalenessClass(lastActive: string | null): string {
 
 export function AgentTable({ agents, selectedId, onSelect }: Props) {
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-y-auto flex-1">
+    <div className="bg-ac-card border border-ac-border rounded-lg overflow-y-auto flex-1">
       <div
         className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted
                    uppercase tracking-wide border-b border-ac-border bg-gray-50"
@@ -45,7 +45,7 @@ export function AgentTable({ agents, selectedId, onSelect }: Props) {
                       ${
                         selectedId === a.id
                           ? "bg-ac-primary-bg"
-                          : "hover:bg-gray-50"
+                          : "hover:bg-ac-peacock-50"
                       }`}
           style={{ gridTemplateColumns: "1fr 70px 110px 80px 80px 70px" }}
         >

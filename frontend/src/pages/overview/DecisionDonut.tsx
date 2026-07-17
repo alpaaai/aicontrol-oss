@@ -8,13 +8,13 @@ interface Props {
 
 export function DecisionDonut({ allow, deny, review }: Props) {
   const data = [
-    { name: "Allow",  value: allow,  color: "#1D9E75" },
-    { name: "Deny",   value: deny,   color: "#E24B4A" },
-    { name: "Review", value: review, color: "#BA7517" },
+    { name: "Allow",  value: allow,  color: "#0F7A54" },
+    { name: "Deny",   value: deny,   color: "#C22E28" },
+    { name: "Review", value: review, color: "#8F5710" },
   ].filter((d) => d.value > 0);
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] p-4">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4">
       <p className="text-[12px] font-medium text-ac-text-muted mb-3">Decision breakdown</p>
       <ResponsiveContainer width="100%" height={160}>
         <PieChart>
@@ -31,7 +31,7 @@ export function DecisionDonut({ allow, deny, review }: Props) {
           </Pie>
           <Tooltip
             formatter={(value, name) => [value, name]}
-            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #E5E7EB" }}
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #DDE9EC" }}
           />
         </PieChart>
       </ResponsiveContainer>

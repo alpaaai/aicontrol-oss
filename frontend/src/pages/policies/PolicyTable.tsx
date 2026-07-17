@@ -20,7 +20,7 @@ const conditionTypeLabel = (ruleType: string): string =>
 
 export function PolicyTable({ policies, onEdit, onDelete }: Props) {
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] overflow-hidden">
+    <div className="bg-ac-card border border-ac-border rounded-lg overflow-hidden">
       <div
         className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted
                    border-b border-ac-border bg-gray-50"
@@ -44,7 +44,7 @@ export function PolicyTable({ policies, onEdit, onDelete }: Props) {
         <div
           key={p.id}
           className="grid gap-3 px-4 py-3 text-[13px] border-b border-gray-50
-                     hover:bg-gray-50/60 transition-colors items-center"
+                     hover:bg-ac-peacock-50/60 transition-colors items-center"
           style={{ gridTemplateColumns: "1fr 110px 120px 60px 70px 70px" }}
         >
           <div>
