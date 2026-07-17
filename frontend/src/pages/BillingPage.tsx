@@ -151,7 +151,7 @@ export default function BillingPage() {
             <XAxis dataKey="name" tick={{ fontSize: 12 }} />
             <YAxis tickFormatter={(v) => formatNumber(v)} tick={{ fontSize: 12 }} />
             <Tooltip formatter={(v) => [formatNumber(Number(v)), 'Intercepts']} />
-            <Bar dataKey="intercepts" fill="#3B5BDB" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="intercepts" fill="#0284A8" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
 

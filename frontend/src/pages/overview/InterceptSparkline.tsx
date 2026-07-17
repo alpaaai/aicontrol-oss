@@ -22,14 +22,14 @@ export function InterceptSparkline({ data }: Props) {
     }));
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] p-4">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4">
       <p className="text-[12px] font-medium text-ac-text-muted mb-3">Intercepts — last 30 days</p>
       <ResponsiveContainer width="100%" height={100}>
         <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
           <defs>
-            <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#3B5BDB" stopOpacity={0.15} />
-              <stop offset="95%" stopColor="#3B5BDB" stopOpacity={0} />
+            <linearGradient id="peacockGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#0284A8" stopOpacity={0.15} />
+              <stop offset="95%" stopColor="#0284A8" stopOpacity={0} />
             </linearGradient>
           </defs>
           <XAxis
@@ -42,13 +42,13 @@ export function InterceptSparkline({ data }: Props) {
           <Area
             type="monotone"
             dataKey="count"
-            stroke="#3B5BDB"
+            stroke="#0284A8"
             strokeWidth={1.5}
-            fill="url(#blueGrad)"
+            fill="url(#peacockGrad)"
             dot={false}
           />
           <Tooltip
-            contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #E5E7EB" }}
+            contentStyle={{ fontSize: 11, borderRadius: 8, border: "1px solid #DDE9EC" }}
             formatter={(v) => [v, "intercepts"]}
           />
         </AreaChart>

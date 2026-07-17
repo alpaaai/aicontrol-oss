@@ -15,7 +15,7 @@ interface Props {
 
 export function TopToolsChart({ data }: Props) {
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] p-4">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4">
       <p className="text-[13px] font-medium text-ac-text-primary mb-4">
         Top tools — last 24h
       </p>
@@ -48,12 +48,12 @@ export function TopToolsChart({ data }: Props) {
             contentStyle={{
               fontSize: 12,
               borderRadius: 8,
-              border: "1px solid #E5E7EB",
+              border: "1px solid #DDE9EC",
             }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={14}>
             {data.map((_, i) => (
-              <Cell key={i} fill="#3B5BDB" opacity={1 - i * 0.06} />
+              <Cell key={i} fill="#0284A8" opacity={1 - i * 0.06} />
             ))}
           </Bar>
         </BarChart>

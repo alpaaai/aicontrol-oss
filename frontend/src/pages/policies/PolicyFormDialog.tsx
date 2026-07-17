@@ -155,7 +155,7 @@ export function PolicyFormDialog({ open, policy, onClose, onSaved }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 border border-ac-border rounded-lg py-2 text-sm text-ac-text-muted hover:bg-gray-50"
+              className="flex-1 border border-ac-border rounded-lg py-2 text-sm text-ac-text-muted hover:bg-ac-peacock-50"
             >
               Cancel
             </button>

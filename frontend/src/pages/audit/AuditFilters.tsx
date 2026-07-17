@@ -97,11 +97,11 @@ export function AuditFilters({ onFilter }: Props) {
           className="border border-ac-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 w-44"
         />
         {agentOpen && filteredAgents.length > 0 && (
-          <div className="absolute z-20 top-full mt-1 left-0 w-44 bg-white border border-ac-border rounded-lg shadow-lg overflow-y-auto max-h-48 [scrollbar-width:thin]">
+          <div className="absolute z-20 top-full mt-1 left-0 w-44 bg-ac-card border border-ac-border rounded-lg shadow-ac-modal overflow-y-auto max-h-48 [scrollbar-width:thin]">
             {agentId && (
               <button
                 onClick={() => selectAgent(null)}
-                className="w-full text-left px-3 py-2 text-[12px] text-ac-text-muted hover:bg-gray-50 border-b border-gray-100"
+                className="w-full text-left px-3 py-2 text-[12px] text-ac-text-muted hover:bg-ac-peacock-50 border-b border-ac-border"
               >
                 Clear
               </button>
@@ -110,7 +110,7 @@ export function AuditFilters({ onFilter }: Props) {
               <button
                 key={a.id}
                 onClick={() => selectAgent(a)}
-                className={`w-full text-left px-3 py-2 text-[12px] hover:bg-gray-50 ${
+                className={`w-full text-left px-3 py-2 text-[12px] hover:bg-ac-peacock-50 ${
                   a.id === agentId ? "text-ac-primary font-medium" : "text-ac-text-primary"
                 }`}
               >

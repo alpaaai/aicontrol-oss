@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { LicenseProvider } from "./context/LicenseContext";
 import { OrgSettingsProvider } from "./context/OrgSettingsContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import { Layout } from "./components/layout/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { SetupPage } from "./pages/SetupPage";
@@ -47,6 +48,7 @@ function RequireSetupOrAuth({ children }: { children: React.ReactElement }) {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <LicenseProvider>
     <OrgSettingsProvider>
     <BrowserRouter>
@@ -85,5 +87,6 @@ export default function App() {
     </BrowserRouter>
     </OrgSettingsProvider>
     </LicenseProvider>
+    </ThemeProvider>
   );
 }

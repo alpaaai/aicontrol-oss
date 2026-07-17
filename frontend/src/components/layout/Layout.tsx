@@ -9,9 +9,9 @@ export function Layout() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
         {/* Radial gradient: subtle warmth in the content area top-right */}
         <div
-          className="pointer-events-none absolute top-0 right-0 w-[600px] h-[400px] opacity-30"
+          className="pointer-events-none absolute top-0 right-0 w-[600px] h-[400px] opacity-30 dark:opacity-[0.12]"
           style={{
-            background: "radial-gradient(ellipse at top right, #E3F4F8 0%, transparent 70%)",
+            background: "radial-gradient(ellipse at top right, var(--ac-primary-bg) 0%, transparent 70%)",
           }}
           aria-hidden
         />

@@ -40,7 +40,7 @@ export function DecisionTrendChart({ data }: Props) {
     }));
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-[10px] p-4">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4">
       <p className="text-[13px] font-medium text-ac-text-primary mb-4">
         Decisions by hour — last 24h
       </p>
@@ -65,13 +65,13 @@ export function DecisionTrendChart({ data }: Props) {
             contentStyle={{
               fontSize: 12,
               borderRadius: 8,
-              border: "1px solid #E5E7EB",
+              border: "1px solid #DDE9EC",
             }}
           />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <Bar dataKey="allow"  fill="#1D9E75" radius={[3, 3, 0, 0]} maxBarSize={16} />
-          <Bar dataKey="deny"   fill="#E24B4A" radius={[3, 3, 0, 0]} maxBarSize={16} />
-          <Bar dataKey="review" fill="#BA7517" radius={[3, 3, 0, 0]} maxBarSize={16} />
+          <Bar dataKey="allow"  fill="#0F7A54" radius={[3, 3, 0, 0]} maxBarSize={16} />
+          <Bar dataKey="deny"   fill="#C22E28" radius={[3, 3, 0, 0]} maxBarSize={16} />
+          <Bar dataKey="review" fill="#8F5710" radius={[3, 3, 0, 0]} maxBarSize={16} />
         </BarChart>
       </ResponsiveContainer>
     </div>

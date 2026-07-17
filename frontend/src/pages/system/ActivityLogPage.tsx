@@ -72,7 +72,7 @@ function ActivityRow({ entry, timezone }: { entry: ActivityLogEntry; timezone: s
       <div
         onClick={() => hasDetail && setExpanded(e => !e)}
         className={`flex items-start gap-3 px-4 py-3 transition-colors rounded-lg
-          ${hasDetail ? 'cursor-pointer hover:bg-gray-50/70' : ''}`}
+          ${hasDetail ? 'cursor-pointer hover:bg-ac-peacock-50/70' : ''}`}
       >
         <span className="mt-1 text-slate-300 shrink-0 w-[13px]">
           {hasDetail

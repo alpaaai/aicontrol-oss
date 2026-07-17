@@ -290,7 +290,7 @@ export function PolicyEditor({ open, policy, onClose, onSaved }: Props) {
                   className={`px-3 py-1.5 transition-colors ${
                     isFormMode
                       ? "bg-ac-primary text-white"
-                      : "text-ac-text-muted hover:bg-gray-50"
+                      : "text-ac-text-muted hover:bg-ac-peacock-50"
                   }`}
                 >
                   Form
@@ -301,7 +301,7 @@ export function PolicyEditor({ open, policy, onClose, onSaved }: Props) {
                   className={`px-3 py-1.5 transition-colors ${
                     !isFormMode
                       ? "bg-ac-primary text-white"
-                      : "text-ac-text-muted hover:bg-gray-50"
+                      : "text-ac-text-muted hover:bg-ac-peacock-50"
                   }`}
                 >
                   JSON
@@ -487,7 +487,7 @@ export function PolicyEditor({ open, policy, onClose, onSaved }: Props) {
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm border border-ac-border rounded-lg text-ac-text-muted hover:bg-gray-50"
+                className="px-4 py-2 text-sm border border-ac-border rounded-lg text-ac-text-muted hover:bg-ac-peacock-50"
               >
                 Cancel
               </button>

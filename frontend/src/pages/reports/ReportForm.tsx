@@ -55,7 +55,7 @@ export function ReportForm({ onGenerated }: Props) {
   }
 
   return (
-    <div className="bg-white border border-gray-200 rounded-[10px] p-5">
+    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-5">
       <h3 className="text-[14px] font-semibold text-ac-text-primary mb-4">Generate Compliance Report</h3>
       <form onSubmit={handleGenerate} className="space-y-4">
 
@@ -63,12 +63,12 @@ export function ReportForm({ onGenerated }: Props) {
           <div>
             <label className="text-[12px] text-gray-500 block mb-1">From</label>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20" />
           </div>
           <div>
             <label className="text-[12px] text-gray-500 block mb-1">To</label>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500/20" />
+              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20" />
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export function ReportForm({ onGenerated }: Props) {
                 className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                   frameworks.includes(fw.value)
                     ? 'bg-purple-600 text-white border-purple-600'
-                    : 'border-gray-200 text-gray-600 hover:border-purple-400/40'
+                    : 'border-ac-border text-gray-600 hover:border-purple-400/40'
                 }`}>
                 {fw.label}
               </button>
@@ -97,8 +97,8 @@ export function ReportForm({ onGenerated }: Props) {
                 onClick={() => setFormat(f)}
                 className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                   format === f
-                    ? 'bg-blue-600 text-white border-blue-600'
-                    : 'border-gray-200 text-gray-600 hover:border-blue-400/40'
+                    ? 'bg-ac-primary text-white border-ac-primary'
+                    : 'border-ac-border text-gray-600 hover:border-ac-primary/40'
                 }`}>
                 {f === 'both' ? 'PDF + MD' : f.toUpperCase()}
               </button>

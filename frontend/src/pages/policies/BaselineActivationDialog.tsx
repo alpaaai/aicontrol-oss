@@ -40,7 +40,7 @@ export function BaselineActivationDialog({ onClose, onDone }: Props) {
         </div>
 
         <div className="space-y-3">
-          <div className="border border-ac-border rounded-[10px] p-4">
+          <div className="border border-ac-border rounded-lg p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-medium text-[14px] text-ac-text-primary">Standard</p>
@@ -60,7 +60,7 @@ export function BaselineActivationDialog({ onClose, onDone }: Props) {
             </div>
           </div>
 
-          <div className="border border-ac-border rounded-[10px] p-4">
+          <div className="border border-ac-border rounded-lg p-4">
             <div className="flex items-start justify-between">
               <div>
                 <p className="font-medium text-[14px] text-ac-text-primary">Strict</p>
@@ -73,7 +73,7 @@ export function BaselineActivationDialog({ onClose, onDone }: Props) {
                 data-testid="baseline-strict-btn"
                 type="button"
                 onClick={() => handleActivate("strict")}
-                className="shrink-0 ml-4 border border-ac-border text-ac-text-primary text-sm font-medium px-4 py-2 rounded-lg hover:bg-gray-50"
+                className="shrink-0 ml-4 border border-ac-border text-ac-text-primary text-sm font-medium px-4 py-2 rounded-lg hover:bg-ac-peacock-50"
               >
                 Strict
               </button>
