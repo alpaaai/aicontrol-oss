@@ -16,9 +16,15 @@ class FrameworkAdapter(Protocol):
         ...
 
     def extract_usage(self, response: Any) -> dict:
-        """Best-effort token/cost usage from a framework response object.
+        """Pulls real per-LLM-call token usage off a raw framework response
+        object (e.g. ModelResponse, LlmResponse). Called internally by the
+        adapter's own model-call hook (on_llm_end, after_model_callback) to
+        feed the accumulator that on_tool_start/before_tool_callback reads
+        from — not called directly by patch() or any external caller.
 
-        Returns a dict with any subset of input_tokens/output_tokens/cost_usd keys.
-        Frameworks that don't expose per-call usage return {}.
+        Returns a dict with any subset of input_tokens/output_tokens keys.
+        Frameworks with no model-call-level hook (e.g. Claude Agent SDK, as
+        of this writing) return {} — there is no response object to extract
+        from without one.
         """
         ...

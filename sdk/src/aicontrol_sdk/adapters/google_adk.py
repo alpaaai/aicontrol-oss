@@ -53,10 +53,26 @@ class GoogleADKAdapter:
 
         client = self._client
         session_counters: dict[str, itertools.count] = {}
+        usage_accumulators: dict[str, dict] = {}
 
         class AIControlPlugin(BasePlugin):
             def __init__(self_):
                 super().__init__(name="aicontrol")
+
+            async def after_model_callback(self_, *, callback_context, llm_response) -> None:
+                """Fires once per LLM call. Accumulates rather than
+                overwrites -- see build_hooks() in the OpenAI adapter for
+                why (retried model calls must not have their usage
+                discarded). Keyed by session_id, same pattern as
+                session_counters above, since this plugin instance is
+                shared across a Runner's sessions."""
+                session_id = getattr(callback_context, "session_id", None) or getattr(
+                    callback_context, "invocation_id", "default"
+                )
+                usage = self.extract_usage(llm_response)
+                acc = usage_accumulators.setdefault(session_id, {"input_tokens": 0, "output_tokens": 0})
+                acc["input_tokens"] += usage.get("input_tokens", 0)
+                acc["output_tokens"] += usage.get("output_tokens", 0)
 
             async def before_tool_callback(
                 self_, *, tool, tool_args: dict, tool_context
@@ -65,12 +81,19 @@ class GoogleADKAdapter:
                     tool_context, "invocation_id", "default"
                 )
                 counter = session_counters.setdefault(session_id, itertools.count(1))
+                acc = usage_accumulators.setdefault(session_id, {"input_tokens": 0, "output_tokens": 0})
+                input_tokens = acc["input_tokens"] or None
+                output_tokens = acc["output_tokens"] or None
+                acc["input_tokens"] = 0
+                acc["output_tokens"] = 0
                 try:
                     await client.intercept(
                         tool_name=getattr(tool, "name", str(tool)),
                         tool_parameters=tool_args or {},
                         session_id=session_id,
                         sequence_number=next(counter),
+                        input_tokens=input_tokens,
+                        output_tokens=output_tokens,
                     )
                 except PolicyDeniedError as exc:
                     return {"error": f"Blocked by AIControl policy: {exc.reason}"}
@@ -99,5 +122,14 @@ class GoogleADKAdapter:
         return AIControlPlugin()
 
     def extract_usage(self, response: Any) -> dict:
-        """No stable per-tool-call usage attribute confirmed on ToolContext — best-effort None."""
-        return {}
+        """Pulls real per-call token counts off an LlmResponse.usage_metadata
+        (google.genai.types.GenerateContentResponseUsageMetadata), as handed
+        to after_model_callback. Called internally by build_plugin()'s
+        after_model_callback — not part of the public patch() flow."""
+        usage_metadata = getattr(response, "usage_metadata", None)
+        if usage_metadata is None:
+            return {}
+        return {
+            "input_tokens": usage_metadata.prompt_token_count or 0,
+            "output_tokens": usage_metadata.candidates_token_count or 0,
+        }
