@@ -1,0 +1,13 @@
+policies:
+  - name: deny_cross_encounter_phi_access
+    description: "Block PHI access to patients outside authorized encounter cohort — healthcare demo"
+    rule_type: tool_denylist
+    condition:
+      blocked_tools:
+        - read_patient_record
+      parameter_match:
+        patient_id: "PT-2024-09*"
+    action: deny
+    active: true
+    severity: critical
+    compliance_frameworks: ["HIPAA", "SOC2"]

@@ -1,0 +1,13 @@
+policies:
+  - name: deny_bulk_account_lookup
+    description: "Block wildcard account_id in customer account queries — support demo"
+    rule_type: tool_denylist
+    condition:
+      blocked_tools:
+        - read_customer_account
+      parameter_match:
+        account_id: "*"
+    action: deny
+    active: true
+    severity: critical
+    compliance_frameworks: ["GDPR", "SOC2", "CCPA"]

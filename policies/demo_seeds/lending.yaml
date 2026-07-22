@@ -1,0 +1,28 @@
+policies:
+  - name: deny_bulk_credit_query
+    description: "Block wildcard applicant_id in credit bureau queries — lending demo"
+    rule_type: tool_denylist
+    condition:
+      blocked_tools:
+        - query_credit_bureau
+      parameter_match:
+        applicant_id: "*"
+    action: deny
+    active: true
+    severity: critical
+    compliance_frameworks: ["GLBA", "OCC", "SOC2"]
+
+  - name: deny_bulk_credit_query_rate
+    description: "Deny more than 2 credit bureau queries per session — bulk data collection via repeated single queries — lending demo"
+    rule_type: rate_limit
+    condition:
+      tools:
+        - query_credit_bureau
+      rate_limit:
+        max_calls: 2
+        window: session
+        on_exceed: deny
+    action: deny
+    active: true
+    severity: high
+    compliance_frameworks: ["FCRA", "GLBA", "SOC2"]

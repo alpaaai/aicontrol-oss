@@ -51,3 +51,41 @@ def test_load_yaml_never_uses_compliance_tags_key():
     from app.services.policy_loader import load_yaml
     offenders = [p["name"] for p in load_yaml() if "compliance_tags" in p]
     assert offenders == [], f"policies still using unread 'compliance_tags' key: {offenders}"
+
+
+def test_policies_yaml_excludes_demo_scenario_policies():
+    """The default shipped seed (policies.yaml) must contain only generic
+    policies -- demo-scenario-specific policies live under policies/demo_seeds/
+    and are loaded explicitly by scripts/seed.py, never by app startup."""
+    from app.services.policy_loader import load_yaml
+    demo_only_names = {
+        "deny_bulk_credit_query", "deny_bulk_credit_query_rate",
+        "deny_cross_encounter_phi_access", "deny_bulk_account_lookup",
+        "block_http_post_in_itsm", "deny_unscoped_crm_query",
+        "review_high_value_claim_payment", "deny_unscoped_claims_query",
+    }
+    names = {p["name"] for p in load_yaml()}
+    assert names.isdisjoint(demo_only_names), (
+        f"demo-scenario policies leaked into default seed: {names & demo_only_names}"
+    )
+
+
+def test_load_yaml_accepts_explicit_path_for_demo_seeds():
+    """load_yaml(path) must read an arbitrary policies-shaped YAML file, so
+    demo seed files under policies/demo_seeds/ can reuse the same loader."""
+    from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
+    policies = load_yaml(DEMO_SEEDS_DIR / "lending.yaml")
+    names = {p["name"] for p in policies}
+    assert names == {"deny_bulk_credit_query", "deny_bulk_credit_query_rate"}
+
+
+def test_all_demo_seed_files_load_and_have_valid_actions():
+    """Every YAML file under policies/demo_seeds/ must parse and contain only
+    valid policy actions -- same contract as the default policies.yaml."""
+    from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
+    valid_actions = {"allow", "deny", "review"}
+    seed_files = sorted(DEMO_SEEDS_DIR.glob("*.yaml"))
+    assert len(seed_files) == 6, f"expected 6 demo seed files, found {len(seed_files)}"
+    for path in seed_files:
+        for p in load_yaml(path):
+            assert p["action"] in valid_actions, f"{path.name}: invalid action {p['action']}"

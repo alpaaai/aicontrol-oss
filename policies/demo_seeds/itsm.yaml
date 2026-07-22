@@ -1,0 +1,11 @@
+policies:
+  - name: block_http_post_in_itsm
+    description: "Block all outbound HTTP POST from incident response agent — ITSM demo"
+    rule_type: tool_denylist
+    condition:
+      blocked_tools:
+        - http_post
+    action: deny
+    active: true
+    severity: critical
+    compliance_frameworks: ["SOC2", "NIST_CSF"]
