@@ -100,3 +100,17 @@ policies:
     severity: critical
     compliance_frameworks: ["HIPAA"]
     active: false
+
+  - name: example_rate_limit_sensitive_reads
+    description: "Cap repeated calls to a sensitive read tool within a session — rate-limiting example"
+    rule_type: rate_limit
+    condition:
+      tools: [read_record]
+      rate_limit:
+        max_calls: 20
+        window: session
+        on_exceed: review
+    action: review
+    severity: medium
+    compliance_frameworks: ["SOC2"]
+    active: false
