@@ -3,6 +3,7 @@ import asyncio
 import json
 from sqlalchemy import text
 from app.models.database import async_session_factory
+from app.services.policy_loader import DEMO_SEEDS_DIR, load_yaml, push_rego_to_opa, upsert_policies
 
 # approved_tools: lending + healthcare agents are allowlisted (P1-1 enforcement).
 # All other agents use [] (unrestricted) — intentional contrast for future demo scenarios.
@@ -208,7 +209,20 @@ async def seed():
             print(f"Seeded policy: {policy['name']}")
 
         await session.commit()
-        print(f"\nDone — {len(AGENTS)} agents, {len(V2_POLICIES)} V2 policies seeded.")
+
+        demo_policy_count = 0
+        for seed_file in sorted(DEMO_SEEDS_DIR.glob("*.yaml")):
+            demo_policies = load_yaml(seed_file)
+            await upsert_policies(session, demo_policies)
+            demo_policy_count += len(demo_policies)
+            print(f"Seeded {len(demo_policies)} demo policies from {seed_file.name}")
+
+        await push_rego_to_opa()
+
+        print(
+            f"\nDone — {len(AGENTS)} agents, {len(V2_POLICIES)} V2 policies, "
+            f"{demo_policy_count} demo-scenario policies seeded."
+        )
 
 
 if __name__ == "__main__":

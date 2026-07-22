@@ -14,11 +14,14 @@ logger = get_logger("policy_loader")
 
 POLICIES_YAML = Path(__file__).parent.parent.parent / "policies" / "policies.yaml"
 REGO_BUNDLE = Path(__file__).parent.parent.parent / "policies" / "base.rego"
+DEMO_SEEDS_DIR = Path(__file__).parent.parent.parent / "policies" / "demo_seeds"
 
 
-def load_yaml() -> list[dict[str, Any]]:
-    """Read and parse policies/policies.yaml."""
-    with open(POLICIES_YAML) as f:
+def load_yaml(path: Path = POLICIES_YAML) -> list[dict[str, Any]]:
+    """Read and parse a policies-shaped YAML file. Defaults to policies.yaml
+    (the default shipped seed); pass a path under policies/demo_seeds/ to
+    load a scenario's demo-only policies instead."""
+    with open(path) as f:
         data = yaml.safe_load(f)
     return data["policies"]
 

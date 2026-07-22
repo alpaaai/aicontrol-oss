@@ -23,31 +23,8 @@ policies:
     severity: high
     compliance_frameworks: ["SOC2"]
 
-  - name: allow_standard_tools
-    description: Allow all other tools by default
-    rule_type: default_allow
-    condition: {}
-    action: allow
-    severity: low
-    compliance_frameworks: []
-
-# ── Demo scenario policies ────────────────────────────────────────────────────
-
-  - name: deny_bulk_credit_query
-    description: "Block wildcard applicant_id in credit bureau queries — lending demo"
-    rule_type: tool_denylist
-    condition:
-      blocked_tools:
-        - query_credit_bureau
-      parameter_match:
-        applicant_id: "*"
-    action: deny
-    active: true
-    severity: critical
-    compliance_frameworks: ["GLBA", "OCC", "SOC2"]
-
   - name: block_unapproved_outbound_http
-    description: "Block outbound HTTP to unapproved external domains — manufacturing demo"
+    description: "Block outbound HTTP POST/request calls to unapproved external destinations"
     rule_type: tool_denylist
     condition:
       blocked_tools:
@@ -58,55 +35,13 @@ policies:
     severity: critical
     compliance_frameworks: ["SOC2", "ISO27001"]
 
-  - name: deny_cross_encounter_phi_access
-    description: "Block PHI access to patients outside authorized encounter cohort"
-    rule_type: tool_denylist
-    condition:
-      blocked_tools:
-        - read_patient_record
-      parameter_match:
-        patient_id: "PT-2024-09*"
-    action: deny
-    active: true
-    severity: critical
-    compliance_frameworks: ["HIPAA", "SOC2"]
-
-  - name: deny_bulk_account_lookup
-    description: "Block wildcard account_id in customer account queries — support demo"
-    rule_type: tool_denylist
-    condition:
-      blocked_tools:
-        - read_customer_account
-      parameter_match:
-        account_id: "*"
-    action: deny
-    active: true
-    severity: critical
-    compliance_frameworks: ["GDPR", "SOC2", "CCPA"]
-
-  - name: block_http_post_in_itsm
-    description: "Block all outbound HTTP POST from incident response agent — ITSM demo"
-    rule_type: tool_denylist
-    condition:
-      blocked_tools:
-        - http_post
-    action: deny
-    active: true
-    severity: critical
-    compliance_frameworks: ["SOC2", "NIST_CSF"]
-
-  - name: deny_unscoped_crm_query
-    description: "Block unfiltered account queries from CRM agent — RevOps demo"
-    rule_type: tool_denylist
-    condition:
-      blocked_tools:
-        - query_all_accounts
-      parameter_match:
-        filter: null
-    action: deny
-    active: true
-    severity: high
-    compliance_frameworks: ["GDPR", "SOC2", "CCPA"]
+  - name: allow_standard_tools
+    description: Allow all other tools by default
+    rule_type: default_allow
+    condition: {}
+    action: allow
+    severity: low
+    compliance_frameworks: []
 
   # ── Example policies (inactive — activate per customer) ────────────────────
 
@@ -165,46 +100,3 @@ policies:
     severity: critical
     compliance_frameworks: ["HIPAA"]
     active: false
-
-# ── Insurance demo policies ───────────────────────────────────────────────────
-
-  - name: review_high_value_claim_payment
-    description: "Route claim payments above $5,000 to senior adjuster for human review — insurance demo"
-    rule_type: tool_denylist
-    condition:
-      blocked_tools: ["process_claim_payment"]
-      numeric_conditions:
-        - parameter: amount
-          operator: gt
-          value: 5000
-    action: review
-    severity: high
-    active: true
-    compliance_frameworks: ["SOC2", "NAIC", "EU_AI_ACT"]
-
-  - name: deny_unscoped_claims_query
-    description: "Block wildcard insured_id in claims database queries — prevents bulk data access via prompt injection"
-    rule_type: tool_denylist
-    condition:
-      blocked_tools: ["query_claims_database"]
-      parameter_match:
-        insured_id: "*"
-    action: deny
-    severity: critical
-    active: true
-    compliance_frameworks: ["SOC2", "NAIC", "GDPR"]
-
-  - name: deny_bulk_credit_query_rate
-    description: "Deny more than 2 credit bureau queries per session — bulk data collection via repeated single queries"
-    rule_type: rate_limit
-    condition:
-      tools:
-        - query_credit_bureau
-      rate_limit:
-        max_calls: 2
-        window: session
-        on_exceed: deny
-    action: deny
-    active: true
-    severity: high
-    compliance_frameworks: ["FCRA", "GLBA", "SOC2"]
