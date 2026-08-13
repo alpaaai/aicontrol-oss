@@ -136,6 +136,38 @@ async def _cleanup_test_admission_scans():
         await session.commit()
 
 
+async def _cleanup_test_discovery_rows(session):
+    # discovered_agents.promoted_agent_id FKs to agents.id -- delete the
+    # child rows first or the agents delete violates the FK constraint.
+    await session.execute(text("DELETE FROM discovered_agents WHERE external_id LIKE 'DISCOVERY-API-TEST-%'"))
+    await session.execute(text(
+        "DELETE FROM agents WHERE name IN "
+        "('test-discovered-via-api', 'test-promote-candidate', 'test-promote-no-owner', 'test-dismiss-candidate')"
+    ))
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _cleanup_test_discovery():
+    """Session setup + teardown: remove discovered_agents/agents rows
+    created by tests/enterprise/test_discovery_api.py so they don't
+    accumulate across pytest runs. Same class of bug fixed in fc54acd
+    (test_promote_creates_a_real_agent had no cleanup fixture, so an
+    assertion failure before its own inline cleanup ran left a leaked row
+    permanently) -- following the established
+    _cleanup_test_agents/_cleanup_test_policies pattern: runs both before
+    (removes prior-run leaks) and after (removes this-run creations)
+    regardless of test outcome, rather than relying on inline
+    post-assertion cleanup in each test."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        await _cleanup_test_discovery_rows(session)
+        await session.commit()
+    yield
+    async with async_session_factory() as session:
+        await _cleanup_test_discovery_rows(session)
+        await session.commit()
+
+
 _PYTEST_FIXTURE_TOKEN_DESCRIPTIONS = ("pytest-admin-fixture", "pytest-agent-fixture")
 
 

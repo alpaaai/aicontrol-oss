@@ -219,9 +219,20 @@ async def seed():
 
         await push_rego_to_opa()
 
+        tag_count = 0
+        try:
+            from enterprise.compliance.policy_tag_seeds import seed_policy_compliance_tags
+        except ImportError:
+            pass
+        else:
+            tag_count = await seed_policy_compliance_tags(session)
+            await session.commit()
+            print(f"Seeded {tag_count} policy_compliance_tags rows")
+
         print(
             f"\nDone — {len(AGENTS)} agents, {len(V2_POLICIES)} V2 policies, "
-            f"{demo_policy_count} demo-scenario policies seeded."
+            f"{demo_policy_count} demo-scenario policies seeded, "
+            f"{tag_count} policy_compliance_tags rows."
         )
 
 

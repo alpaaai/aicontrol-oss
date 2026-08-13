@@ -13,6 +13,25 @@ receives `serialized={"name": ..., "description": ...}` and `inputs=`, but
 `on_tool_end` receives only `output` and `run_id` — no tool name. This
 adapter tracks run_id -> tool_name (set in on_tool_start, popped in
 on_tool_end) to report the correct name in report_response.
+
+KNOWN LIMITATION -- blocking only holds for async-defined tools
+(`@tool async def ...` / a `BaseTool` implementing `_arun`). Confirmed
+against installed langchain_core.callbacks.manager source: a sync tool
+(only `_run` implemented) fires `on_tool_start` through the SYNC
+`CallbackManager.handle_event`, which calls the (async) handler method to
+get a coroutine object, queues it, and runs it later via `_run_coros` --
+whose exceptions are "always logged and swallowed here, regardless of the
+handler's raise_error setting" (LangChain's own comment,
+callbacks/manager.py). `raise_error = True` below only takes effect on the
+ASYNC path (`_ahandle_event_for_handler`, used when the tool's own
+execution is async), which the handler's on_tool_start coroutine runs on
+directly rather than being queued. Confirmed empirically this session:
+identical deny scenario, only the tool's sync-vs-async definition differs
+-- async tool call was blocked, sync tool call executed anyway despite the
+same deny decision and the same raise_error=True handler. There is no
+workaround from this adapter's side; integrators who need a governance
+deny to actually block LangGraph tool execution must define tools with
+`async def`, not plain `def`.
 """
 import itertools
 import uuid
@@ -47,6 +66,13 @@ class LangGraphAdapter:
         run_id_to_tool_name: dict[Any, str] = {}
 
         class AIControlCallbackHandler(BaseCallbackHandler):
+            # LangChain's CallbackManager swallows exceptions raised from
+            # callback methods by default (logs a warning and continues) --
+            # raise_error=True is the documented opt-out, required here so a
+            # policy deny/review actually aborts the tool call instead of
+            # only being logged.
+            raise_error = True
+
             async def on_tool_start(self_, serialized, input_str, *, run_id, **kwargs):
                 tool_name = serialized.get("name", "unknown")
                 run_id_to_tool_name[run_id] = tool_name

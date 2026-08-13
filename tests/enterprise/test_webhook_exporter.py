@@ -47,3 +47,55 @@ async def test_export_does_not_advance_checkpoint_on_delivery_failure(sample_aud
     result = await exporter.export(sample_audit_event)
     assert result.delivered is False
     assert exporter.checkpoint_unchanged_since_last_success() is True
+
+
+@pytest.mark.asyncio
+async def test_checkpoint_has_lock_to_guard_concurrent_writes(tmp_path):
+    import asyncio
+    from enterprise.app.services.audit_export.webhook_exporter import WebhookExporter
+
+    exporter = WebhookExporter(webhook_url="http://example.invalid/webhook", checkpoint_path=tmp_path / "c.checkpoint")
+    assert isinstance(exporter._checkpoint_lock, asyncio.Lock)
+
+
+@pytest.mark.asyncio
+async def test_out_of_order_delivery_does_not_regress_checkpoint(monkeypatch, tmp_path):
+    from enterprise.app.services.audit_export.webhook_exporter import WebhookExporter
+
+    class _FakeResponse:
+        def raise_for_status(self):
+            pass
+
+    class _FakeAsyncClient:
+        def __init__(self, *a, **k):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, *a, **k):
+            return _FakeResponse()
+
+    monkeypatch.setattr("enterprise.app.services.audit_export.webhook_exporter.httpx.AsyncClient", _FakeAsyncClient)
+
+    exporter = WebhookExporter(webhook_url="http://example.invalid/webhook", checkpoint_path=tmp_path / "c.checkpoint")
+
+    older = AuditEvent(
+        id=uuid.uuid4(), session_id=uuid.uuid4(), sequence_number=1, agent_id=uuid.uuid4(),
+        agent_name="a", tool_name="t", tool_parameters={}, decision="allow",
+        decision_reason="x", duration_ms=1, created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    newer = AuditEvent(
+        id=uuid.uuid4(), session_id=uuid.uuid4(), sequence_number=2, agent_id=uuid.uuid4(),
+        agent_name="a", tool_name="t", tool_parameters={}, decision="allow",
+        decision_reason="x", duration_ms=1, created_at=datetime(2026, 6, 1, tzinfo=timezone.utc),
+    )
+
+    await exporter.export(newer)
+    await exporter.export(older)
+
+    assert str(newer.id) in exporter.checkpoint_path.read_text()
+    assert str(older.id) not in exporter.checkpoint_path.read_text()

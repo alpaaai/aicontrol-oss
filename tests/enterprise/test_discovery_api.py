@@ -40,12 +40,6 @@ async def test_scan_upserts_candidates_and_is_idempotent(admin_token):
     assert len(second.json()) == 1
     assert first.json()[0]["id"] == second.json()[0]["id"]
 
-    from app.models.database import async_session_factory
-    from sqlalchemy import text
-    async with async_session_factory() as session:
-        await session.execute(text("DELETE FROM discovered_agents WHERE external_id = 'DISCOVERY-API-TEST-1'"))
-        await session.commit()
-
 
 @pytest.mark.asyncio
 async def test_promote_creates_a_real_agent(admin_token):
@@ -67,15 +61,6 @@ async def test_promote_creates_a_real_agent(admin_token):
         assert promote_resp.status_code == 201
         assert promote_resp.json()["name"] == "test-promote-candidate"
         assert promote_resp.json()["owner"] == "security-team"
-
-    from app.models.database import async_session_factory
-    from sqlalchemy import text
-    async with async_session_factory() as session:
-        # discovered_agents.promoted_agent_id FKs to agents.id -- delete the
-        # child row first or the agents delete violates the FK constraint.
-        await session.execute(text("DELETE FROM discovered_agents WHERE external_id = 'DISCOVERY-API-TEST-2'"))
-        await session.execute(text("DELETE FROM agents WHERE id = :id"), {"id": promote_resp.json()["id"]})
-        await session.commit()
 
 
 @pytest.mark.asyncio
@@ -103,12 +88,6 @@ async def test_promote_rejects_missing_owner(admin_token):
     assert unpromoted["status"] == "new"
     assert unpromoted["promoted_agent_id"] is None
 
-    from app.models.database import async_session_factory
-    from sqlalchemy import text
-    async with async_session_factory() as session:
-        await session.execute(text("DELETE FROM discovered_agents WHERE external_id = 'DISCOVERY-API-TEST-4'"))
-        await session.commit()
-
 
 @pytest.mark.asyncio
 async def test_dismiss_marks_candidate_dismissed(admin_token):
@@ -127,12 +106,6 @@ async def test_dismiss_marks_candidate_dismissed(admin_token):
         dismiss_resp = await client.post(f"/discovery/candidates/{candidate_id}/dismiss", headers=admin_token)
     assert dismiss_resp.status_code == 200
     assert dismiss_resp.json()["status"] == "dismissed"
-
-    from app.models.database import async_session_factory
-    from sqlalchemy import text
-    async with async_session_factory() as session:
-        await session.execute(text("DELETE FROM discovered_agents WHERE external_id = 'DISCOVERY-API-TEST-3'"))
-        await session.commit()
 
 
 @pytest.mark.asyncio

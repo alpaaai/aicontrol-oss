@@ -1,5 +1,7 @@
 """Writes immutable audit events for every intercepted tool call."""
+import asyncio
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,6 +10,13 @@ from app.core.logging import get_logger
 from app.models.schemas import AuditEvent
 
 logger = get_logger("audit_writer")
+
+try:
+    from app.core.license_gate import get_license_info
+    from enterprise.app.services.audit_export.dispatch import AuditEventRecord, dispatch_audit_event
+    _export_dispatch_available = True
+except ImportError:
+    _export_dispatch_available = False
 
 
 async def write_event(
@@ -60,4 +69,20 @@ async def write_event(
     session.add(event)
     await session.flush()
     logger.info("audit_event_written", tool_name=tool_name, decision=decision)
+
+    if _export_dispatch_available and get_license_info().is_business:
+        record = AuditEventRecord(
+            id=event_id,
+            session_id=session_id,
+            agent_name=agent_name,
+            tool_name=tool_name,
+            tool_parameters=tool_parameters,
+            decision=decision,
+            decision_reason=decision_reason,
+            policy_name=policy_name,
+            duration_ms=duration_ms,
+            created_at=datetime.now(timezone.utc),
+        )
+        asyncio.create_task(dispatch_audit_event(record))
+
     return event_id

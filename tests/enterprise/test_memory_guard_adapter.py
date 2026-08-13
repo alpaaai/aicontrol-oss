@@ -57,3 +57,13 @@ def test_is_memory_write_matches_known_patterns():
     assert is_memory_write("write_memory") is True
     assert is_memory_write("agent_store_context_v2") is True
     assert is_memory_write("get_weather") is False
+
+
+def test_is_memory_write_does_not_false_positive_on_bare_substring():
+    """Self-critique finding: bare `pattern in tool_name` substring
+    containment matched "store_context" inside "restore_context_window"
+    and "unstore_context" -- tool names that read (write) instead of
+    writing memory. Token-boundary matching (split on "_") must not match
+    these, while still matching "agent_store_context_v2" above."""
+    assert is_memory_write("restore_context_window") is False
+    assert is_memory_write("unstore_context") is False
