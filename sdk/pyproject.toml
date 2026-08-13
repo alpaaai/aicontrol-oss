@@ -15,7 +15,8 @@ dependencies = [
 anthropic = ["claude-agent-sdk>=0.2"]
 openai = ["openai-agents>=0.17"]
 google-adk = ["google-adk>=2.0"]
-dev = ["pytest", "pytest-asyncio", "claude-agent-sdk>=0.2", "openai-agents>=0.17", "google-adk>=2.0"]
+langgraph = ["langgraph>=1.0", "langchain-core>=0.3"]
+dev = ["pytest", "pytest-asyncio", "claude-agent-sdk>=0.2", "openai-agents>=0.17", "google-adk>=2.0", "langgraph>=1.0", "langchain-core>=0.3"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aicontrol_sdk"]
