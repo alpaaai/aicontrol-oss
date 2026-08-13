@@ -377,4 +377,28 @@ SCENARIOS = {
             },
         ],
     },
+    "nl_policy_authoring": {
+        "kind": "nl_policy_draft",
+        "name": "Enforce — Natural-Language Policy Authoring",
+        "description": (
+            "An admin describes a governance rule in plain English. The LLM proposes a "
+            "candidate policy, restricted to the same closed set of rule_types the OPA "
+            "engine already evaluates -- never a new evaluation path. OPA never calls the "
+            "LLM; the draft is inert until a human explicitly approves it."
+        ),
+        "steps": [
+            {
+                "label": "Draft a policy from a plain-English description",
+                "narrative": "\"Block any agent from calling delete_customer_record.\"",
+                "description": "Block any agent from calling delete_customer_record",
+                "insight": "Returned as a pending draft only -- nothing is written to the policies table until a human reviews it and explicitly creates it via POST /policies.",
+            },
+            {
+                "label": "Attempt a request that can't be expressed in an existing rule_type",
+                "narrative": "\"Block anything that feels like it's trying to exfiltrate data.\" -- too vague for any of the eight supported rule_types.",
+                "description": "Block anything that feels like it's trying to exfiltrate data",
+                "insight": "Rejected with requires_manual_authoring=True rather than inventing a new policy type -- the closed rule_type set never grows to accommodate a draft.",
+            },
+        ],
+    },
 }

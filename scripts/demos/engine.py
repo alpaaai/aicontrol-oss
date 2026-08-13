@@ -364,6 +364,72 @@ async def _run_mcp_gateway(scenario: dict, token: str, mode: str) -> None:
     console.print()
 
 
+async def _run_nl_policy_draft(scenario: dict, token: str, mode: str) -> None:
+    print_scenario_header(scenario)
+
+    results = []
+    steps = scenario["steps"]
+
+    async with httpx.AsyncClient() as client:
+        for i, step in enumerate(steps, 1):
+            console.print(f"[dim]Step {i} of {len(steps)}[/dim]")
+            console.print(f"[bold]-> {step['label']}[/bold]")
+            console.print(f"  [dim]{step['narrative']}[/dim]")
+
+            if mode == "walkthrough":
+                console.print("\n  [dim]Press ENTER to send...[/dim]", end="")
+                input()
+
+            start = time.time()
+            console.print(f"  [cyan]POST /policies/nl-draft[/cyan]  description={step['description']!r}")
+            resp = await client.post(
+                f"{API_BASE}/policies/nl-draft",
+                headers={"Authorization": f"Bearer {token}"},
+                json={"description": step["description"]},
+                timeout=15.0,
+            )
+            elapsed = (time.time() - start) * 1000
+            data = resp.json()
+
+            if resp.status_code != 200:
+                console.print(f"\n  [red]HTTP {resp.status_code}[/red]  {data}")
+                results.append({"step": i, "target": step["label"], "outcome": f"error {resp.status_code}", "ms": f"{elapsed:.0f}"})
+                console.print()
+                continue
+
+            if data.get("requires_manual_authoring"):
+                console.print(f"\n  [yellow]⚑ requires_manual_authoring[/yellow]  [dim]{data['confidence_notes']}  |  {elapsed:.0f}ms[/dim]")
+                results.append({"step": i, "target": step["label"], "outcome": "requires_manual_authoring", "ms": f"{elapsed:.0f}"})
+            else:
+                console.print(
+                    f"\n  [green]✓ rule_type={data['rule_type']}[/green]  "
+                    f"[dim]condition={json.dumps(data['rego_condition'])}  |  {elapsed:.0f}ms[/dim]"
+                )
+                console.print(f"    [dim]requires_admin_approval={data['requires_admin_approval']} -- not yet an active policy[/dim]")
+                results.append({"step": i, "target": step["label"], "outcome": f"draft rule_type={data['rule_type']}", "ms": f"{elapsed:.0f}"})
+
+            console.print(f"  [italic dim]{step['insight']}[/italic dim]")
+
+            if mode == "walkthrough":
+                console.print()
+                time.sleep(0.4)
+            else:
+                time.sleep(0.2)
+
+    console.print()
+    table = Table(title="Session Summary", box=box.SIMPLE_HEAVY)
+    table.add_column("Step", style="dim", width=6)
+    table.add_column("Target", style="cyan")
+    table.add_column("Outcome")
+    table.add_column("ms", style="dim", width=6)
+    for r in results:
+        table.add_row(str(r["step"]), r["target"], r["outcome"], r["ms"])
+    console.print(table)
+    console.print()
+    console.print(f"[dim]Dashboard (policies): http://localhost:3000/policies[/dim]")
+    console.print()
+
+
 def dispatch(name: str, token: str, mode: str = "walkthrough") -> None:
     scenario = SCENARIOS[name]
     kind = scenario["kind"]
@@ -373,5 +439,7 @@ def dispatch(name: str, token: str, mode: str = "walkthrough") -> None:
         asyncio.run(_run_admission_scan(scenario, token, mode))
     elif kind == "mcp_gateway":
         asyncio.run(_run_mcp_gateway(scenario, token, mode))
+    elif kind == "nl_policy_draft":
+        asyncio.run(_run_nl_policy_draft(scenario, token, mode))
     else:
         raise ValueError(f"Unknown demo kind: {kind!r}")

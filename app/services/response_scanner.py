@@ -3,12 +3,29 @@
 (enterprise/mcp_gateway/main.py). Wraps agent_os.mcp_response_scanner.
 MCPResponseScanner, which was previously only wired into the gateway --
 the direct SDK path never scanned tool output at all before this task.
+
+Also runs the OWASP Agent Memory Guard adapter (ASI06) for memory-write
+tool calls, gated by is_memory_write(tool_name) — enterprise/ is optional
+(see app/main.py's ImportError-guarded enterprise router imports), so this
+falls back to a no-op adapter when it isn't installed.
 """
+from dataclasses import replace
 from typing import Any
 
-from agent_os.mcp_response_scanner import MCPResponseScanner
+from agent_os.mcp_response_scanner import MCPResponseScanner, MCPResponseThreat
 
 _scanner = MCPResponseScanner()
+
+try:
+    from enterprise.app.services.memory_guard.memory_guard_adapter import (
+        MemoryGuardAdapter,
+        is_memory_write,
+    )
+    _memory_guard_adapter = MemoryGuardAdapter()
+except ImportError:
+    def is_memory_write(tool_name: str) -> bool:
+        return False
+    _memory_guard_adapter = None
 
 
 def extract_response_text(response: Any) -> str:
@@ -30,4 +47,16 @@ def extract_response_text(response: Any) -> str:
 
 
 def scan_tool_response(response: Any, tool_name: str):
-    return _scanner.scan_response(extract_response_text(response), tool_name)
+    text = extract_response_text(response)
+    result = _scanner.scan_response(text, tool_name)
+
+    if _memory_guard_adapter is not None and is_memory_write(tool_name):
+        findings = _memory_guard_adapter.scan(tool_name, {"content": text})
+        if findings:
+            memory_threats = [
+                MCPResponseThreat(category=f.rule_id, description=f.message, matched_pattern=None, details=f.raw)
+                for f in findings
+            ]
+            result = replace(result, is_safe=False, threats=[*result.threats, *memory_threats])
+
+    return result

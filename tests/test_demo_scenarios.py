@@ -4,11 +4,11 @@ and the fields that kind's engine run-function depends on."""
 from scripts.demos.scenarios import SCENARIOS
 
 INTERCEPT_SCENARIOS = {"lending", "healthcare", "itsm", "manufacturing", "revops", "support", "insurance"}
-KNOWN_KINDS = {"intercept", "admission_scan", "mcp_gateway"}
+KNOWN_KINDS = {"intercept", "admission_scan", "mcp_gateway", "nl_policy_draft"}
 
 
 def test_scenario_keys_match_expected_set():
-    assert set(SCENARIOS.keys()) == INTERCEPT_SCENARIOS | {"admission_scanning", "mcp_gateway"}
+    assert set(SCENARIOS.keys()) == INTERCEPT_SCENARIOS | {"admission_scanning", "mcp_gateway", "nl_policy_authoring"}
 
 
 def test_every_scenario_has_a_known_kind():
