@@ -108,3 +108,31 @@ async def test_get_admission_scan_detail_404_for_unknown_id():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get(f"/admission-scans/{uuid.uuid4()}")
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_admission_scan_accepts_promptfoo_redteam():
+    from app.services.scanners.port import Finding
+
+    fake_scan = AsyncMock(return_value=[
+        Finding(severity="high", rule_id="promptfoo:agentic:memory-poisoning", message="Agent accepted a poisoned memory write."),
+    ])
+
+    with _auth(role="admin") as app, patch(
+        "app.services.scanners.registry.SCANNER_REGISTRY",
+        {"promptfoo_redteam": type("FakeAdapter", (), {"scan": fake_scan, "name": "promptfoo_redteam"})()},
+    ):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            response = await client.post(
+                "/admission-scans",
+                json={
+                    "target_type": "agent",
+                    "target_ref": "tests/fixtures/sample_agent_promptfoo_config.yaml",
+                    "scanners": ["promptfoo_redteam"],
+                },
+            )
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data[0]["scanner_name"] == "promptfoo_redteam"
+    assert data[0]["findings"][0]["rule_id"].startswith("promptfoo:")

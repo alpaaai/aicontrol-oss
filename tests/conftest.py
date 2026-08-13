@@ -113,18 +113,26 @@ async def _cleanup_test_agents():
         await session.commit()
 
 
+_ADMISSION_SCAN_TEST_TARGET_REFS = (
+    "/some/skill",
+    "tests/fixtures/sample_agent_promptfoo_config.yaml",
+)
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _cleanup_test_admission_scans():
     """Session setup + teardown: remove admission_scans rows created by
-    test_admission_scans_api.py (target_ref='/some/skill') so they don't
-    accumulate across pytest runs."""
+    test_admission_scans_api.py and test_promptfoo_redteam_adapter.py's
+    router test so they don't accumulate across pytest runs."""
     from app.models.database import async_session_factory
     async with async_session_factory() as session:
-        await session.execute(text("DELETE FROM admission_scans WHERE target_ref = '/some/skill'"))
+        for target_ref in _ADMISSION_SCAN_TEST_TARGET_REFS:
+            await session.execute(text("DELETE FROM admission_scans WHERE target_ref = :ref"), {"ref": target_ref})
         await session.commit()
     yield
     async with async_session_factory() as session:
-        await session.execute(text("DELETE FROM admission_scans WHERE target_ref = '/some/skill'"))
+        for target_ref in _ADMISSION_SCAN_TEST_TARGET_REFS:
+            await session.execute(text("DELETE FROM admission_scans WHERE target_ref = :ref"), {"ref": target_ref})
         await session.commit()
 
 
