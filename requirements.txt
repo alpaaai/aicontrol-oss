@@ -46,3 +46,6 @@ agent-governance-toolkit-core==4.1.0
 
 # Enterprise scanners (in-process — no heavy/conflicting transitive deps)
 agent-memory-guard==0.3.0
+
+# Cloud discovery (WS-G)
+boto3

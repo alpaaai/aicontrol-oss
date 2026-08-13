@@ -12,6 +12,8 @@ import app.models.schemas
 import app.models.policy_warning
 import app.models.user
 import app.models.mcp_server
+import app.models.discovered_agent
+import app.models.audit_export_config
 
 # enterprise/ is proprietary and physically absent from the public OSS
 # mirror — only needed here for `alembic revision --autogenerate` to see
