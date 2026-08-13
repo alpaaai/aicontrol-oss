@@ -1,0 +1,8 @@
+description: AIControl demo agent — Promptfoo agentic memory-poisoning / hijacking red-team
+targets:
+  - id: file://scripts/demos/promptfoo_target_provider.py
+redteam:
+  plugins:
+    - agentic:memory-poisoning
+    - hijacking
+  numTests: 5
