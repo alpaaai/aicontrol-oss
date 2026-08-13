@@ -95,3 +95,26 @@ async def test_patch_review_already_resolved_returns_409(human_admin_token, fres
 
     assert second.status_code == 409
     assert second.json()["detail"] == "Review already resolved"
+
+
+@pytest.mark.asyncio
+async def test_action_review_never_persists_dashboard_placeholder(human_admin_token, fresh_pending_review):
+    """action_review must capture the authenticated human's real identity
+    (the JWT's email claim) rather than hardcoding the string 'dashboard' --
+    confirmed bug at app/routers/reviews.py, review.reviewer = "dashboard"."""
+    review_id = fresh_pending_review
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.patch(
+            f"/reviews/{review_id}",
+            json={"action": "approve", "note": "Looks fine"},
+            headers={"Authorization": f"Bearer {human_admin_token}"},
+        )
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "approved"
+
+    async with async_session_factory() as session:
+        row = (await session.execute(
+            text("SELECT reviewer FROM hitl_reviews WHERE id = :id"), {"id": str(review_id)}
+        )).mappings().one()
+        assert row["reviewer"] != "dashboard"
+        assert row["reviewer"] == "test_human@aicontrol.dev"

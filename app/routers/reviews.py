@@ -113,7 +113,7 @@ class ReviewActionBody(BaseModel):
 async def action_review(
     review_id: UUID,
     body: ReviewActionBody,
-    _=Depends(require_human),
+    human: dict = Depends(require_human),
     _license=Depends(require_enterprise_license),
 ):
     async with async_session_factory() as session:
@@ -127,7 +127,7 @@ async def action_review(
         review.status = "approved" if body.action == "approve" else "denied"
         review.review_note = body.note
         review.reviewed_at = datetime.utcnow()
-        review.reviewer = "dashboard"
+        review.reviewer = human.get("email", "unknown")
         await session.commit()
         await session.refresh(review)
     return {
