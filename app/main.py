@@ -39,11 +39,13 @@ try:
     from enterprise.app.routers.warnings import router as warnings_router
     from enterprise.app.routers.mcp_servers import router as mcp_servers_router
     from enterprise.compliance.router import router as compliance_router
+    from enterprise.app.routers.policy_authoring import router as policy_authoring_router
     from enterprise.app.services.drift_detector import DriftDetector
 except ImportError:
     warnings_router = None
     mcp_servers_router = None
     compliance_router = None
+    policy_authoring_router = None
     DriftDetector = None
 
 configure_logging(env=_settings.app_env)
@@ -135,6 +137,8 @@ if mcp_servers_router is not None:
     app.include_router(mcp_servers_router)
 if compliance_router is not None:
     app.include_router(compliance_router)
+if policy_authoring_router is not None:
+    app.include_router(policy_authoring_router)
 
 
 @app.get("/health")
