@@ -44,3 +44,24 @@ def test_scan_tool_response_flags_unsafe_when_memory_guard_finds_something(monke
 
     assert result.is_safe is False
     assert any(t.category == "memory_guard:prompt_injection" for t in result.threats)
+
+
+def test_scan_tool_response_skips_memory_guard_without_enterprise_license(monkeypatch):
+    """Self-critique finding: Memory Guard previously ran on every
+    /intercept call regardless of license tier -- enterprise/ being
+    importable was the only gate. Must also check the license plan."""
+    from unittest.mock import MagicMock
+
+    called = {}
+
+    def fake_scan(tool_name, payload):
+        called["tool_name"] = tool_name
+        return []
+
+    monkeypatch.setattr("app.services.response_scanner._memory_guard_adapter.scan", fake_scan)
+    monkeypatch.setattr(
+        "app.services.response_scanner.get_license_info",
+        lambda: MagicMock(is_enterprise=False),
+    )
+    scan_tool_response({"content": [{"type": "text", "text": "ok"}]}, tool_name="save_memory")
+    assert called == {}

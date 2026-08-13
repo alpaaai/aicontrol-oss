@@ -66,6 +66,81 @@ async def test_on_tool_start_propagates_policy_denied():
 
 
 @pytest.mark.asyncio
+async def test_denied_tool_call_is_actually_blocked_through_real_callback_manager():
+    """LangChain's CallbackManager swallows exceptions raised from
+    on_tool_start unless the handler opts in via raise_error=True
+    (confirmed against installed langchain_core.callbacks.manager source:
+    _ahandle_event_for_handler only re-raises `if handler.raise_error`).
+    Calling handler.on_tool_start(...) directly (as the other tests in this
+    file do) never exercises that swallow path -- it only proves the
+    handler method itself raises. This test goes through a real
+    AsyncCallbackManager, which is what LangGraph/LangChain's tool
+    execution actually calls, to prove the deny genuinely aborts."""
+    from langchain_core.tools import tool
+
+    from aicontrol_sdk.adapters.langgraph_adapter import LangGraphAdapter
+    from aicontrol_sdk.exceptions import PolicyDeniedError
+
+    client = AsyncMock()
+    client.intercept = AsyncMock(side_effect=PolicyDeniedError(reason="tool_denylisted"))
+
+    adapter = LangGraphAdapter()
+    adapter.patch(client)
+    handler = adapter.build_callback_handler(session_id="s1")
+
+    executed = {"ran": False}
+
+    @tool
+    async def dangerous_tool(x: str) -> str:
+        """A dangerous tool."""
+        executed["ran"] = True
+        return f"EXECUTED: {x}"
+
+    with pytest.raises(PolicyDeniedError):
+        await dangerous_tool.ainvoke(
+            {"x": "hello"}, config={"callbacks": [handler]}
+        )
+
+    assert executed["ran"] is False
+
+
+@pytest.mark.asyncio
+async def test_sync_defined_tool_deny_is_not_actually_blocked_known_langchain_limitation():
+    """Documents a real gap, not a bug in this adapter: LangChain's SYNC
+    CallbackManager path (used when a tool only implements _run, not
+    _arun) queues on_tool_start's coroutine and runs it later via
+    _run_coros, whose exceptions are swallowed unconditionally --
+    raise_error=True has no effect there (see langgraph_adapter.py's
+    module docstring). If a future LangChain release fixes this asymmetry,
+    this test will start failing (executed will be True... would become
+    False), which is the intended signal to revisit the docstring."""
+    from langchain_core.tools import tool
+
+    from aicontrol_sdk.adapters.langgraph_adapter import LangGraphAdapter
+    from aicontrol_sdk.exceptions import PolicyDeniedError
+
+    client = AsyncMock()
+    client.intercept = AsyncMock(side_effect=PolicyDeniedError(reason="tool_denylisted"))
+
+    adapter = LangGraphAdapter()
+    adapter.patch(client)
+    handler = adapter.build_callback_handler(session_id="s1")
+
+    executed = {"ran": False}
+
+    @tool
+    def dangerous_sync_tool(x: str) -> str:
+        """A dangerous tool, defined synchronously."""
+        executed["ran"] = True
+        return f"EXECUTED: {x}"
+
+    # No pytest.raises here -- the deny is silently swallowed for a sync tool.
+    await dangerous_sync_tool.ainvoke({"x": "hello"}, config={"callbacks": [handler]})
+
+    assert executed["ran"] is True  # confirms the known limitation, not a desired outcome
+
+
+@pytest.mark.asyncio
 async def test_on_tool_end_correlates_tool_name_via_run_id():
     """on_tool_end's real BaseCallbackHandler signature carries no tool name or
     serialized dict, only run_id/output -- unlike on_tool_start. Confirmed by

@@ -5,14 +5,21 @@ MCPResponseScanner, which was previously only wired into the gateway --
 the direct SDK path never scanned tool output at all before this task.
 
 Also runs the OWASP Agent Memory Guard adapter (ASI06) for memory-write
-tool calls, gated by is_memory_write(tool_name) — enterprise/ is optional
-(see app/main.py's ImportError-guarded enterprise router imports), so this
-falls back to a no-op adapter when it isn't installed.
+tool calls, gated by is_memory_write(tool_name) AND an enterprise license
+check — enterprise/ is optional (see app/main.py's ImportError-guarded
+enterprise router imports), so this falls back to a no-op adapter when
+it isn't installed. The license check is separate from the import check:
+self-critique found this previously ran unconditionally on every
+/intercept call whenever enterprise/ happened to be importable, with no
+regard for license tier, unlike every other enterprise call-through in
+this codebase.
 """
 from dataclasses import replace
 from typing import Any
 
 from agent_os.mcp_response_scanner import MCPResponseScanner, MCPResponseThreat
+
+from app.core.license_gate import get_license_info
 
 _scanner = MCPResponseScanner()
 
@@ -50,7 +57,7 @@ def scan_tool_response(response: Any, tool_name: str):
     text = extract_response_text(response)
     result = _scanner.scan_response(text, tool_name)
 
-    if _memory_guard_adapter is not None and is_memory_write(tool_name):
+    if _memory_guard_adapter is not None and is_memory_write(tool_name) and get_license_info().is_enterprise:
         findings = _memory_guard_adapter.scan(tool_name, {"content": text})
         if findings:
             memory_threats = [
