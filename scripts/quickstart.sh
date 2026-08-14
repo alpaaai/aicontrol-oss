@@ -89,6 +89,6 @@ else
   echo "     Then: docker compose $COMPOSE build frontend && docker compose $COMPOSE up -d"
 fi
 echo ""
-echo "  Full demo walkthrough: scripts/demos/demo-walkthrough-v2.md"
+echo "  Full demo walkthrough: scripts/demos/demo-walkthrough-workato-fde.md"
 echo "  Docs: https://aictl.io/docs"
 echo ""

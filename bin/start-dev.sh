@@ -18,8 +18,8 @@ fi
 source venv/bin/activate
 export PYTHONPATH="$REPO_ROOT"
 
-SKILL_SCANNER_BIN="$REPO_ROOT/.scanner-venvs/skill-scanner/bin/skill-scanner"
-MCP_SCANNER_BIN="$REPO_ROOT/.scanner-venvs/mcp-scanner/bin/mcp-scanner"
+SKILL_SCANNER_BIN="$HOME/scanner-venvs/skill-scanner/bin/skill-scanner"
+MCP_SCANNER_BIN="$HOME/scanner-venvs/mcp-scanner/bin/mcp-scanner"
 if [[ -x "$SKILL_SCANNER_BIN" ]]; then
   export SKILL_SCANNER_BINARY_PATH="$SKILL_SCANNER_BIN"
 else
@@ -56,11 +56,7 @@ echo "==> Starting dashboard on :3000"
 PIDS+=("$!")
 
 echo "==> Starting demo fixture servers on :8901 :8902 :8903"
-python3 docs/demos/fixtures/mcp_server_malicious.py &
-PIDS+=("$!")
-python3 docs/demos/fixtures/mcp_server_benign.py &
-PIDS+=("$!")
-python3 docs/demos/fixtures/gateway_downstream_stub.py &
+python3 -m scripts.demos.fixture_servers start &
 PIDS+=("$!")
 
 echo ""
