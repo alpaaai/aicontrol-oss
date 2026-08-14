@@ -7,7 +7,9 @@ matching run function in engine.py.
 import os
 
 _repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-_FIXTURES = os.path.join(_repo_root, "docs", "demos", "fixtures")
+# docs/ is gitignored project-wide (see .gitignore) -- fixtures must live
+# somewhere tracked or they vanish on a fresh clone, breaking the demo.
+_FIXTURES = os.path.join(_repo_root, "scripts", "demos", "fixtures")
 
 SCENARIOS = {
     "lending": {

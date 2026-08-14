@@ -6,13 +6,45 @@ Usage:
 import asyncio
 from sqlalchemy import text
 from app.models.database import async_session_factory
+from scripts.seed import AGENTS
 
 AGENT_ID = "00000000-0000-0000-0000-000000000001"
 SESSION_ID = "00000000-0000-0000-0000-000000000002"
 
+ALL_AGENT_IDS = [a["id"] for a in AGENTS]
+DEMO_MCP_SERVER_NAMES = ["vendor-invoice-mcp", "claims-status-mcp", "claims-tool-server"]
+
 
 async def reset():
     async with async_session_factory() as session:
+        # Clear every seeded demo agent's sessions (not just AGENT_ID) -- a
+        # demo touching multiple industries must not leave prior runs' audit
+        # trail behind for any of them.
+        await session.execute(
+            text("DELETE FROM hitl_reviews WHERE session_id IN "
+                 "(SELECT id FROM sessions WHERE agent_id = ANY(:ids))"),
+            {"ids": ALL_AGENT_IDS},
+        )
+        await session.execute(
+            text("DELETE FROM audit_events WHERE session_id IN "
+                 "(SELECT id FROM sessions WHERE agent_id = ANY(:ids))"),
+            {"ids": ALL_AGENT_IDS},
+        )
+        await session.execute(
+            text("DELETE FROM sessions WHERE agent_id = ANY(:ids)"),
+            {"ids": ALL_AGENT_IDS},
+        )
+
+        # admission_scans only ever holds demo data on this deployment.
+        await session.execute(text("DELETE FROM admission_scans"))
+
+        # MCP servers registered by the admission_scanning / mcp_gateway
+        # demo scenarios -- no UI exists to dedupe these from.
+        await session.execute(
+            text("DELETE FROM mcp_servers WHERE name = ANY(:names)"),
+            {"names": DEMO_MCP_SERVER_NAMES},
+        )
+
         # Clear in FK-safe order, scoped to this demo agent only
         await session.execute(
             text("DELETE FROM hitl_reviews WHERE session_id IN "
