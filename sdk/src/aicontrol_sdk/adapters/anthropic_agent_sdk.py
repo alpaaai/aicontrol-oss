@@ -9,11 +9,18 @@ import itertools
 from typing import Any
 
 from aicontrol_sdk.exceptions import AIControlUnavailableError, PolicyDeniedError, ReviewPendingError
+from aicontrol_sdk.adapters.base import CoverageReporting, WorkflowResolution
 from aicontrol_sdk.intercept_client import InterceptClient
 
 
-class AnthropicAgentSDKAdapter:
+class AnthropicAgentSDKAdapter(WorkflowResolution, CoverageReporting):
     name = "anthropic"
+    hook = "HookMatcher.PreToolUse"
+
+    # _framework_workflow stays None here by design, not by oversight: the
+    # Claude Agent SDK has no run-level process name -- the agent
+    # configuration *is* the unit of work. The declared workflow is the whole
+    # answer for this framework.
 
     def is_available(self) -> bool:
         try:
@@ -22,7 +29,8 @@ class AnthropicAgentSDKAdapter:
         except ImportError:
             return False
 
-    def patch(self, client: InterceptClient) -> None:
+    def patch(self, client: InterceptClient, workflow: str | None = None,
+              target: Any = None) -> None:
         """Monkeypatch ClaudeAgentOptions.__init__ so any options instance
         constructed after this call automatically has AIControl's PreToolUse
         HookMatcher registered. Callers who already add their own PreToolUse
@@ -35,6 +43,7 @@ class AnthropicAgentSDKAdapter:
         following tool call, same as the other two adapters' model-call
         hooks -- see _wrap_message_stream()."""
         self._client = client
+        self._declared_workflow = workflow
         self._usage_accumulators: dict[str, dict] = {}
         import claude_agent_sdk
         from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient
@@ -71,6 +80,10 @@ class AnthropicAgentSDKAdapter:
         ClaudeAgentOptions.__init__ = patched_init
         ClaudeSDKClient.receive_messages = patched_receive_messages
         claude_agent_sdk.query = patched_query
+
+        # `target`, when given, is a ClaudeAgentOptions instance -- the object
+        # whose allowed_tools would shadow a can_use_tool callback.
+        self.report_coverage(client, target=target)
 
     async def _wrap_message_stream(self, message_stream):
         """Taps AssistantMessage.usage off an async iterator of SDK messages,
@@ -127,6 +140,7 @@ class AnthropicAgentSDKAdapter:
                     tool_parameters=input_data.get("tool_input", {}),
                     session_id=session_id,
                     sequence_number=next(counter),
+                    workflow=self.resolve_workflow(),
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                 )

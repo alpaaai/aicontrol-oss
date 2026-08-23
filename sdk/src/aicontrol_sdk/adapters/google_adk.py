@@ -8,11 +8,13 @@ import itertools
 from typing import Any, Optional
 
 from aicontrol_sdk.exceptions import AIControlUnavailableError, PolicyDeniedError, ReviewPendingError
+from aicontrol_sdk.adapters.base import CoverageReporting, WorkflowResolution
 from aicontrol_sdk.intercept_client import InterceptClient
 
 
-class GoogleADKAdapter:
+class GoogleADKAdapter(WorkflowResolution, CoverageReporting):
     name = "google_adk"
+    hook = "BasePlugin.before_tool_callback"
 
     def is_available(self) -> bool:
         try:
@@ -21,12 +23,14 @@ class GoogleADKAdapter:
         except ImportError:
             return False
 
-    def patch(self, client: InterceptClient) -> None:
+    def patch(self, client: InterceptClient, workflow: str | None = None,
+              target: Any = None) -> None:
         """Monkeypatch google.adk.runners.Runner.__init__ so any Runner
         constructed after this call automatically has AIControl's plugin
         registered. Callers who already pass their own plugins list keep it
         too. Idempotent -- a second patch() call is a no-op."""
         self._client = client
+        self._declared_workflow = workflow
         from google.adk.runners import Runner
 
         # Always wrap the TRUE original __init__ (captured once, on the first
@@ -46,6 +50,16 @@ class GoogleADKAdapter:
             original_init(self_, *args, **kwargs)
 
         Runner.__init__ = patched_init
+
+        self.report_coverage(client, target=target)
+
+    def capture_framework_workflow(self, context: Any) -> None:
+        """ADK carries `app_name` on the tool/callback context. It names the
+        application the agent runs inside, which is the framework's own unit
+        of business process."""
+        name = getattr(context, "app_name", None)
+        if name:
+            self._framework_workflow = name
 
     def build_plugin(self):
         """Build a BasePlugin subclass instance to pass to the ADK Runner's plugins list."""
@@ -86,12 +100,16 @@ class GoogleADKAdapter:
                 output_tokens = acc["output_tokens"] or None
                 acc["input_tokens"] = 0
                 acc["output_tokens"] = 0
+                # app_name is ADK's own name for the running application --
+                # the closest thing the framework has to a business process.
+                self.capture_framework_workflow(tool_context)
                 try:
                     await client.intercept(
                         tool_name=getattr(tool, "name", str(tool)),
                         tool_parameters=tool_args or {},
                         session_id=session_id,
                         sequence_number=next(counter),
+                        workflow=self.resolve_workflow(),
                         input_tokens=input_tokens,
                         output_tokens=output_tokens,
                     )

@@ -70,6 +70,7 @@ class WalShipper:
                         tool_parameters=line.get("tool_parameters"),
                         decision=line["decision"],
                         decision_reason=line["decision_reason"],
+                        workflow=line.get("workflow"),
                         sequence_number=line["sequence_number"],
                         duration_ms=line["duration_ms"],
                         policy_id=uuid.UUID(line["policy_id"]) if line.get("policy_id") else None,

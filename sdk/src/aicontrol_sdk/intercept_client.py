@@ -1,4 +1,5 @@
 """httpx client for POST /intercept, with fail-open/closed handling."""
+import logging
 import uuid
 from typing import Any, Optional
 
@@ -8,6 +9,8 @@ from aicontrol_sdk.config import Config
 from aicontrol_sdk.exceptions import (
     AIControlUnavailableError, PolicyDeniedError, ReviewPendingError, UnknownDecisionError,
 )
+
+logger = logging.getLogger("aicontrol_sdk.intercept_client")
 
 
 class InterceptClient:
@@ -21,6 +24,7 @@ class InterceptClient:
         tool_parameters: dict[str, Any],
         session_id: str,
         sequence_number: int,
+        workflow: str = "unassigned",
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
         cost_usd: Optional[float] = None,
@@ -37,6 +41,7 @@ class InterceptClient:
             "tool_name": tool_name,
             "tool_parameters": tool_parameters,
             "sequence_number": sequence_number,
+            "workflow": workflow,
         }
         if input_tokens is not None:
             body["input_tokens"] = input_tokens
@@ -67,6 +72,34 @@ class InterceptClient:
         if decision == "review":
             raise ReviewPendingError(review_id=result["review_id"])
         raise UnknownDecisionError(decision=decision)
+
+    def report_coverage(
+        self, *, framework: str, hook: str, sdk_version: str,
+        workflow: str, agent_name: Optional[str], silent_noop_warnings: list[str],
+    ) -> None:
+        """Fire-and-forget install-time handshake. Synchronous because patch()
+        is: adapters bind at import time, where there is no running loop to
+        schedule onto. Never raises -- a governance library must not take the
+        host application down because the control plane was briefly
+        unreachable at import time."""
+        try:
+            httpx.post(
+                f"{self._config.url}/agents/{self._config.agent_id}/coverage",
+                headers={"Authorization": f"Bearer {self._config.token}"},
+                json={
+                    "framework": framework,
+                    "hook": hook,
+                    "sdk_version": sdk_version,
+                    "workflow": workflow,
+                    "agent_name": agent_name,
+                    "silent_noop_warnings": silent_noop_warnings,
+                },
+                timeout=2.0,
+            )
+        except Exception:
+            # Deliberately broad: any failure here is a reporting failure, and
+            # reporting must never be able to break the application it reports on.
+            logger.warning("coverage_handshake_failed framework=%s", framework)
 
     async def report_response(
         self, tool_name: str, tool_response: Any, session_id: str, sequence_number: int,

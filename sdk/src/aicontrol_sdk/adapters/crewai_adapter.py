@@ -36,6 +36,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
+from aicontrol_sdk.adapters.base import CoverageReporting, WorkflowResolution
 from aicontrol_sdk.exceptions import PolicyDeniedError, ReviewPendingError
 from aicontrol_sdk.intercept_client import InterceptClient
 
@@ -49,8 +50,9 @@ def _run_sync(coro):
         return pool.submit(asyncio.run, coro).result()
 
 
-class CrewAIAdapter:
+class CrewAIAdapter(WorkflowResolution, CoverageReporting):
     name = "crewai"
+    hook = "crewai.hooks.before_tool_call"
 
     def is_available(self) -> bool:
         try:
@@ -59,30 +61,81 @@ class CrewAIAdapter:
         except ImportError:
             return False
 
-    def patch(self, client: InterceptClient) -> None:
+    def patch(self, client: InterceptClient, workflow: str | None = None,
+              target: Any = None) -> None:
         """Registers process-global before/after tool-call hooks. Idempotent --
         a second patch() call does not double-register."""
         from crewai.hooks import register_after_tool_call_hook, register_before_tool_call_hook
 
         self._client = client
-        self._session_id = str(uuid.uuid4())
+        self._declared_workflow = workflow
+        # Not assigned here: a session id fixed at patch() time makes every
+        # run of a long-lived adapter share one session, which reads as a
+        # single endless conversation. It is minted per kickoff instead.
+        self._session_id = None
         self._counter = itertools.count(1)
 
         if getattr(self, "_registered", False):
+            self.report_coverage(client, target=target)
             return
         register_before_tool_call_hook(self.on_before_tool_call)
         register_after_tool_call_hook(self.on_after_tool_call)
+        self._subscribe_to_kickoff()
         self._registered = True
+        self.report_coverage(client, target=target)
+
+    def _subscribe_to_kickoff(self) -> None:
+        """CrewAI exposes no per-run conversation id, so one is generated --
+        but per kickoff. CrewKickoffStartedEvent is the only boundary the
+        framework publishes; without it every run of one adapter instance
+        would share a session."""
+        try:
+            from crewai.events import CrewKickoffStartedEvent, crewai_event_bus
+        except ImportError:  # older crewai without the events package
+            return
+
+        adapter = self
+
+        @crewai_event_bus.on(CrewKickoffStartedEvent)
+        def _on_kickoff(source, event) -> None:  # noqa: ARG001
+            adapter.start_kickoff()
+
+    def new_session_id(self) -> str:
+        return str(uuid.uuid4())
+
+    def start_kickoff(self) -> None:
+        """Begin a new session. Called on CrewKickoffStartedEvent."""
+        self._session_id = self.new_session_id()
+        self._counter = itertools.count(1)
+
+    def current_session_id(self) -> str:
+        """The session every tool call in the current kickoff reports under.
+        Minted lazily so a tool call that arrives without a kickoff event
+        (a directly-executed agent, say) still lands in one session."""
+        if getattr(self, "_session_id", None) is None:
+            self._session_id = self.new_session_id()
+        return self._session_id
+
+    def capture_framework_workflow(self, context: Any) -> None:
+        """CrewAI's own name for a process is the crew's name. The hook
+        context carries the crew when one is running; a crew constructed
+        without a name has none, and the declared workflow is used."""
+        crew = getattr(context, "crew", None)
+        name = getattr(crew, "name", None)
+        if name:
+            self._framework_workflow = name
 
     def on_before_tool_call(self, context: Any) -> bool | None:
         """A before_tool_call hook: return False to block execution, None to
         allow it. context.tool_input is the mutable dict of tool arguments."""
+        self.capture_framework_workflow(context)
         try:
             _run_sync(self._client.intercept(
                 tool_name=context.tool_name,
                 tool_parameters=dict(context.tool_input or {}),
-                session_id=self._session_id,
+                session_id=self.current_session_id(),
                 sequence_number=next(self._counter),
+                workflow=self.resolve_workflow(),
             ))
         except (PolicyDeniedError, ReviewPendingError):
             return False
@@ -95,7 +148,7 @@ class CrewAIAdapter:
         _run_sync(self._client.report_response(
             tool_name=context.tool_name,
             tool_response=context.raw_tool_result,
-            session_id=self._session_id,
+            session_id=self.current_session_id(),
             sequence_number=0,
         ))
         return None

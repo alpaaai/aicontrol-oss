@@ -6,13 +6,19 @@ raising PolicyDeniedError/ReviewPendingError directly from on_tool_start,
 which aborts the run before the tool executes.
 """
 import itertools
+import logging
+import uuid
 from typing import Any
 
+from aicontrol_sdk.adapters.base import CoverageReporting, WorkflowResolution
 from aicontrol_sdk.intercept_client import InterceptClient
 
+logger = logging.getLogger("aicontrol_sdk.openai_agents")
 
-class OpenAIAgentsSDKAdapter:
+
+class OpenAIAgentsSDKAdapter(WorkflowResolution, CoverageReporting):
     name = "openai_agents"
+    hook = "RunHooks.on_tool_start"
 
     def is_available(self) -> bool:
         try:
@@ -21,13 +27,14 @@ class OpenAIAgentsSDKAdapter:
         except ImportError:
             return False
 
-    def patch(self, client: InterceptClient) -> None:
+    def patch(self, client: InterceptClient, workflow: str | None = None,
+              target: Any = None) -> None:
         """Monkeypatch agents.Runner.run/run_sync/run_streamed so any call that
         doesn't explicitly pass its own hooks= gets AIControl's hooks injected
         automatically. Callers who pass their own hooks= are left untouched.
         Idempotent -- a second patch() call is a no-op."""
         self._client = client
-        import uuid
+        self._declared_workflow = workflow
         import agents
 
         # Always wrap the TRUE originals (captured once, on the first patch()
@@ -45,23 +52,64 @@ class OpenAIAgentsSDKAdapter:
         original_run_streamed = agents.Runner._aicontrol_original_run_streamed
 
         async def patched_run(cls, *args, **kwargs):
+            run_config = kwargs.get("run_config")
+            adapter.capture_framework_workflow(run_config)
             if kwargs.get("hooks") is None:
-                kwargs["hooks"] = adapter.build_hooks(session_id=str(uuid.uuid4()))
+                kwargs["hooks"] = adapter.build_hooks(
+                    session_id=adapter.session_id_from_run_config(run_config)
+                )
             return await original_run(cls, *args, **kwargs)
 
         def patched_run_sync(cls, *args, **kwargs):
+            run_config = kwargs.get("run_config")
+            adapter.capture_framework_workflow(run_config)
             if kwargs.get("hooks") is None:
-                kwargs["hooks"] = adapter.build_hooks(session_id=str(uuid.uuid4()))
+                kwargs["hooks"] = adapter.build_hooks(
+                    session_id=adapter.session_id_from_run_config(run_config)
+                )
             return original_run_sync(cls, *args, **kwargs)
 
         def patched_run_streamed(cls, *args, **kwargs):
+            run_config = kwargs.get("run_config")
+            adapter.capture_framework_workflow(run_config)
             if kwargs.get("hooks") is None:
-                kwargs["hooks"] = adapter.build_hooks(session_id=str(uuid.uuid4()))
+                kwargs["hooks"] = adapter.build_hooks(
+                    session_id=adapter.session_id_from_run_config(run_config)
+                )
             return original_run_streamed(cls, *args, **kwargs)
 
         agents.Runner.run = classmethod(patched_run)
         agents.Runner.run_sync = classmethod(patched_run_sync)
         agents.Runner.run_streamed = classmethod(patched_run_streamed)
+
+        self.report_coverage(client, target=target)
+
+    def resolve_session_id(self, *, group_id: str | None, trace_id: str | None) -> str:
+        """group_id is the conversation, trace_id the single run. Prefer the
+        conversation so multi-turn work groups under one session. A generated
+        id means the SDK gave us neither, which is worth knowing about --
+        every call in that run lands under an id no one else can correlate."""
+        if group_id:
+            return group_id
+        if trace_id:
+            return trace_id
+        logger.warning("openai_session_id_generated_no_framework_id")
+        return str(uuid.uuid4())
+
+    def session_id_from_run_config(self, run_config: Any) -> str:
+        return self.resolve_session_id(
+            group_id=getattr(run_config, "group_id", None),
+            trace_id=getattr(run_config, "trace_id", None),
+        )
+
+    def capture_framework_workflow(self, run_config: Any) -> None:
+        """RunConfig.workflow_name is the SDK's own name for the run -- the
+        same string that names the trace. It defaults to "Agent workflow",
+        which names nothing, so that value is treated as absent and the
+        declared workflow is used instead."""
+        name = getattr(run_config, "workflow_name", None)
+        if name and name != "Agent workflow":
+            self._framework_workflow = name
 
     def build_hooks(self, session_id: str):
         """Build a RunHooks instance to pass as `Runner.run(..., hooks=...)`.
@@ -105,6 +153,7 @@ class OpenAIAgentsSDKAdapter:
                     tool_parameters=getattr(context, "tool_arguments", {}) or {},
                     session_id=session_id,
                     sequence_number=next(counter),
+                    workflow=self.resolve_workflow(),
                     input_tokens=input_tokens,
                     output_tokens=output_tokens,
                 )
