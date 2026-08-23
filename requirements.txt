@@ -40,5 +40,5 @@ pyyaml
 
 # MCP tool-response scanning (agent_os) -- imported unconditionally by
 # app/services/response_scanner.py, which /intercept calls on every request.
-agent-governance-toolkit-core==4.1.0
+agent-governance-toolkit-core==5.0.0
 
