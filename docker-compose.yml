@@ -15,20 +15,6 @@ services:
     networks:
       - aicontrol
 
-  opa:
-    image: openpolicyagent/opa:latest-debug
-    restart: unless-stopped
-    ports:
-      - "8181:8181"
-    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=info"]
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8181/health || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    networks:
-      - aicontrol
-
 volumes:
   pgdata:
   reports_data:

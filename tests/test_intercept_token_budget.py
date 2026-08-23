@@ -13,6 +13,12 @@ async def clean_token_budget_session():
     yield session_id
     from app.models.database import async_session_factory
     async with async_session_factory() as session:
+        # hitl_reviews.audit_event_id FKs audit_events, so the child rows go first.
+        await session.execute(text(
+            "DELETE FROM hitl_reviews WHERE audit_event_id IN "
+            "(SELECT id FROM audit_events WHERE session_id = :id)"
+        ), {"id": str(session_id)})
+        await session.execute(text("DELETE FROM hitl_reviews WHERE session_id = :id"), {"id": str(session_id)})
         await session.execute(text("DELETE FROM audit_events WHERE session_id = :id"), {"id": str(session_id)})
         await session.execute(text("DELETE FROM sessions WHERE id = :id"), {"id": str(session_id)})
         await session.commit()
@@ -26,12 +32,11 @@ async def test_intercept_denies_when_cumulative_tokens_exceed_budget(
     await client.post("/policies", headers=admin_token, json={
         "name": "test_token_budget_intercept",
         "description": "Deny after 100k cumulative tokens on expensive_llm_probe_tool",
-        "rule_type": "tool_denylist",
         "condition": {
             "blocked_tools": ["expensive_llm_probe_tool"],
             "token_budget": {"max_tokens": 100000, "window": "session", "on_exceed": "deny"},
         },
-        "action": "deny", "severity": "high", "active": True,
+        "effect": "deny", "severity": "high", "active": True,
     })
 
     resp1 = await client.post("/intercept", headers=agent_token, json={
@@ -80,7 +85,9 @@ async def test_intercept_denies_when_cumulative_tokens_exceed_budget(
         "output_tokens": 0,
     })
     assert resp3.json()["decision"] == "deny"
-    assert "token_budget_exceeded" in resp3.json()["reason"]
+    # Cedar names the matching policy; it cannot report which `when`
+    # clause fired. The reason contract is now "policy_matched:<name>".
+    assert resp3.json()["reason"] == "policy_matched:test_token_budget_intercept"
 
 
 @pytest.mark.asyncio
@@ -95,12 +102,11 @@ async def test_intercept_with_null_token_usage_degrades_gracefully(
     await client.post("/policies", headers=admin_token, json={
         "name": "test_token_budget_null_usage",
         "description": "Budget on a tool that gets called with no token data",
-        "rule_type": "tool_denylist",
         "condition": {
             "blocked_tools": ["no_token_data_probe_tool"],
             "token_budget": {"max_tokens": 100, "window": "session", "on_exceed": "deny"},
         },
-        "action": "deny", "severity": "high", "active": True,
+        "effect": "deny", "severity": "high", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": str(session_id),

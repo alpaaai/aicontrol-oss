@@ -68,14 +68,24 @@ async def build_call_counts(
     """
     counts: dict[str, int] = {}
     for policy in active_policies:
-        if policy.get("rule_type") != "rate_limit":
-            continue
+        # No rule_type dispatch: the presence of the condition key is the
+        # dispatch, and the tool binding is the policy's scope column.
         condition = policy.get("condition", {})
-        if tool_name not in condition.get("tools", []):
+        rate_limit = condition.get("rate_limit")
+        if not rate_limit:
+            continue
+        bound_tool = policy.get("action_tool")
+        if bound_tool is not None and bound_tool != tool_name:
+            continue
+        # A condition written against the old engine carries its tool list
+        # inline. Honour it as a narrowing filter -- without this, such a policy
+        # would silently widen from "these tools" to "every tool".
+        legacy_tools = condition.get("tools") or condition.get("blocked_tools")
+        if bound_tool is None and legacy_tools and tool_name not in legacy_tools:
             continue
         if tool_name in counts:
             continue
-        window = condition["rate_limit"]["window"]
+        window = rate_limit.get("window", "session")
         counts[tool_name] = await count_tool_calls_in_window(
             db, agent_id, session_id, tool_name, window
         )

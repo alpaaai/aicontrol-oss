@@ -51,7 +51,7 @@ async def test_count_invalid_window_raises():
 async def test_build_call_counts_skips_non_rate_limit_policies():
     db = make_db_mock(5)
     policies = [
-        {"rule_type": "tool_denylist", "condition": {"blocked_tools": [TOOL]}},
+        {"condition": {"blocked_tools": [TOOL]}, "action_tool": TOOL},
     ]
     result = await build_call_counts(db, AGENT_ID, SESSION_ID, TOOL, policies)
     assert result == {}
@@ -63,7 +63,6 @@ async def test_build_call_counts_returns_count_for_matching_policy():
     db = make_db_mock(10)
     policies = [
         {
-            "rule_type": "rate_limit",
             "condition": {
                 "tools": [TOOL],
                 "rate_limit": {"max_calls": 10, "window": "session"},
@@ -79,14 +78,12 @@ async def test_build_call_counts_does_not_query_twice_for_same_tool():
     db = make_db_mock(5)
     policies = [
         {
-            "rule_type": "rate_limit",
             "condition": {
                 "tools": [TOOL],
                 "rate_limit": {"max_calls": 10, "window": "session"},
             },
         },
         {
-            "rule_type": "rate_limit",
             "condition": {
                 "tools": [TOOL],
                 "rate_limit": {"max_calls": 5, "window": "session"},
@@ -103,7 +100,6 @@ async def test_build_call_counts_empty_when_tool_not_in_policy():
     db = make_db_mock(99)
     policies = [
         {
-            "rule_type": "rate_limit",
             "condition": {
                 "tools": ["send_email"],
                 "rate_limit": {"max_calls": 50, "window": "60m"},

@@ -68,10 +68,7 @@ class Policy(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    rule_type: Mapped[str] = mapped_column(String(50), nullable=False)
     condition: Mapped[dict] = mapped_column(JSONB, nullable=False)
-    action: Mapped[str] = mapped_column(String(20), nullable=False)
-    applies_to_agents: Mapped[Optional[list]] = mapped_column(JSONB, server_default="[]")
     compliance_frameworks: Mapped[Optional[list]] = mapped_column(JSONB, server_default="[]")
     severity: Mapped[Optional[str]] = mapped_column(String(20), server_default="medium")
     active: Mapped[Optional[bool]] = mapped_column(Boolean, server_default="true")
@@ -80,6 +77,24 @@ class Policy(Base):
     library: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     priority: Mapped[int] = mapped_column(Integer, nullable=False, server_default="100")
     category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+
+    # Cedar scope. principal_type is "agent" or "group"; principal_id is that
+    # agent's or group's name. Two columns rather than one string so the
+    # /intercept pre-filter can index on them. NULL action_tool means "any tool"
+    # and NULL resource_system means "any system" (Cedar scope unconstrained).
+    # effect is "deny" or "review". There is no "allow" -- that is the catch-all
+    # permit cedar_client appends to every bundle, not a policy row. cedar_text
+    # caches the compiled Cedar source so the hot path never recompiles from
+    # columns; the loader and POST/PUT /policies fill it on write.
+    # principal_type and principal_id stay nullable on purpose: NULL principal
+    # reads as "applies to every agent", which get_scoped_policies matches with
+    # an IS NULL branch rather than inventing a magic "all" group.
+    principal_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    principal_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    action_tool: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    resource_system: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    effect: Mapped[str] = mapped_column(String(20), nullable=False)
+    cedar_text: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     audit_events: Mapped[list["AuditEvent"]] = relationship(back_populates="policy")
 

@@ -3,7 +3,7 @@ import asyncio
 import json
 from sqlalchemy import text
 from app.models.database import async_session_factory
-from app.services.policy_loader import DEMO_SEEDS_DIR, load_yaml, push_rego_to_opa, upsert_policies
+from app.services.policy_loader import DEMO_SEEDS_DIR, load_yaml, upsert_policies
 
 # approved_tools: lending + healthcare agents are allowlisted (P1-1 enforcement).
 # All other agents use [] (unrestricted) — intentional contrast for future demo scenarios.
@@ -130,15 +130,17 @@ V2_POLICIES = [
             "No agent may query the credit bureau more than 2 times in a single session. "
             "Prevents bulk data extraction via repeated single-record queries."
         ),
-        "rule_type": "rate_limit",
+        "principal_type": None,
+        "principal_id": None,
+        "action_tool": "query_credit_bureau",
+        "resource_system": None,
+        "effect": "deny",
         "condition": {
-            "tools": ["query_credit_bureau"],
             "rate_limit": {
                 "window": "session",
                 "max_calls": 2,
             },
         },
-        "action": "deny",
         "severity": "high",
         "compliance_frameworks": ["GLBA", "OCC", "SOC2"],
         "active": True,
@@ -151,11 +153,12 @@ V2_POLICIES = [
             "to 'query_credit_bureau' in agent approved_tools. Policy is stale — "
             "seeded to demonstrate drift detection."
         ),
-        "rule_type": "tool_denylist",
-        "condition": {
-            "blocked_tools": ["query_credit_report_batch"],
-        },
-        "action": "deny",
+        "principal_type": None,
+        "principal_id": None,
+        "action_tool": "query_credit_report_batch",
+        "resource_system": None,
+        "effect": "deny",
+        "condition": {},
         "severity": "high",
         "compliance_frameworks": ["GLBA", "SOC2"],
         "active": True,
@@ -186,26 +189,11 @@ async def seed():
 
         await session.commit()
 
+        # Route through upsert_policies so the seeds get compiled to Cedar the
+        # same way policies.yaml does -- a raw INSERT would leave cedar_text NULL
+        # and the policy would never match anything.
+        await upsert_policies(session, V2_POLICIES)
         for policy in V2_POLICIES:
-            await session.execute(text("""
-                INSERT INTO policies
-                    (id, name, description, rule_type, condition, action,
-                     compliance_frameworks, severity, active)
-                VALUES
-                    (gen_random_uuid(), :name, :description, :rule_type,
-                     CAST(:condition AS jsonb), :action,
-                     CAST(:compliance_frameworks AS jsonb), :severity, :active)
-                ON CONFLICT (name) DO NOTHING
-            """), {
-                "name": policy["name"],
-                "description": policy["description"],
-                "rule_type": policy["rule_type"],
-                "condition": json.dumps(policy["condition"]),
-                "action": policy["action"],
-                "compliance_frameworks": json.dumps(policy["compliance_frameworks"]),
-                "severity": policy["severity"],
-                "active": policy["active"],
-            })
             print(f"Seeded policy: {policy['name']}")
 
         await session.commit()
@@ -216,8 +204,6 @@ async def seed():
             await upsert_policies(session, demo_policies)
             demo_policy_count += len(demo_policies)
             print(f"Seeded {len(demo_policies)} demo policies from {seed_file.name}")
-
-        await push_rego_to_opa()
 
         tag_count = 0
         try:

@@ -34,11 +34,15 @@ async def maybe_alert_budget_threshold(
         return
 
     for policy in active_policies:
-        if policy.get("rule_type") != "tool_denylist":
-            continue
         condition = policy.get("condition", {})
         token_budget = condition.get("token_budget")
-        if not token_budget or tool_name not in condition.get("blocked_tools", []):
+        if not token_budget:
+            continue
+        bound_tool = policy.get("action_tool")
+        if bound_tool is not None and bound_tool != tool_name:
+            continue
+        legacy_tools = condition.get("blocked_tools") or condition.get("tools")
+        if bound_tool is None and legacy_tools and tool_name not in legacy_tools:
             continue
 
         if token_budget.get("max_tokens"):

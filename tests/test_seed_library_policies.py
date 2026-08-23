@@ -33,11 +33,15 @@ async def test_all_library_policy_names_are_unique():
 @pytest.mark.asyncio
 async def test_library_policies_exist_after_seed():
     """After running the seed, all 18 names exist in the DB as library=true."""
-    import importlib.util, sys, os
+    import importlib.util, pathlib, sys, os
 
     spec = importlib.util.spec_from_file_location(
         "seed_library_policies",
-        "/home/deven/aicontrol/scripts/seed_library_policies.py",
+        # Resolve from this file, not an absolute path: a hardcoded
+        # /home/deven/aicontrol/... loads the MAIN checkout's script even when
+        # the tests run from a worktree, so the test silently exercised the
+        # wrong code.
+        str(pathlib.Path(__file__).parent.parent / "scripts" / "seed_library_policies.py"),
     )
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

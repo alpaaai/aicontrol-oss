@@ -47,10 +47,10 @@ def _mock_admin():
 async def rate_limit_setup():
     """Push updated base.rego to OPA, seed test agent, create rate_limit policy."""
     from app.models.database import async_session_factory
-    from app.services.policy_loader import push_rego_to_opa
+    from app.services.cedar_client import invalidate_policy_set_cache
 
     # Push the worktree's updated base.rego (with rate_limit rules) to OPA
-    await push_rego_to_opa()
+    invalidate_policy_set_cache()
 
     async with async_session_factory() as session:
         # Seed test agent with RATE_TOOL in approved_tools
@@ -71,12 +71,11 @@ async def rate_limit_setup():
             resp = await client.post("/policies", json={
                 "name": RATE_POLICY_NAME,
                 "description": "Test: deny > 10 credit queries per session",
-                "rule_type": "rate_limit",
                 "condition": {
                     "tools": [RATE_TOOL],
                     "rate_limit": {"max_calls": 10, "window": "session"},
                 },
-                "action": "deny",
+                "effect": "deny",
                 "active": True,
                 "severity": "high",
                 "compliance_tags": [],
@@ -186,7 +185,9 @@ async def test_call_11_denied_with_rate_limit_reason(rate_limit_setup):
         assert resp.status_code == 200, resp.text
         body = resp.json()
         assert body["decision"] == "deny"
-        assert body["reason"].startswith(f"rate_limit_exceeded:{RATE_TOOL}:10:session")
+        # Cedar names the matching policy; it cannot report which `when`
+        # clause fired. The reason contract is now "policy_matched:<name>".
+        assert body["reason"] == "policy_matched:test_rate_limit_credit_query"
         # policy_id is whichever rate_limit policy fires first — assert it's present and non-null
         assert body["policy_id"] is not None
         assert body["policy_name"] is not None

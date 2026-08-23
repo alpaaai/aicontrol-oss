@@ -33,10 +33,6 @@ docker compose $COMPOSE exec -T postgres psql -U aicontrol -d aicontrol -c "
 " 2>&1 || echo "ERROR: could not query tables"
 
 echo ""
-echo "--- OPA Health ---"
-curl -s --max-time 5 http://localhost:8181/health 2>&1 \
-  || echo "ERROR: OPA not reachable"
-
 echo ""
 echo "--- API /health ---"
 curl -s --max-time 5 http://localhost:8001/health 2>&1 \
@@ -58,10 +54,6 @@ docker compose $COMPOSE logs --tail=20 frontend 2>&1 \
   || echo "ERROR: could not fetch frontend logs"
 
 echo ""
-echo "--- OPA Logs (last 20 lines) ---"
-docker compose $COMPOSE logs --tail=20 opa 2>&1 \
-  || echo "ERROR: could not fetch opa logs"
-
 echo ""
 echo "--- Docker Version ---"
 docker --version 2>&1

@@ -16,8 +16,8 @@ a human sign-off.
 
 ## Features
 
-- **OPA-based policy engine** — five rule types, evaluated before every tool call and
-  pushed to OPA immediately on change (no restart):
+- **Cedar policy engine, in-process** — evaluated before every tool call; policies
+  are recompiled immediately on change (no restart, no sidecar):
   - `tool_denylist` — block specific tools outright
   - `tool_pattern` — block by name pattern, not just exact match
   - `rate_limit` — cap how many times a tool can be called in a window
@@ -80,7 +80,7 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose
 ## How it works
 
 ```
-Your Agent ──► POST /intercept ──► OPA Policy Engine ──► allow / deny / review
+Your Agent ──► POST /intercept ──► Cedar Policy Engine ──► allow / deny / review
                                            │
                                   Immutable Audit Log
                                      (PostgreSQL)
@@ -168,7 +168,7 @@ cloud calls, ever. See [`NOTICE`](NOTICE) for full attribution.
 }
 ```
 
-Policies are pushed to OPA immediately through the API or dashboard — no restart required.
+Policies are recompiled immediately through the API or dashboard — no restart required.
 See [aictl.io/docs/policies](https://aictl.io/docs/policies) for all five rule types.
 
 ---

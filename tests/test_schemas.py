@@ -48,7 +48,8 @@ def test_policies_table_name():
 def test_policies_required_columns():
     from app.models.schemas import Policy
     cols = _cols(Policy)
-    for name in ["id", "name", "rule_type", "condition", "action", "active"]:
+    for name in ["id", "name", "condition", "effect", "principal_type",
+                 "principal_id", "action_tool", "resource_system", "cedar_text", "active"]:
         assert name in cols, f"policies missing column: {name}"
 
 

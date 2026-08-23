@@ -106,9 +106,8 @@ async def test_observe_mode_always_allows_but_records_true_decision(
     await client.post("/policies", headers=admin_token, json={
         "name": "test_observe_mode_deny_all",
         "description": "Deny everything, to prove observe mode overrides it",
-        "rule_type": "tool_denylist",
         "condition": {"blocked_tools": ["observe_mode_probe_tool"]},
-        "action": "deny", "severity": "critical", "active": True,
+        "effect": "deny", "severity": "critical", "active": True,
     })
     resp = await client.post("/intercept", headers=agent_token, json={
         "session_id": str(uuid.uuid4()),
@@ -168,9 +167,8 @@ async def test_deny_events_accumulate_session_risk_score(client, agent_token, ad
     await client.post("/policies", headers=admin_token, json={
         "name": "test_risk_score_deny_tool",
         "description": "Always deny this tool",
-        "rule_type": "tool_denylist",
         "condition": {"blocked_tools": ["test_risk_score_tool"]},
-        "action": "deny", "active": True,
+        "effect": "deny", "active": True,
     })
     session_id = str(uuid.uuid4())
     for seq in range(1, 4):

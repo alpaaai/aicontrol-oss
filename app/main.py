@@ -23,9 +23,8 @@ from app.routers.users import router as users_router
 from app.routers.setup import router as setup_router
 from app.routers.org_settings import router as org_settings_router
 from app.routers.demo import router as demo_router
-from app.services.opa_client import warmup as warmup_opa_client
-from app.services.opa_health_watcher import OpaHealthWatcher
-from app.services.policy_loader import load_all, push_rego_to_opa
+from app.services.cedar_client import invalidate_policy_set_cache
+from app.services.policy_loader import load_all
 from app.services.wal import default_wal_writer
 from app.services.wal_shipper import WalShipper
 
@@ -50,20 +49,12 @@ logger = get_logger("main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Run policy loader on startup, start OPA health watcher and drift detector."""
+    """Run policy loader on startup and start the drift detector."""
     logger.info("aicontrol_starting")
     async with async_session_factory() as session:
         await load_all(session)
 
-    await warmup_opa_client()
-
     _http_client = httpx.AsyncClient()
-    opa_watcher = OpaHealthWatcher(
-        push_fn=push_rego_to_opa,
-        http_client=_http_client,
-    )
-    opa_watcher.start()
-    app.state.opa_watcher = opa_watcher
 
     wal_shipper = WalShipper(wal_path=default_wal_writer.wal_path, session_factory=async_session_factory)
     await wal_shipper.replay_and_start()
@@ -87,7 +78,6 @@ async def lifespan(app: FastAPI):
     if app.state.drift_detector is not None:
         await app.state.drift_detector.stop()
     await app.state.wal_shipper.stop()
-    await opa_watcher.stop()  # task fully cancelled before client closes
     await _http_client.aclose()
     logger.info("aicontrol_stopping")
 
@@ -136,17 +126,15 @@ if audit_export_config_router is not None:
 @app.get("/health")
 async def health(request: Request) -> dict:
     """Liveness check — returns ok when the app process is running."""
-    watcher = getattr(request.app.state, "opa_watcher", None)
     drift_detector = getattr(request.app.state, "drift_detector", None)
     has_license = bool(_settings.AICONTROL_LICENSE_KEY)
     return {
         "status": "ok",
         "service": "aicontrol",
-        "opa_status": (
-            (watcher.opa_status if watcher else "unknown")
-            if has_license
-            else "enterprise_only"
-        ),
+        # Cedar evaluates in this process, so there is no sidecar that can be
+        # unreachable and nothing to poll. The field is kept so existing health
+        # consumers do not break on a missing key.
+        "policy_engine_status": "in_process",
         "drift_detector_status": (
             (drift_detector.status if drift_detector else "unknown")
             if has_license

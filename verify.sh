@@ -32,9 +32,6 @@ check "Postgres accepting connections" \
   "docker compose $COMPOSE exec -T postgres pg_isready -U aicontrol -d aicontrol" \
   "accepting connections"
 
-check "OPA reachable" \
-  "curl -s --max-time 5 http://localhost:8181/health" \
-  "{}"
 
 check "API /health returns ok" \
   "curl -s --max-time 5 http://localhost:8001/health" \

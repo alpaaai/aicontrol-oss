@@ -11,7 +11,8 @@ from app.core.auth import require_admin
 from app.models.database import get_db
 from app.models.schemas import Policy
 from app.services.activity_log_service import write_activity_log
-from app.services.policy_loader import push_rego_to_opa
+from app.services.cedar_client import invalidate_policy_set_cache
+from app.services.policy_compiler import compile_policy
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -78,8 +79,15 @@ def validate_parameter_match_condition(condition: dict) -> list[str]:
     errors: list[str] = []
     for key, spec in pm.items():
         if not isinstance(spec, dict):
+            # A plain scalar is the base.rego spelling and stays valid: it means
+            # exact equality, or a glob when it contains * or ?. Rejecting it
+            # here would 422 every denylist policy that pins a parameter value,
+            # which is most of the demo seeds.
+            if isinstance(spec, (str, int, float, bool)) or spec is None:
+                continue
             errors.append(
-                f"parameter_match[{key!r}] must be an object with 'contains_any' or 'equals'"
+                f"parameter_match[{key!r}] must be a scalar, or an object with "
+                "'contains_any' or 'equals'"
             )
             continue
         has_contains = "contains_any" in spec
@@ -181,31 +189,84 @@ def validate_tool_denylist_time_conditions(condition: dict) -> list[str]:
     return errors
 
 
-def validate_condition(rule_type: str, condition: dict) -> list[str]:
-    if rule_type == "tool_denylist":
-        errors = validate_tool_denylist_condition(condition)
-        if condition.get("token_budget"):
-            errors += validate_token_budget_condition(condition)
-        errors += validate_tool_denylist_numeric_conditions(condition)
+def validate_condition(condition: dict) -> list[str]:
+    """Validate a condition dict. Dispatch is by key presence and by shape, not
+    by rule_type -- the same rule the compiler and the counting services follow."""
+    errors: list[str] = []
+    if "blocked_tools" in condition:
+        errors += validate_tool_denylist_condition(condition)
+    if "tool_name_contains" in condition:
+        errors += validate_tool_pattern_condition(condition)
+    if condition.get("token_budget"):
+        errors += validate_token_budget_condition(condition)
+    if condition.get("rate_limit"):
+        errors += validate_rate_limit_condition(condition)
+    if condition.get("parameter_match"):
+        errors += validate_parameter_match_condition(condition)
+    if "numeric_conditions" in condition:
+        # Two shapes: the compact {"amount": {"op": ">", "value": 5}} object and
+        # base.rego's [{"parameter", "operator", "value"}] list. Each has its own
+        # operator vocabulary, so validate by shape.
+        if isinstance(condition["numeric_conditions"], list):
+            errors += validate_tool_denylist_numeric_conditions(condition)
+        else:
+            errors += validate_numeric_conditions_condition(condition)
+    if condition.get("time_conditions"):
         errors += validate_tool_denylist_time_conditions(condition)
-        return errors
-    if rule_type == "parameter_match":
-        return validate_parameter_match_condition(condition)
-    if rule_type == "rate_limit":
-        return validate_rate_limit_condition(condition)
-    if rule_type == "tool_pattern":
-        return validate_tool_pattern_condition(condition)
-    if rule_type == "numeric_conditions":
-        return validate_numeric_conditions_condition(condition)
-    return []
+    return errors
+
+
+def validate_scope(body: "PolicyCreate | PolicyUpdate", condition: dict) -> list[str]:
+    """Reject a policy that constrains nothing.
+
+    With no condition and no scope, compile_policy emits a bare
+    `forbid (principal, action, resource);` -- which denies every tool call from
+    every agent. Under Rego this was impossible to express by accident because a
+    denylist needed a blocked_tools list; under the scope model it is one empty
+    object away, so it is rejected explicitly.
+    """
+    # A token budget or rate limit that binds no tool would meter every tool the
+    # policy's principal touches, which is never what the author meant. Under
+    # Rego the tool list was structurally required; under the scope model the
+    # binding can be action_tool instead, so accept either.
+    if condition.get("token_budget") or condition.get("rate_limit"):
+        bound = (
+            getattr(body, "action_tool", None)
+            or condition.get("blocked_tools")
+            or condition.get("tools")
+        )
+        if not bound:
+            return [
+                "a token_budget or rate_limit condition must bind a tool, via "
+                "action_tool or a blocked_tools/tools list"
+            ]
+
+    if condition:
+        return []
+    if any([
+        getattr(body, "principal_id", None),
+        getattr(body, "action_tool", None),
+        getattr(body, "resource_system", None),
+    ]):
+        return []
+    return [
+        "a policy with no condition must constrain at least one of "
+        "principal_id, action_tool or resource_system -- otherwise it denies "
+        "every call from every agent"
+    ]
 
 
 class PolicyCreate(BaseModel):
     name: str = Field(min_length=1)
     description: Optional[str] = None
-    rule_type: str
     condition: dict[str, Any]
-    action: str
+    # Cedar scope. NULL principal means "every agent", NULL action_tool "any
+    # tool", NULL resource_system "any system".
+    principal_type: Optional[str] = None
+    principal_id: Optional[str] = None
+    action_tool: Optional[str] = None
+    resource_system: Optional[str] = None
+    effect: str = "deny"
     severity: str = "medium"
     compliance_frameworks: list[str] = []
     priority: int = 100
@@ -215,9 +276,12 @@ class PolicyCreate(BaseModel):
 
 class PolicyUpdate(BaseModel):
     description: Optional[str] = None
-    rule_type: Optional[str] = None
     condition: Optional[dict[str, Any]] = None
-    action: Optional[str] = None
+    principal_type: Optional[str] = None
+    principal_id: Optional[str] = None
+    action_tool: Optional[str] = None
+    resource_system: Optional[str] = None
+    effect: Optional[str] = None
     severity: Optional[str] = None
     active: Optional[bool] = None
     compliance_frameworks: Optional[list[str]] = None
@@ -230,13 +294,16 @@ class PolicyResponse(BaseModel):
     id: uuid.UUID
     name: str
     description: Optional[str]
-    rule_type: str
     condition: dict[str, Any]
-    action: str
+    principal_type: Optional[str] = None
+    principal_id: Optional[str] = None
+    action_tool: Optional[str] = None
+    resource_system: Optional[str] = None
+    effect: Optional[str] = None
+    cedar_text: Optional[str] = None
     severity: Optional[str]
     active: Optional[bool]
     compliance_frameworks: Optional[list]
-    applies_to_agents: int = 0
     created_by: Optional[str] = None
     priority: int = 100
     library: bool = False
@@ -245,14 +312,6 @@ class PolicyResponse(BaseModel):
     class Config:
         from_attributes = True
 
-    @field_validator("applies_to_agents", mode="before")
-    @classmethod
-    def _coerce_list_to_count(cls, v: Any) -> int:
-        if isinstance(v, list):
-            return len(v)
-        if isinstance(v, int):
-            return v
-        return 0
 
 
 @router.get("", response_model=list[PolicyResponse])
@@ -329,7 +388,7 @@ async def activate_baseline(
         activated.append(policy.name)
 
     await db.flush()
-    await push_rego_to_opa()
+    invalidate_policy_set_cache()
     return BaselineActivateResponse(mode=body.mode, activated=activated)
 
 
@@ -352,15 +411,18 @@ async def create_policy(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_admin),
 ) -> PolicyResponse:
-    errors = validate_condition(body.rule_type, body.condition)
+    errors = validate_condition(body.condition) + validate_scope(body, body.condition)
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
     policy = Policy(
         name=body.name,
         description=body.description,
-        rule_type=body.rule_type,
         condition=body.condition,
-        action=body.action,
+        principal_type=body.principal_type,
+        principal_id=body.principal_id,
+        action_tool=body.action_tool,
+        resource_system=body.resource_system,
+        effect=body.effect,
         severity=body.severity,
         compliance_frameworks=body.compliance_frameworks,
         active=True,
@@ -368,9 +430,12 @@ async def create_policy(
         library=body.library,
         category=body.category,
     )
+    policy.id = uuid.uuid4()
+    # Compile here so the /intercept hot path never recompiles from columns.
+    policy.cedar_text = compile_policy(policy)
     db.add(policy)
     await db.flush()
-    await push_rego_to_opa()
+    invalidate_policy_set_cache()
     return policy
 
 
@@ -386,16 +451,17 @@ async def update_policy(
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
     updated = body.model_dump(exclude_none=True)
-    effective_rule_type = updated.get("rule_type", policy.rule_type)
     effective_condition = updated.get("condition", policy.condition)
-    errors = validate_condition(effective_rule_type, effective_condition)
+    errors = validate_condition(effective_condition)
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
     before = {k: getattr(policy, k) for k in updated}
     for field, value in updated.items():
         setattr(policy, field, value)
+    # Recompile: any scope or condition edit changes the Cedar source.
+    policy.cedar_text = compile_policy(policy)
     await db.flush()
-    await push_rego_to_opa()
+    invalidate_policy_set_cache()
     await write_activity_log(
         action="policy.update",
         resource_type="policy",
@@ -418,4 +484,4 @@ async def delete_policy(
     if not policy:
         raise HTTPException(status_code=404, detail="Policy not found")
     await db.delete(policy)
-    await push_rego_to_opa()
+    invalidate_policy_set_cache()

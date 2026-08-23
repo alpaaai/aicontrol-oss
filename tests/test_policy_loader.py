@@ -12,35 +12,48 @@ def test_load_yaml_returns_list_of_policies():
     assert len(policies) > 0
     for p in policies:
         assert "name" in p
-        assert "rule_type" in p
-        assert "action" in p
+        assert "effect" in p
+        assert "condition" in p
         assert "condition" in p
 
 
-def test_load_yaml_actions_are_valid():
-    """All policy actions must be allow, deny, or review."""
+def test_load_yaml_effects_are_valid():
+    """Every seed policy is a Cedar forbid, so its effect is deny or review.
+    There is no "allow" effect -- that is the catch-all permit cedar_client
+    appends to every bundle, not a policy row."""
     from app.services.policy_loader import load_yaml
-    valid_actions = {"allow", "deny", "review"}
+    valid_effects = {"deny", "review"}
     for p in load_yaml():
-        assert p["action"] in valid_actions, f"Invalid action: {p['action']}"
+        assert p["effect"] in valid_effects, f"Invalid effect: {p['effect']}"
 
 
 @pytest.mark.asyncio
-async def test_upsert_policies_calls_db():
-    """upsert_policies must execute one upsert per policy."""
+async def test_upsert_policies_compiles_cedar_text(db_session):
+    """upsert_policies must compile each policy on the way in. A mock session
+    cannot show that any more -- the loader now reads back an existing row to
+    keep its id stable, and compiling is the behaviour worth asserting."""
+    from cedarpy import PolicySet
+    from sqlalchemy import select
+
+    from app.models.schemas import Policy
     from app.services.policy_loader import upsert_policies
 
-    mock_session = AsyncMock()
-    mock_session.execute = AsyncMock()
-    mock_session.commit = AsyncMock()
+    await upsert_policies(db_session, [{
+        "name": "test_loader_compiles",
+        "description": "",
+        "effect": "deny",
+        "action_tool": "delete_database",
+        "condition": {"numeric_conditions": {"rows": {"gt": 10}}},
+        "severity": "low",
+        "compliance_frameworks": [],
+    }])
 
-    policies = [
-        {"name": "test", "description": "", "rule_type": "default_allow",
-         "condition": {}, "action": "allow", "severity": "low",
-         "compliance_frameworks": []}
-    ]
-    await upsert_policies(mock_session, policies)
-    assert mock_session.execute.called
+    row = (await db_session.execute(
+        select(Policy).where(Policy.name == "test_loader_compiles")
+    )).scalar_one()
+    assert row.cedar_text, "loader stored no cedar_text"
+    assert "context.rows > 10" in row.cedar_text
+    PolicySet.from_str(row.cedar_text + "\npermit (principal, action, resource);")
 
 
 def test_load_yaml_never_uses_compliance_tags_key():
@@ -79,13 +92,13 @@ def test_load_yaml_accepts_explicit_path_for_demo_seeds():
     assert names == {"deny_bulk_credit_query", "deny_bulk_credit_query_rate"}
 
 
-def test_all_demo_seed_files_load_and_have_valid_actions():
+def test_all_demo_seed_files_load_and_have_valid_effects():
     """Every YAML file under policies/demo_seeds/ must parse and contain only
-    valid policy actions -- same contract as the default policies.yaml."""
+    valid policy effects -- same contract as the default policies.yaml."""
     from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
-    valid_actions = {"allow", "deny", "review"}
+    valid_effects = {"deny", "review"}
     seed_files = sorted(DEMO_SEEDS_DIR.glob("*.yaml"))
     assert len(seed_files) == 6, f"expected 6 demo seed files, found {len(seed_files)}"
     for path in seed_files:
         for p in load_yaml(path):
-            assert p["action"] in valid_actions, f"{path.name}: invalid action {p['action']}"
+            assert p["effect"] in valid_effects, f"{path.name}: invalid effect {p['effect']}"

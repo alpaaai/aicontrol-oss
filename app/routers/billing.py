@@ -21,7 +21,7 @@ PLAN_CONFIG = {
         "rate_per_million": 0.0,
         "retention_days": 7,
         "features": [
-            "OPA policy enforcement",
+            "Cedar policy enforcement",
             "Per-agent approved tools enforcement",
             "Rate-based policies",
             "Audit log (7-day retention)",
@@ -49,7 +49,7 @@ PLAN_CONFIG = {
         "retention_days": None,
         "features": [
             "Everything in Business",
-            "OPA health-watch observability",
+            "Policy engine observability",
             "Policy drift detection + warning feed",
             "Compliance report export (SOC 2, PCI, HIPAA, GLBA)",
             "SLA (99.9% uptime guarantee)",
