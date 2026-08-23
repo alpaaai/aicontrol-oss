@@ -70,6 +70,19 @@ def reset_config_and_db_engine():
 
 
 
+@pytest_asyncio.fixture(loop_scope="session")
+async def db_session():
+    """An async ORM session that never commits. Tests flush to exercise the
+    schema, then the rollback on teardown discards everything -- no cleanup
+    fixture needed for rows created through this."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        try:
+            yield session
+        finally:
+            await session.rollback()
+
+
 # ── Integration test fixtures (live API at localhost:8001) ────────────────────
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
@@ -418,8 +431,8 @@ async def seed_policy():
     policy_id = uuid.uuid4()
     async with async_session_factory() as db:
         await db.execute(text("""
-            INSERT INTO policies (id, name, rule_type, condition, action, active)
-            VALUES (:id, 'test_p1_8a_policy', 'tool_call', '{"tool": "any"}'::jsonb, 'allow', true)
+            INSERT INTO policies (id, name, condition, effect, action_tool, active)
+            VALUES (:id, 'test_p1_8a_policy', '{}'::jsonb, 'deny', 'any_tool', true)
         """), {"id": str(policy_id)})
         await db.commit()
 

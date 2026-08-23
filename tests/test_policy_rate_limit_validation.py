@@ -6,12 +6,11 @@ from httpx import AsyncClient, ASGITransport
 VALID_RATE_LIMIT_POLICY = {
     "name": "test_rate_val_policy",
     "description": "test",
-    "rule_type": "rate_limit",
     "condition": {
         "tools": ["query_credit_bureau"],
         "rate_limit": {"max_calls": 10, "window": "session"},
     },
-    "action": "deny",
+    "effect": "deny",
     "active": True,
     "severity": "high",
     "compliance_tags": [],

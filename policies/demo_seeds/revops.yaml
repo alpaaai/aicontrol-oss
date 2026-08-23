@@ -1,13 +1,14 @@
 policies:
   - name: deny_unscoped_crm_query
     description: "Block unfiltered account queries from CRM agent — RevOps demo"
-    rule_type: tool_denylist
+    principal_type: null
+    principal_id: null
+    action_tool: query_all_accounts
+    resource_system: null
+    effect: deny
     condition:
-      blocked_tools:
-        - query_all_accounts
       parameter_match:
-        filter: null
-    action: deny
+        filter: "null"
     active: true
     severity: high
     compliance_frameworks: ["GDPR", "SOC2", "CCPA"]

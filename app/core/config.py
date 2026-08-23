@@ -25,14 +25,6 @@ class Settings(BaseSettings):
     )
 
     database_url: str
-    opa_url: str = "http://localhost:8181"
-    opa_failure_mode: Literal["deny", "allow"] = "deny"
-    opa_poll_interval_seconds: int = 30
-    # Measured on a warm, connection-pooled client against ~20 policies on a
-    # quiet localhost OPA: p50=10ms, p90=17ms, p99=39ms. 20ms (the original
-    # WS0 target) sits inside that distribution and fails ~5-12% of calls
-    # under any real load — 100ms gives ~2.5x headroom over measured p99.
-    opa_decision_timeout_s: float = 0.1
     WAL_DIR: str = "./data/wal"
     REPORTS_DIR: str = "./data/reports"
     MCP_RESPONSE_SCAN_POLICY: Literal["block", "log"] = "block"

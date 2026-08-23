@@ -82,7 +82,7 @@ async def test_a_tool_in_approved_list_passes_to_opa(p1_1_agents):
 
     with patch("app.routers.intercept.evaluate", new=mock_evaluate), \
          patch("app.routers.intercept.write_event", new=AsyncMock(return_value=uuid.uuid4())), \
-         patch("app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])), \
+         patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])), \
          patch("app.routers.intercept.ensure_session", new=AsyncMock()), \
          _mock_auth():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -115,7 +115,7 @@ async def test_b_tool_not_in_approved_list_denied_before_opa(p1_1_agents):
 
     with patch("app.routers.intercept.evaluate", new=mock_evaluate), \
          patch("app.routers.intercept.wal_writer", new=wal_mock), \
-         patch("app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])), \
+         patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])), \
          patch("app.routers.intercept.ensure_session", new=AsyncMock()), \
          _mock_auth():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -149,7 +149,7 @@ async def test_c_agent_not_in_db_passes_through(p1_1_agents):
 
     with patch("app.routers.intercept.evaluate", new=mock_evaluate), \
          patch("app.routers.intercept.write_event", new=AsyncMock(return_value=uuid.uuid4())), \
-         patch("app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])), \
+         patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])), \
          patch("app.routers.intercept.ensure_session", new=AsyncMock()), \
          _mock_auth():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -174,7 +174,7 @@ async def test_d_empty_approved_tools_passes_any_tool(p1_1_agents):
 
     with patch("app.routers.intercept.evaluate", new=mock_evaluate), \
          patch("app.routers.intercept.write_event", new=AsyncMock(return_value=uuid.uuid4())), \
-         patch("app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])), \
+         patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])), \
          patch("app.routers.intercept.ensure_session", new=AsyncMock()), \
          _mock_auth():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -199,7 +199,7 @@ async def test_e_tool_in_list_but_opa_denies_returns_opa_reason(p1_1_agents):
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "tool_denylisted"}
     )), patch("app.routers.intercept.write_event", new=AsyncMock(return_value=uuid.uuid4())), \
-         patch("app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])), \
+         patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])), \
          patch("app.routers.intercept.ensure_session", new=AsyncMock()), \
          _mock_auth():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -229,7 +229,7 @@ async def test_f_normal_allow_audit_event_does_not_use_approved_tools_policy_nam
     with patch("app.routers.intercept.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch("app.routers.intercept.write_event", new=AsyncMock(side_effect=capture_write_event)), \
-         patch("app.routers.intercept.get_active_policies", new=AsyncMock(return_value=[])), \
+         patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])), \
          patch("app.routers.intercept.ensure_session", new=AsyncMock()), \
          _mock_auth():
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:

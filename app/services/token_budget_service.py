@@ -44,14 +44,18 @@ async def build_token_budgets(
     cumulative_cost_usd: dict[str, float] = {}
 
     for policy in active_policies:
-        if policy.get("rule_type") != "tool_denylist":
-            continue
         condition = policy.get("condition", {})
         token_budget = condition.get("token_budget")
-        if not token_budget or tool_name not in condition.get("blocked_tools", []):
+        if not token_budget:
+            continue
+        bound_tool = policy.get("action_tool")
+        if bound_tool is not None and bound_tool != tool_name:
+            continue
+        legacy_tools = condition.get("blocked_tools") or condition.get("tools")
+        if bound_tool is None and legacy_tools and tool_name not in legacy_tools:
             continue
 
-        window = token_budget["window"]
+        window = token_budget.get("window", "session")
         if token_budget.get("max_tokens") and tool_name not in cumulative_tokens:
             cumulative_tokens[tool_name] = await _sum_in_window(
                 db, "COALESCE(input_tokens, 0) + COALESCE(output_tokens, 0)", agent_id, session_id, tool_name, window,
@@ -68,10 +72,20 @@ async def build_aggregate_budgets(
     db: AsyncSession, agent_id: str, active_policies: list[dict],
 ) -> tuple[dict[str, float], dict[str, float]]:
     """Sum tokens/cost across every tool call (no tool_name filter), for
-    the standalone rule_type == "budget" policy. Only queries if at least
-    one active "budget" policy exists -- avoids the extra SQL round-trip
+    the standalone aggregate `budget` condition. Only queries if at least
+    one active budget policy exists -- avoids the extra SQL round-trip
     on the (overwhelmingly common) case of no aggregate-budget policy."""
-    has_budget_policy = any(p.get("rule_type") == "budget" for p in active_policies)
+    # The aggregate-budget condition exists in two shapes: nested under a
+    # "budget" key, and flat with its fields at the top level. policy_compiler
+    # normalises both; this gate has to recognise both too, or the sums are
+    # never computed and the policy compares against a zero it was never given.
+    def _is_budget(policy: dict) -> bool:
+        condition = policy.get("condition") or {}
+        if condition.get("budget"):
+            return True
+        return bool({"max_tokens", "max_cost_usd"} & set(condition))
+
+    has_budget_policy = any(_is_budget(p) for p in active_policies)
     if not has_budget_policy:
         return {}, {}
 

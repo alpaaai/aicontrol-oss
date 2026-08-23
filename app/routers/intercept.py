@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select, update
+from sqlalchemy import and_, or_, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,8 +17,10 @@ from app.models.schemas import Agent, Policy, Session
 from app.services.audit_writer import write_event
 from app.services.budget_alert_service import maybe_alert_budget_threshold
 from app.services.hitl_service import create_hitl_review, post_slack_review
-from app.services.opa_client import evaluate
+from app.services.cedar_client import current_time_context, evaluate
+from app.services.policy_compiler import ALL_PARAMS_FIELD
 from app.services.rate_limit_service import build_call_counts
+from app.services.system_resolver import resolve_system
 from app.services.response_scanner import scan_tool_response
 from app.services.token_budget_service import build_aggregate_budgets, build_token_budgets
 from app.services.wal import default_wal_writer as wal_writer
@@ -66,22 +68,50 @@ def enrich_parameters(tool_name: str, tool_parameters: dict[str, Any]) -> dict[s
     return params
 
 
-async def get_active_policies(session: AsyncSession) -> list[dict]:
-    """Load all active policies from Postgres as plain dicts for OPA."""
-    result = await session.execute(
-        select(Policy).where(Policy.active == True)
+async def get_scoped_policies(
+    session: AsyncSession,
+    *,
+    agent_name: str,
+    agent_groups: list[str],
+    tool_name: str,
+    system: str,
+) -> list[dict]:
+    """Load only the active policies whose scope matches this call.
+
+    This is what the scope columns exist for: without the WHERE clause every
+    policy is evaluated against every call for every agent, which is the
+    defect the Cedar migration was undertaken to fix.
+
+    NULL action_tool means "any tool"; NULL resource_system means "any system".
+    """
+    principal_match = or_(
+        # NULL principal = applies to every agent. Task 2.8 chose this over a
+        # magic "all" group that every agent would have to be enrolled in.
+        Policy.principal_id.is_(None),
+        and_(Policy.principal_type == "agent", Policy.principal_id == agent_name),
+        and_(Policy.principal_type == "group", Policy.principal_id.in_(agent_groups or [""])),
     )
-    policies = result.scalars().all()
+    result = await session.execute(
+        select(Policy).where(
+            Policy.active == True,  # noqa: E712 -- SQLAlchemy needs ==, not `is`
+            principal_match,
+            or_(Policy.action_tool.is_(None), Policy.action_tool == tool_name),
+            or_(Policy.resource_system.is_(None), Policy.resource_system == system),
+        )
+    )
     return [
         {
             "id": str(p.id),
             "name": p.name,
-            "rule_type": p.rule_type,
+            "effect": p.effect or "deny",
+            "cedar_text": p.cedar_text,
             "condition": p.condition,
-            "action": p.action,
             "severity": p.severity,
+            # The tool binding moved from condition["tools"]/["blocked_tools"]
+            # into the scope column, so the counting services need it here.
+            "action_tool": p.action_tool,
         }
-        for p in policies
+        for p in result.scalars().all()
     ]
 
 
@@ -139,7 +169,7 @@ async def intercept(
 
     start = time.monotonic()
 
-    # Step 2b: approved_tools enforcement gate — runs before OPA, but must
+    # Step 2b: approved_tools enforcement gate — runs before the engine, but must
     # still respect observe mode (never blocks, only records).
     # Case-sensitive match: tool_name is never normalized upstream.
     # approved_tools = [] means unrestricted (backward compatible).
@@ -175,8 +205,17 @@ async def intercept(
                 review_id=None,
             )
 
-    # Load active policies from DB
-    policies = await get_active_policies(db)
+    # Resolve the business system this call touches, then load only the
+    # policies scoped to (this agent, this tool, this system).
+    system = resolve_system(body.tool_name, body.tool_parameters)
+    agent_groups: list[str] = list(getattr(agent, "groups", None) or []) if agent else []
+    policies = await get_scoped_policies(
+        db,
+        agent_name=body.agent_name,
+        agent_groups=agent_groups,
+        tool_name=body.tool_name,
+        system=system,
+    )
 
     # Step 3b: build call_counts for rate-limit policy evaluation
     call_counts = await build_call_counts(
@@ -203,18 +242,34 @@ async def intercept(
         active_policies=policies, tool_name=body.tool_name,
     ))
 
-    # Evaluate via OPA
-    opa_result = await evaluate(
+    # Evaluate in-process via Cedar. The result shape is identical to the one
+    # the OPA client returned, so everything downstream of here is untouched.
+    decision_result = await evaluate(
+        agent_name=body.agent_name,
+        agent_groups=agent_groups,
         tool_name=body.tool_name,
-        tool_parameters=body.tool_parameters,
+        system=system,
+        context={
+            "tool_name": body.tool_name,
+            **body.tool_parameters,
+            # Flattened parameter text, so a policy can match "any parameter
+            # contains X" -- Cedar cannot iterate the context's own keys.
+            ALL_PARAMS_FIELD: " ".join(
+                str(v) for v in body.tool_parameters.values()
+            ),
+            **current_time_context(),
+            "call_count": call_counts.get(body.tool_name, 0),
+            # build_token_budgets returns {tool_name: sum}, keyed per tool --
+            # not {"tokens": ...}. Keying it wrong made every per-tool token
+            # budget read 0 and never fire.
+            "cumulative_tokens": cumulative_tokens.get(body.tool_name, 0),
+            "cumulative_cost_usd": cumulative_cost_usd.get(body.tool_name, 0),
+            "agent_cumulative_tokens": agent_cumulative.get("tokens", 0),
+            "agent_cumulative_cost_usd": agent_cumulative.get("cost_usd", 0),
+            "org_cumulative_tokens": org_cumulative.get("tokens", 0),
+            "org_cumulative_cost_usd": org_cumulative.get("cost_usd", 0),
+        },
         policies=policies,
-        call_counts=call_counts,
-        cumulative_tokens=cumulative_tokens,
-        cumulative_cost_usd=cumulative_cost_usd,
-        agent_cumulative_tokens=agent_cumulative.get("tokens", 0),
-        agent_cumulative_cost_usd=agent_cumulative.get("cost_usd", 0),
-        org_cumulative_tokens=org_cumulative.get("tokens", 0),
-        org_cumulative_cost_usd=org_cumulative.get("cost_usd", 0),
     )
 
     duration_ms = int((time.monotonic() - start) * 1000)
@@ -222,20 +277,20 @@ async def intercept(
     # Enrich parameters (e.g. extract domain from HTTP tool URLs)
     enriched_parameters = enrich_parameters(body.tool_name, body.tool_parameters)
 
-    # OPA returns which policy fired directly — no reverse-engineering needed
-    fired_policy_id: Optional[str] = opa_result.get("fired_policy_id") or None
-    fired_policy_name: Optional[str] = opa_result.get("fired_policy_name") or None
+    # Cedar names the policy that fired directly — no reverse-engineering needed
+    fired_policy_id: Optional[str] = decision_result.get("fired_policy_id") or None
+    fired_policy_name: Optional[str] = decision_result.get("fired_policy_name") or None
 
     # Ensure session row exists (auto-create if agent didn't pre-register)
     await ensure_session(db, body.session_id, body.agent_id)
 
-    true_decision = opa_result["decision"]
-    true_reason = opa_result["reason"]
+    true_decision = decision_result["decision"]
+    true_reason = decision_result["reason"]
     enforced_decision = "allow" if is_observe_mode else true_decision
 
-    if opa_result.get("bypass"):
+    if decision_result.get("bypass"):
         logger.critical(
-            "opa_bypass_event",
+            "engine_bypass_event",
             tool_name=body.tool_name,
             agent_id=str(body.agent_id),
             decision=true_decision,
@@ -301,7 +356,7 @@ async def intercept(
             "input_tokens": body.input_tokens,
             "output_tokens": body.output_tokens,
             "cost_usd": body.cost_usd,
-            "bypass": opa_result.get("bypass", False),
+            "bypass": decision_result.get("bypass", False),
             "enforced": not is_observe_mode,
         })
         await accumulate_session_risk(db, body.session_id, RISK_SCORE_DELTA.get(true_decision, 0))

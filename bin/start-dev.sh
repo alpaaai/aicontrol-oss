@@ -1,20 +1,16 @@
 #!/usr/bin/env bash
 # Starts API, MCP gateway, dashboard, and demo fixture servers in the foreground.
-# Assumes Postgres + OPA are already running (e.g. via Docker Desktop).
+# Assumes Postgres is already running (e.g. via Docker Desktop).
 # Ctrl+C stops everything this script started.
 set -uo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
-echo "==> Checking Postgres + OPA..."
+echo "==> Checking Postgres..."
 if ! docker compose ps --status running 2>/dev/null | grep -q postgres; then
   echo "    WARNING: postgres container not detected as running (check Docker Desktop)." >&2
 fi
-if ! docker compose ps --status running 2>/dev/null | grep -q opa; then
-  echo "    WARNING: opa container not detected as running (check Docker Desktop)." >&2
-fi
-
 source venv/bin/activate
 export PYTHONPATH="$REPO_ROOT"
 

@@ -7,8 +7,7 @@ import pytest
 async def test_alerts_when_over_80_percent_of_token_budget():
     from app.services.budget_alert_service import maybe_alert_budget_threshold
 
-    policies = [{
-        "rule_type": "tool_denylist", "name": "test_budget_alert_policy",
+    policies = [{ "name": "test_budget_alert_policy",
         "condition": {
             "blocked_tools": ["alert_probe_tool"],
             "token_budget": {"max_tokens": 100000, "window": "session", "on_exceed": "deny"},
@@ -34,8 +33,7 @@ async def test_alerts_when_over_80_percent_of_token_budget():
 async def test_does_not_alert_under_80_percent():
     from app.services.budget_alert_service import maybe_alert_budget_threshold
 
-    policies = [{
-        "rule_type": "tool_denylist", "name": "test_budget_alert_policy_2",
+    policies = [{ "name": "test_budget_alert_policy_2",
         "condition": {
             "blocked_tools": ["alert_probe_tool_2"],
             "token_budget": {"max_tokens": 100000, "window": "session", "on_exceed": "deny"},
@@ -56,8 +54,7 @@ async def test_does_not_alert_under_80_percent():
 async def test_skips_silently_when_not_business_tier():
     from app.services.budget_alert_service import maybe_alert_budget_threshold
 
-    policies = [{
-        "rule_type": "tool_denylist", "name": "test_budget_alert_policy_3",
+    policies = [{ "name": "test_budget_alert_policy_3",
         "condition": {
             "blocked_tools": ["alert_probe_tool_3"],
             "token_budget": {"max_tokens": 100000, "window": "session", "on_exceed": "deny"},

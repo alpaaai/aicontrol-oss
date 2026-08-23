@@ -1,19 +1,19 @@
-"""Loads policies from YAML, upserts to Postgres, pushes Rego to OPA."""
+"""Loads policies from YAML, compiles them to Cedar, upserts to Postgres."""
+import uuid
 from pathlib import Path
 from typing import Any
 
-import httpx
 import yaml
-from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.core.logging import get_logger
+from sqlalchemy import select
+from app.models.schemas import Policy
+from app.services.policy_compiler import compile_policy
 
 logger = get_logger("policy_loader")
 
 POLICIES_YAML = Path(__file__).parent.parent.parent / "policies" / "policies.yaml"
-REGO_BUNDLE = Path(__file__).parent.parent.parent / "policies" / "base.rego"
 DEMO_SEEDS_DIR = Path(__file__).parent.parent.parent / "policies" / "demo_seeds"
 
 
@@ -27,58 +27,39 @@ def load_yaml(path: Path = POLICIES_YAML) -> list[dict[str, Any]]:
 
 
 async def upsert_policies(session: AsyncSession, policies: list[dict]) -> None:
-    """Insert or update each policy row in Postgres."""
+    """Insert or update each policy row, compiling its Cedar source on the way in.
+
+    Compilation happens here rather than at evaluation time so the hot path
+    never parses a condition dict.
+    """
     for p in policies:
-        await session.execute(
-            text("""
-                INSERT INTO policies
-                    (id, name, description, rule_type, condition, action,
-                     compliance_frameworks, severity, active)
-                VALUES
-                    (gen_random_uuid(), :name, :description, :rule_type,
-                     CAST(:condition AS jsonb), :action,
-                     CAST(:compliance_frameworks AS jsonb), :severity, :active)
-                ON CONFLICT (name) DO UPDATE SET
-                    description = EXCLUDED.description,
-                    rule_type = EXCLUDED.rule_type,
-                    condition = EXCLUDED.condition,
-                    action = EXCLUDED.action,
-                    compliance_frameworks = EXCLUDED.compliance_frameworks,
-                    severity = EXCLUDED.severity,
-                    active = EXCLUDED.active
-            """),
-            {
-                "name": p["name"],
-                "description": p.get("description", ""),
-                "rule_type": p["rule_type"],
-                "condition": __import__("json").dumps(p["condition"]),
-                "action": p["action"],
-                "compliance_frameworks": __import__("json").dumps(
-                    p.get("compliance_frameworks", [])
-                ),
-                "severity": p.get("severity", "medium"),
-                "active": p.get("active", True),
-            },
+        row = Policy(
+            name=p["name"],
+            description=p.get("description", ""),
+            condition=p["condition"],
+            principal_type=p.get("principal_type"),
+            principal_id=p.get("principal_id"),
+            action_tool=p.get("action_tool"),
+            resource_system=p.get("resource_system"),
+            effect=p["effect"],
+            severity=p.get("severity", "medium"),
+            active=p.get("active", True),
+            compliance_frameworks=p.get("compliance_frameworks", []),
+            library=p.get("library", False),
+            priority=p.get("priority", 100),
+            category=p.get("category"),
         )
+        existing = (await session.execute(
+            select(Policy).where(Policy.name == row.name)
+        )).scalar_one_or_none()
+        row.id = existing.id if existing else uuid.uuid4()
+        row.cedar_text = compile_policy(row)
+        await session.merge(row)
     await session.commit()
     logger.info("policies_upserted", count=len(policies))
 
 
-async def push_rego_to_opa() -> None:
-    """Push base.rego to OPA as a policy bundle."""
-    rego_content = REGO_BUNDLE.read_text()
-    async with httpx.AsyncClient() as client:
-        response = await client.put(
-            f"{settings.opa_url}/v1/policies/aicontrol",
-            content=rego_content,
-            headers={"Content-Type": "text/plain"},
-        )
-        response.raise_for_status()
-    logger.info("rego_pushed_to_opa")
-
-
 async def load_all(session: AsyncSession) -> None:
-    """Full startup sequence: YAML → Postgres → OPA."""
+    """Full startup sequence: YAML -> compile -> Postgres."""
     policies = load_yaml()
     await upsert_policies(session, policies)
-    await push_rego_to_opa()

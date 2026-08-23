@@ -19,7 +19,7 @@ def _admin_auth_override():
 
 
 def _opa_patch():
-    return patch("app.services.policy_loader.push_rego_to_opa", new=AsyncMock(return_value=None))
+    return patch("app.routers.policies.invalidate_policy_set_cache", new=AsyncMock(return_value=None))
 
 
 @pytest.mark.asyncio

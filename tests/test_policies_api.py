@@ -19,7 +19,7 @@ def _auth_override(role: str = "admin"):
 
 def _opa_patch():
     return patch(
-        "app.services.policy_loader.push_rego_to_opa",
+        "app.routers.policies.invalidate_policy_set_cache",
         new=AsyncMock(return_value=None)
     )
 
@@ -51,9 +51,8 @@ async def test_create_policy_returns_201():
     from app.main import app
     payload = {
         "name": f"test_policy_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_denylist",
         "condition": {"blocked_tools": ["bad_tool"]},
-        "action": "deny",
+        "effect": "deny",
         "severity": "high",
         "description": "Test policy",
         "compliance_frameworks": [],
@@ -75,7 +74,7 @@ async def test_create_policy_requires_admin():
         ) as client:
             response = await client.post("/policies", json={
                 "name": "test", "rule_type": "default_allow",
-                "condition": {}, "action": "allow",
+                "condition": {}, "effect": "allow",
                 "severity": "low", "compliance_frameworks": [],
             })
     assert response.status_code == 403
@@ -129,9 +128,8 @@ async def test_create_policy_response_includes_new_fields():
     from app.main import app
     payload = {
         "name": f"test_newfields_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_denylist",
         "condition": {"blocked_tools": ["bad_tool"]},
-        "action": "deny",
+        "effect": "deny",
         "priority": 50,
         "library": False,
         "category": "Dangerous Operations",
@@ -166,9 +164,8 @@ async def test_list_library_policies_excludes_non_library():
     non_lib_name = f"not_lib_{uuid.uuid4().hex[:6]}"
     payload = {
         "name": non_lib_name,
-        "rule_type": "tool_denylist",
         "condition": {"blocked_tools": ["bad"]},
-        "action": "deny",
+        "effect": "deny",
         "library": False,
     }
     with _auth_override("admin"), _opa_patch():
@@ -198,9 +195,8 @@ async def test_create_tool_denylist_requires_blocked_tools():
     from app.main import app
     payload = {
         "name": f"test_val_td_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_denylist",
         "condition": {},
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -215,9 +211,8 @@ async def test_create_tool_denylist_rejects_empty_blocked_tools():
     from app.main import app
     payload = {
         "name": f"test_val_td2_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_denylist",
         "condition": {"blocked_tools": []},
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -232,9 +227,8 @@ async def test_create_parameter_match_valid():
     from app.main import app
     payload = {
         "name": f"test_pm_{uuid.uuid4().hex[:6]}",
-        "rule_type": "parameter_match",
         "condition": {"parameter_match": {"path": {"contains_any": ["/etc/passwd"]}}},
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -249,9 +243,8 @@ async def test_create_parameter_match_wildcard_valid():
     from app.main import app
     payload = {
         "name": f"test_pm_wc_{uuid.uuid4().hex[:6]}",
-        "rule_type": "parameter_match",
         "condition": {"parameter_match": {"*": {"contains_any": ["jailbreak"]}}},
-        "action": "review",
+        "effect": "review",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -262,13 +255,35 @@ async def test_create_parameter_match_wildcard_valid():
 
 
 @pytest.mark.asyncio
-async def test_create_parameter_match_rejects_flat_string_spec():
+async def test_create_parameter_match_accepts_a_scalar_spec():
+    """A flat scalar is base.rego's own parameter_match spelling -- exact
+    equality, or a glob when it contains * or ?. It used to be rejected because
+    the standalone parameter_match rule_type demanded the object form while
+    tool_denylist policies accepted scalars; with rule_type gone, one rule has to
+    hold for both, and every demo seed uses the scalar form."""
+    from app.main import app
+    payload = {
+        "name": f"test_pm_scalar_{uuid.uuid4().hex[:6]}",
+        "condition": {"parameter_match": {"path": "/etc/passwd"}},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
+async def test_create_parameter_match_rejects_a_list_spec():
+    """Still rejected: a value that is neither a scalar nor a
+    contains_any/equals object has no meaning to the compiler."""
     from app.main import app
     payload = {
         "name": f"test_pm_bad_{uuid.uuid4().hex[:6]}",
-        "rule_type": "parameter_match",
-        "condition": {"parameter_match": {"path": "flat_string_not_allowed"}},
-        "action": "deny",
+        "condition": {"parameter_match": {"path": ["not", "valid"]}},
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -283,9 +298,8 @@ async def test_create_tool_pattern_valid():
     from app.main import app
     payload = {
         "name": f"test_tp_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_pattern",
         "condition": {"tool_name_contains": ["write", "update"]},
-        "action": "review",
+        "effect": "review",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -300,9 +314,8 @@ async def test_create_tool_pattern_rejects_empty_patterns():
     from app.main import app
     payload = {
         "name": f"test_tp_bad_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_pattern",
         "condition": {"tool_name_contains": []},
-        "action": "review",
+        "effect": "review",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -317,9 +330,8 @@ async def test_create_numeric_conditions_valid():
     from app.main import app
     payload = {
         "name": f"test_nc_{uuid.uuid4().hex[:6]}",
-        "rule_type": "numeric_conditions",
         "condition": {"numeric_conditions": {"amount": {"op": ">", "value": 10000}}},
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -334,9 +346,8 @@ async def test_create_numeric_conditions_rejects_bad_op():
     from app.main import app
     payload = {
         "name": f"test_nc_bad_{uuid.uuid4().hex[:6]}",
-        "rule_type": "numeric_conditions",
         "condition": {"numeric_conditions": {"amount": {"op": "neq", "value": 100}}},
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -351,9 +362,8 @@ async def test_create_numeric_conditions_rejects_non_number_value():
     from app.main import app
     payload = {
         "name": f"test_nc_bad2_{uuid.uuid4().hex[:6]}",
-        "rule_type": "numeric_conditions",
         "condition": {"numeric_conditions": {"amount": {"op": ">", "value": "big"}}},
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -427,14 +437,13 @@ async def test_create_policy_rejects_unsupported_numeric_operator():
     from app.main import app
     payload = {
         "name": f"test_reject_neq_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_denylist",
         "condition": {
             "blocked_tools": ["some_tool"],
             "numeric_conditions": [
                 {"parameter": "amount", "operator": "neq", "value": 100}
             ],
         },
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -453,12 +462,11 @@ async def test_create_policy_rejects_malformed_time_conditions():
     from app.main import app
     payload = {
         "name": f"test_reject_badtime_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_denylist",
         "condition": {
             "blocked_tools": ["some_tool"],
             "time_conditions": {"deny_hours": {"start": 9, "end": 17}},
         },
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -476,7 +484,6 @@ async def test_create_policy_accepts_valid_numeric_and_time_conditions():
     from app.main import app
     payload = {
         "name": f"test_accept_valid_nt_{uuid.uuid4().hex[:6]}",
-        "rule_type": "tool_denylist",
         "condition": {
             "blocked_tools": ["some_other_tool"],
             "numeric_conditions": [
@@ -484,7 +491,7 @@ async def test_create_policy_accepts_valid_numeric_and_time_conditions():
             ],
             "time_conditions": {"deny_days": [5, 6], "deny_hours": {"from": 9, "to": 17}},
         },
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
@@ -500,9 +507,8 @@ async def test_create_policy_rejects_blank_name():
     from app.main import app
     payload = {
         "name": "",
-        "rule_type": "tool_denylist",
         "condition": {"blocked_tools": ["some_tool"]},
-        "action": "deny",
+        "effect": "deny",
     }
     with _auth_override("admin"), _opa_patch():
         async with AsyncClient(
