@@ -57,7 +57,7 @@ os.environ["WAL_DIR"] = os.path.join(
 @pytest.fixture(autouse=True)
 def reset_config_and_db_engine():
     """
-    Reload app.core.config and reset the dashboard engine cache after each test.
+    Reload app.core.config after each test.
 
     test_config.py reloads app.core.config with a fake DATABASE_URL, leaving
     the module-level settings singleton poisoned for subsequent tests. This
@@ -68,9 +68,6 @@ def reset_config_and_db_engine():
     import app.core.config
     importlib.reload(app.core.config)
 
-    import dashboard.db
-    dashboard.db._sync_engine = None
-    dashboard.db._SyncSession = None
 
 
 # ── Integration test fixtures (live API at localhost:8001) ────────────────────
@@ -98,6 +95,44 @@ async def _cleanup_test_policies():
         await session.commit()
 
 
+async def _cleanup_test_agent_rows(session):
+    # sessions.agent_id, audit_events.agent_id and audit_events.session_id are
+    # all NO ACTION FKs, so a bare DELETE FROM agents raises
+    # ForeignKeyViolationError the moment a test drives a real intercept for a
+    # test agent -- which aborts this session-scoped fixture and turns every
+    # later test into an "ERROR at setup". audit_events is append-only, so the
+    # event rows are never deleted: their nullable FK columns are cleared
+    # instead, exactly as _cleanup_test_policies already does for
+    # policy_id/policy_name. hitl_reviews.session_id is the same case.
+    await session.execute(text(
+        "UPDATE audit_events SET agent_id = NULL "
+        "WHERE agent_id IN (SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
+    ))
+    await session.execute(text(
+        "UPDATE audit_events SET session_id = NULL WHERE session_id IN "
+        "(SELECT id FROM sessions WHERE agent_id IN "
+        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%'))"
+    ))
+    await session.execute(text(
+        "UPDATE hitl_reviews SET session_id = NULL WHERE session_id IN "
+        "(SELECT id FROM sessions WHERE agent_id IN "
+        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%'))"
+    ))
+    await session.execute(text(
+        "DELETE FROM sessions WHERE agent_id IN "
+        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
+    ))
+    await session.execute(text(
+        "DELETE FROM admission_scans WHERE agent_id IN "
+        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
+    ))
+    await session.execute(text(
+        "UPDATE discovered_agents SET promoted_agent_id = NULL "
+        "WHERE promoted_agent_id IN (SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
+    ))
+    await session.execute(text("DELETE FROM agents WHERE name LIKE 'test-agent-%'"))
+
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _cleanup_test_agents():
     """Session setup + teardown: remove test-agent-* rows so they don't accumulate
@@ -105,34 +140,11 @@ async def _cleanup_test_agents():
     after (removes this-run creations)."""
     from app.models.database import async_session_factory
     async with async_session_factory() as session:
-        await session.execute(text("DELETE FROM agents WHERE name LIKE 'test-agent-%'"))
+        await _cleanup_test_agent_rows(session)
         await session.commit()
     yield
     async with async_session_factory() as session:
-        await session.execute(text("DELETE FROM agents WHERE name LIKE 'test-agent-%'"))
-        await session.commit()
-
-
-_ADMISSION_SCAN_TEST_TARGET_REFS = (
-    "/some/skill",
-    "tests/fixtures/sample_agent_promptfoo_config.yaml",
-)
-
-
-@pytest_asyncio.fixture(scope="session", autouse=True)
-async def _cleanup_test_admission_scans():
-    """Session setup + teardown: remove admission_scans rows created by
-    test_admission_scans_api.py and test_promptfoo_redteam_adapter.py's
-    router test so they don't accumulate across pytest runs."""
-    from app.models.database import async_session_factory
-    async with async_session_factory() as session:
-        for target_ref in _ADMISSION_SCAN_TEST_TARGET_REFS:
-            await session.execute(text("DELETE FROM admission_scans WHERE target_ref = :ref"), {"ref": target_ref})
-        await session.commit()
-    yield
-    async with async_session_factory() as session:
-        for target_ref in _ADMISSION_SCAN_TEST_TARGET_REFS:
-            await session.execute(text("DELETE FROM admission_scans WHERE target_ref = :ref"), {"ref": target_ref})
+        await _cleanup_test_agent_rows(session)
         await session.commit()
 
 
@@ -170,11 +182,20 @@ async def _cleanup_test_discovery():
 
 _PYTEST_FIXTURE_TOKEN_DESCRIPTIONS = ("pytest-admin-fixture", "pytest-agent-fixture")
 
+# Throwaway descriptions used only by test_conftest_token_cleanup.py to exercise
+# the deletion helper. Kept disjoint from the real ones above so that test can
+# never delete the live tokens _seed_and_token_setup issued for this session.
+_PROBE_TOKEN_DESCRIPTIONS = ("pytest-probe-admin-token", "pytest-probe-agent-token")
 
-async def _delete_pytest_fixture_tokens(session):
+
+async def _delete_pytest_fixture_tokens(session, descriptions=None):
+    """Delete api_tokens rows by description. Defaults to the live fixture
+    descriptions; callers that only want to exercise the mechanism must pass
+    their own throwaway descriptions."""
+    descs = _PYTEST_FIXTURE_TOKEN_DESCRIPTIONS if descriptions is None else descriptions
     await session.execute(
         text("DELETE FROM api_tokens WHERE description = ANY(:descs)"),
-        {"descs": list(_PYTEST_FIXTURE_TOKEN_DESCRIPTIONS)},
+        {"descs": list(descs)},
     )
 
 
@@ -186,10 +207,12 @@ async def _cleanup_pytest_fixture_tokens():
     from app.models.database import async_session_factory
     async with async_session_factory() as session:
         await _delete_pytest_fixture_tokens(session)
+        await _delete_pytest_fixture_tokens(session, descriptions=_PROBE_TOKEN_DESCRIPTIONS)
         await session.commit()
     yield
     async with async_session_factory() as session:
         await _delete_pytest_fixture_tokens(session)
+        await _delete_pytest_fixture_tokens(session, descriptions=_PROBE_TOKEN_DESCRIPTIONS)
         await session.commit()
 
 

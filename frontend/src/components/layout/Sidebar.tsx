@@ -1,12 +1,8 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import {
-  Lock, LayoutDashboard, List, BarChart2, GitBranch,
-  Shield, Bot, Key, CheckSquare, Activity,
-  Brain, FileCheck, LogOut, Settings, CreditCard,
-  Layers, ShieldCheck, ClipboardList, BarChart3, Sparkles,
-  ChevronRight, HeartPulse, SlidersHorizontal, ScanSearch,
-  Sun, Moon,
+  Lock, LayoutDashboard, List, BarChart2, Shield, Bot, Key, CheckSquare, FileCheck, LogOut, Settings, CreditCard,
+  Layers, ShieldCheck, ClipboardList, BarChart3, ChevronRight, SlidersHorizontal, Sun, Moon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useLicense } from "../../hooks/useLicense";
@@ -15,12 +11,11 @@ import { useOrgSettings } from "../../context/OrgSettingsContext";
 import { useTheme } from "../../context/ThemeContext";
 
 const SECTION_PATHS: Record<string, string[]> = {
-  activity:     ["/overview", "/audit-log", "/metrics", "/sessions", "/activity-log"],
-  governance:   ["/policies", "/agents", "/tokens", "/admission-scans"],
+  activity:     ["/overview", "/audit-log", "/metrics"],
+  governance:   ["/policies", "/agents", "/tokens"],
   reviews:      ["/reviews"],
   reports:      ["/reports"],
-  intelligence: ["/intelligence"],
-  admin:        ["/health", "/settings", "/billing"],
+  admin:        ["/settings", "/billing"],
 };
 
 interface NavItemProps {
@@ -154,8 +149,6 @@ export function Sidebar() {
             <NavItem to="/overview"     icon={<LayoutDashboard {...iconProps} />} label="Dashboard" />
             <NavItem to="/audit-log"    icon={<List {...iconProps} />}            label="Agent activity" />
             <NavItem to="/metrics"      icon={<BarChart2 {...iconProps} />}       label="Decision metrics" />
-            <NavItem to="/activity-log" icon={<Activity {...iconProps} />}        label="Activity audit" />
-            <NavItem to="/sessions"     icon={<GitBranch {...iconProps} />}       label="Sessions" locked />
           </div>
         )}
 
@@ -171,7 +164,6 @@ export function Sidebar() {
             <NavItem to="/policies" icon={<Shield {...iconProps} />} label="Policies" />
             <NavItem to="/agents"   icon={<Bot {...iconProps} />}    label="Agents" />
             <NavItem to="/tokens"   icon={<Key {...iconProps} />}    label="API tokens" />
-            <NavItem to="/admission-scans" icon={<ScanSearch {...iconProps} />} label="Admission scans" />
           </div>
         )}
 
@@ -207,19 +199,6 @@ export function Sidebar() {
           </div>
         )}
 
-        {/* INTELLIGENCE */}
-        <SectionHeader
-          icon={<Sparkles {...iconProps} />}
-          label="Intelligence"
-          isOpen={openSection === "intelligence"}
-          onClick={() => toggleSection("intelligence")}
-        />
-        {openSection === "intelligence" && (
-          <div className="animate-fade-up pb-1">
-            <NavItem to="/intelligence"       icon={<Brain {...iconProps} />}     label="Threat summaries" locked={!isEnterprise} />
-          </div>
-        )}
-
         {/* ADMIN */}
         <SectionHeader
           icon={<SlidersHorizontal {...iconProps} />}
@@ -229,7 +208,6 @@ export function Sidebar() {
         />
         {openSection === "admin" && (
           <div className="animate-fade-up pb-1">
-            <NavItem to="/health"   icon={<HeartPulse {...iconProps} />} label="System health" />
             <NavItem to="/settings" icon={<Settings {...iconProps} />}   label="Settings" />
             <NavItem to="/billing"  icon={<CreditCard {...iconProps} />} label="Subscription" />
           </div>

@@ -10,11 +10,9 @@ from app.models.database import async_session_factory
 from app.routers.auth import router as auth_router
 from app.routers.audit_events import router as audit_events_router
 from app.routers.dashboard import router as dashboard_router
-from app.routers.debug import router as debug_router
 from app.routers.intercept import router as intercept_router
 from app.routers.policies import router as policies_router
 from app.routers.agents import router as agents_router
-from app.routers.admission_scans import router as admission_scans_router
 from app.routers.reviews import router as reviews_router
 from app.routers.sessions import router as sessions_router
 from app.routers.slack_actions import router as slack_router
@@ -36,17 +34,11 @@ from app.services.wal_shipper import WalShipper
 # pushing to github.com/alpaaai/aicontrol-oss) — these imports must stay
 # optional so every OSS deployment can still boot.
 try:
-    from enterprise.app.routers.warnings import router as warnings_router
-    from enterprise.app.routers.mcp_servers import router as mcp_servers_router
-    from enterprise.app.routers.discovery import router as discovery_router
     from enterprise.compliance.router import router as compliance_router
     from enterprise.app.routers.policy_authoring import router as policy_authoring_router
     from enterprise.app.routers.audit_export_config import router as audit_export_config_router
     from enterprise.app.services.drift_detector import DriftDetector
 except ImportError:
-    warnings_router = None
-    mcp_servers_router = None
-    discovery_router = None
     compliance_router = None
     policy_authoring_router = None
     audit_export_config_router = None
@@ -122,11 +114,9 @@ app.include_router(setup_router)
 app.include_router(auth_router)
 app.include_router(audit_events_router)
 app.include_router(dashboard_router)
-app.include_router(debug_router)
 app.include_router(intercept_router)
 app.include_router(policies_router)
 app.include_router(agents_router)
-app.include_router(admission_scans_router)
 app.include_router(reviews_router)
 app.include_router(sessions_router)
 app.include_router(slack_router)
@@ -135,12 +125,6 @@ app.include_router(billing_router)
 app.include_router(users_router)
 app.include_router(org_settings_router)
 app.include_router(demo_router)
-if warnings_router is not None:
-    app.include_router(warnings_router)
-if mcp_servers_router is not None:
-    app.include_router(mcp_servers_router)
-if discovery_router is not None:
-    app.include_router(discovery_router)
 if compliance_router is not None:
     app.include_router(compliance_router)
 if policy_authoring_router is not None:
