@@ -143,6 +143,13 @@ async def _cleanup_test_agent_rows(session):
         "UPDATE discovered_agents SET promoted_agent_id = NULL "
         "WHERE promoted_agent_id IN (SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
     ))
+    # api_tokens.agent_id is another NO ACTION FK: an agent-scoped token issued
+    # by a test pins its agent row and turns the delete below into a
+    # ForeignKeyViolationError.
+    await session.execute(text(
+        "DELETE FROM api_tokens WHERE agent_id IN "
+        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
+    ))
     await session.execute(text("DELETE FROM agents WHERE name LIKE 'test-agent-%'"))
 
 

@@ -20,7 +20,7 @@ from app.services.hitl_service import create_hitl_review, post_slack_review
 from app.services.cedar_client import current_time_context, evaluate
 from app.services.policy_compiler import ALL_PARAMS_FIELD
 from app.services.rate_limit_service import build_call_counts
-from app.services.system_resolver import resolve_system
+from app.services.system_resolver import UNKNOWN_SYSTEM, merge_unresolved, resolve_system
 from app.services.response_scanner import scan_tool_response
 from app.services.token_budget_service import build_aggregate_budgets, build_token_budgets
 from app.services.wal import default_wal_writer as wal_writer
@@ -42,6 +42,9 @@ class InterceptRequest(BaseModel):
     tool_name: str
     tool_parameters: dict[str, Any] = {}
     sequence_number: int
+    # Defaulted rather than nullable on the wire, so the grouping dimension
+    # always has a value even from an adapter that cannot resolve one.
+    workflow: str = "unassigned"
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     cost_usd: Optional[float] = None
@@ -190,6 +193,7 @@ async def intercept(
                 "tool_parameters": enriched_early,
                 "decision": "deny",
                 "decision_reason": "tool_not_approved_for_agent",
+                "workflow": body.workflow,
                 "sequence_number": body.sequence_number,
                 "duration_ms": early_duration_ms,
                 "risk_delta": RISK_SCORE_DELTA["deny"],
@@ -208,6 +212,12 @@ async def intercept(
     # Resolve the business system this call touches, then load only the
     # policies scoped to (this agent, this tool, this system).
     system = resolve_system(body.tool_name, body.tool_parameters)
+    if system == UNKNOWN_SYSTEM and agent is not None:
+        # Record it so an admin can correct the mapping. Guarded: writing on
+        # every call would put a row update on the hot path for no gain.
+        merged = merge_unresolved(agent.unresolved_systems, body.tool_name)
+        if merged != (agent.unresolved_systems or []):
+            agent.unresolved_systems = merged
     agent_groups: list[str] = list(getattr(agent, "groups", None) or []) if agent else []
     policies = await get_scoped_policies(
         db,
@@ -252,6 +262,10 @@ async def intercept(
         context={
             "tool_name": body.tool_name,
             **body.tool_parameters,
+            # Context, not a binding axis: a policy can condition on
+            # context.workflow with no migration. Set after the spread so a
+            # tool parameter named "workflow" cannot shadow the real one.
+            "workflow": body.workflow,
             # Flattened parameter text, so a policy can match "any parameter
             # contains X" -- Cedar cannot iterate the context's own keys.
             ALL_PARAMS_FIELD: " ".join(
@@ -312,6 +326,7 @@ async def intercept(
             tool_parameters=enriched_parameters,
             decision=true_decision,
             decision_reason=true_reason,
+            workflow=body.workflow,
             sequence_number=body.sequence_number,
             duration_ms=duration_ms,
             risk_delta=RISK_SCORE_DELTA.get(true_decision, 0),
@@ -350,6 +365,7 @@ async def intercept(
             "policy_name": fired_policy_name or None,
             "decision": true_decision,
             "decision_reason": true_reason,
+            "workflow": body.workflow,
             "sequence_number": body.sequence_number,
             "duration_ms": duration_ms,
             "risk_delta": RISK_SCORE_DELTA.get(true_decision, 0),

@@ -59,6 +59,13 @@ class AgentResponse(BaseModel):
     approved_tools: list
     approved_by: Optional[str]
     governance_mode: str
+    hook: Optional[str] = None
+    sdk_version: Optional[str] = None
+    workflow: Optional[str] = None
+    coverage_last_seen_at: Optional[datetime] = None
+    coverage_state: str = "unknown"
+    silent_noop_warnings: list = []
+    unresolved_systems: list = []
 
 
 class AgentListItem(BaseModel):
@@ -75,6 +82,21 @@ class AgentListItem(BaseModel):
     created_at: Optional[datetime]
     last_active: Optional[datetime]
     deny_rate: Optional[float]
+    hook: Optional[str] = None
+    sdk_version: Optional[str] = None
+    workflow: Optional[str] = None
+    coverage_last_seen_at: Optional[datetime] = None
+    coverage_state: str = "unknown"
+    silent_noop_warnings: list = []
+    unresolved_systems: list = []
+
+
+def derive_coverage_state(agent: Any, has_recent_traffic: bool) -> str:
+    """installed_not_firing is the state this feature exists to surface: the
+    library loaded and the hook bound, but no call ever arrived."""
+    if agent.coverage_last_seen_at is None:
+        return "unknown"
+    return "governed" if has_recent_traffic else "installed_not_firing"
 
 
 class ApprovedToolsUpdate(BaseModel):
@@ -157,6 +179,18 @@ async def list_agents(
         .scalar_subquery()
     )
 
+    # One correlated EXISTS for every agent, not one query per agent.
+    recent_traffic_sq = (
+        select(func.count())
+        .select_from(AuditEvent)
+        .where(
+            AuditEvent.agent_id == Agent.id,
+            AuditEvent.created_at >= Agent.coverage_last_seen_at,
+        )
+        .correlate(Agent)
+        .scalar_subquery()
+    )
+
     rows = (await db.execute(
         select(
             Agent.id,
@@ -170,9 +204,16 @@ async def list_agents(
             Agent.system_prompt_hash,
             Agent.approved_at,
             Agent.created_at,
+            Agent.hook,
+            Agent.sdk_version,
+            Agent.workflow,
+            Agent.coverage_last_seen_at,
+            Agent.silent_noop_warnings,
+            Agent.unresolved_systems,
             last_active_sq.label("last_active"),
             total_sq.label("total_count"),
             deny_sq.label("deny_count"),
+            recent_traffic_sq.label("recent_traffic_count"),
         ).order_by(Agent.name)
     )).all()
 
@@ -191,6 +232,13 @@ async def list_agents(
             created_at=r.created_at,
             last_active=r.last_active,
             deny_rate=round(r.deny_count / r.total_count, 4) if r.total_count else None,
+            hook=r.hook,
+            sdk_version=r.sdk_version,
+            workflow=r.workflow,
+            coverage_last_seen_at=r.coverage_last_seen_at,
+            coverage_state=derive_coverage_state(r, bool(r.recent_traffic_count)),
+            silent_noop_warnings=r.silent_noop_warnings or [],
+            unresolved_systems=r.unresolved_systems or [],
         )
         for r in rows
     ]
@@ -205,7 +253,23 @@ async def get_agent(
     agent = await db.get(Agent, agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    return agent
+
+    has_recent_traffic = False
+    if agent.coverage_last_seen_at is not None:
+        has_recent_traffic = bool((await db.execute(
+            select(func.count())
+            .select_from(AuditEvent)
+            .where(
+                AuditEvent.agent_id == agent.id,
+                AuditEvent.created_at >= agent.coverage_last_seen_at,
+            )
+        )).scalar())
+
+    response = AgentResponse.model_validate(agent)
+    response.coverage_state = derive_coverage_state(agent, has_recent_traffic)
+    response.silent_noop_warnings = agent.silent_noop_warnings or []
+    response.unresolved_systems = agent.unresolved_systems or []
+    return response
 
 
 @router.post("", response_model=AgentResponse, status_code=201)

@@ -34,14 +34,19 @@ deny to actually block LangGraph tool execution must define tools with
 `async def`, not plain `def`.
 """
 import itertools
+import logging
 import uuid
 from typing import Any
 
+from aicontrol_sdk.adapters.base import CoverageReporting, WorkflowResolution
 from aicontrol_sdk.intercept_client import InterceptClient
 
+logger = logging.getLogger("aicontrol_sdk.langgraph")
 
-class LangGraphAdapter:
+
+class LangGraphAdapter(WorkflowResolution, CoverageReporting):
     name = "langgraph"
+    hook = "BaseCallbackHandler.on_tool_start"
 
     def is_available(self) -> bool:
         try:
@@ -50,20 +55,71 @@ class LangGraphAdapter:
         except ImportError:
             return False
 
-    def patch(self, client: InterceptClient) -> None:
+    def patch(self, client: InterceptClient, workflow: str | None = None,
+              target: Any = None) -> None:
+        """`target` is the compiled graph, when the caller has one: it is what
+        the sync-tool detection inspects, and what carries the graph name."""
         self._client = client
+        self._declared_workflow = workflow
+        if target is not None:
+            self.capture_framework_workflow(target)
+        self.report_coverage(client, target=target)
 
-    def build_callback_handler(self, session_id: str | None = None):
+    def resolve_session_id(self, *, thread_id: str | None, run_id: Any = None) -> str:
+        """thread_id is LangGraph's conversation: it is stable across the turns
+        of one thread, which is what a session means here. run_id identifies a
+        single invocation and is the next best thing. Generating one is the
+        last resort -- it correlates with nothing on the LangGraph side."""
+        if thread_id:
+            return str(thread_id)
+        if run_id:
+            return str(run_id)
+        logger.warning("langgraph_session_id_generated_no_framework_id")
+        return str(uuid.uuid4())
+
+    def session_id_from_config(self, config: Any, run_id: Any = None) -> str:
+        """The callback receives the run config (and, on newer langchain_core,
+        a metadata dict carrying the same thread_id). Read either shape."""
+        configurable = (config or {}).get("configurable", {}) if isinstance(config, dict) else {}
+        thread_id = configurable.get("thread_id") or (
+            (config or {}).get("thread_id") if isinstance(config, dict) else None
+        )
+        return self.resolve_session_id(thread_id=thread_id, run_id=run_id)
+
+    def capture_framework_workflow(self, graph: Any) -> None:
+        """LangGraph's own name for a process is the compiled graph's name
+        (`assistant_id` on a deployed graph, `name` on a locally compiled
+        one). "LangGraph" is the default StateGraph name and identifies
+        nothing, so it is treated as absent."""
+        name = getattr(graph, "assistant_id", None) or getattr(graph, "name", None)
+        if name and name != "LangGraph":
+            self._framework_workflow = name
+
+    def build_callback_handler(self, session_id: str | None = None, graph: Any = None):
         """Returns a BaseCallbackHandler to pass as config={"callbacks": [...]}
         on graph.invoke()/.ainvoke() calls — LangGraph does not offer a global
         monkeypatch point the way OpenAI Agents SDK's Runner does, so callers
         wire this in explicitly per invocation."""
         from langchain_core.callbacks import BaseCallbackHandler
 
+        if graph is not None:
+            self.capture_framework_workflow(graph)
+
         client = self._client
-        sid = session_id or str(uuid.uuid4())
+        adapter = self
         counter = itertools.count(1)
         run_id_to_tool_name: dict[Any, str] = {}
+        run_id_to_session_id: dict[Any, str] = {}
+
+        def _session_for(run_id, kwargs) -> str:
+            """One handler can serve many threads, so the session is taken
+            from the callback's own metadata rather than fixed when the
+            handler was built. An explicit session_id= still wins, for
+            callers who correlate sessions themselves."""
+            if session_id:
+                return session_id
+            metadata = kwargs.get("metadata") or {}
+            return adapter.session_id_from_config(metadata, run_id=run_id)
 
         class AIControlCallbackHandler(BaseCallbackHandler):
             # LangChain's CallbackManager swallows exceptions raised from
@@ -76,15 +132,21 @@ class LangGraphAdapter:
             async def on_tool_start(self_, serialized, input_str, *, run_id, **kwargs):
                 tool_name = serialized.get("name", "unknown")
                 run_id_to_tool_name[run_id] = tool_name
+                sid = _session_for(run_id, kwargs)
+                run_id_to_session_id[run_id] = sid
                 await client.intercept(
                     tool_name=tool_name,
                     tool_parameters=kwargs.get("inputs") or {},
                     session_id=sid,
                     sequence_number=next(counter),
+                    workflow=adapter.resolve_workflow(),
                 )
 
             async def on_tool_end(self_, output, *, run_id, **kwargs):
                 tool_name = run_id_to_tool_name.pop(run_id, "unknown")
+                # Same session the matching on_tool_start reported under --
+                # on_tool_end carries no metadata to re-derive it from.
+                sid = run_id_to_session_id.pop(run_id, None) or _session_for(run_id, kwargs)
                 await client.report_response(
                     tool_name=tool_name,
                     tool_response=output,

@@ -57,6 +57,22 @@ def _system_from_url(url: str) -> str | None:
     return None
 
 
+MAX_UNRESOLVED_TRACKED = 20
+
+
+def merge_unresolved(existing: list[str] | None, tool_name: str) -> list[str]:
+    """Append a tool whose system could not be inferred, distinct and bounded.
+
+    This is the 2.2 fail-open mitigation: a policy bound to a system silently
+    does not match a call whose system is unknown, so the unknowns have to be
+    visible for an admin to correct the mapping.
+    """
+    current = list(existing or [])
+    if tool_name in current:
+        return current
+    return (current + [tool_name])[-MAX_UNRESOLVED_TRACKED:]
+
+
 def resolve_system(tool_name: str, tool_parameters: dict[str, Any]) -> str:
     """Return the business system this tool call touches, or UNKNOWN_SYSTEM."""
     explicit = tool_parameters.get("system")

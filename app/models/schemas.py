@@ -25,6 +25,17 @@ class Agent(Base):
     approved_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, server_default="{}")
     governance_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="govern")
+    # Coverage: what the adapter reported about itself at bind time. Separates
+    # "this agent has never run" from "this agent ran and the hook never fired",
+    # which traffic alone cannot distinguish.
+    hook: Mapped[Optional[str]] = mapped_column(String(100))
+    sdk_version: Mapped[Optional[str]] = mapped_column(String(30))
+    workflow: Mapped[Optional[str]] = mapped_column(String(100))
+    coverage_last_seen_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
+    # JSONB, not ARRAY(String): asyncpg cannot infer an array type from a
+    # Python list bound into text() SQL, which the test fixtures use.
+    silent_noop_warnings: Mapped[Optional[list]] = mapped_column(JSONB, server_default="[]")
+    unresolved_systems: Mapped[Optional[list]] = mapped_column(JSONB, server_default="[]")
     created_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP, server_default=func.now())
 
     @validates("status")
@@ -114,6 +125,9 @@ class AuditEvent(Base):
     policy_name: Mapped[Optional[str]] = mapped_column(String(100))
     decision: Mapped[str] = mapped_column(String(20), nullable=False)
     decision_reason: Mapped[Optional[str]] = mapped_column(Text)
+    # The business process the call belongs to. Context, not a binding axis --
+    # it groups the audit trail by process rather than by a stranger's uuid.
+    workflow: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
     risk_delta: Mapped[Optional[int]] = mapped_column(Integer, server_default="0")
     duration_ms: Mapped[Optional[int]] = mapped_column(Integer)
     input_tokens: Mapped[Optional[int]] = mapped_column(Integer)
