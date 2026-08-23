@@ -28,7 +28,6 @@ test("activity section auto-opens on /overview and shows sub-items", async ({ pa
   await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Agent activity" })).toBeVisible();
   await expect(page.getByRole("link", { name: "Decision metrics" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Activity audit" })).toBeVisible();
 });
 
 test("clicking a section header expands it and collapses others", async ({ page }) => {

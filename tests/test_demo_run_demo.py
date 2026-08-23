@@ -10,10 +10,10 @@ from scripts.demos.scenarios import SCENARIOS
 
 
 def test_main_forwards_args_to_dispatch():
-    test_args = ["run_demo.py", "--scenario", "lending", "--token", "tok123", "--mode", "fast"]
+    test_args = ["run_demo.py", "--scenario", "insurance", "--token", "tok123", "--mode", "fast"]
     with patch.object(sys, "argv", test_args), patch("scripts.demos.run_demo.dispatch") as mock_dispatch:
         run_demo.main()
-        mock_dispatch.assert_called_once_with("lending", "tok123", "fast")
+        mock_dispatch.assert_called_once_with("insurance", "tok123", "fast")
 
 
 def test_main_defaults_mode_to_walkthrough():
@@ -34,6 +34,6 @@ def test_unknown_scenario_rejected_by_argparse():
 
 
 def test_all_scenario_names_are_selectable():
-    parser_choices = run_demo.build_parser().parse_args(["--scenario", "mcp_gateway", "--token", "t"]).scenario
-    assert parser_choices == "mcp_gateway"
+    parser_choices = run_demo.build_parser().parse_args(["--scenario", "revops", "--token", "t"]).scenario
+    assert parser_choices == "revops"
     assert set(SCENARIOS.keys()) == set(run_demo.build_parser()._option_string_actions["--scenario"].choices)

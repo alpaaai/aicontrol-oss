@@ -79,14 +79,9 @@ test.describe('P1-8 Demo Walkthrough', () => {
   })
 
   test('6. Enterprise features are locked (community install)', async ({ page }) => {
-    await page.goto('/sessions')
-    await expect(page.getByText('Sessions — Enterprise Feature')).toBeVisible({ timeout: 5000 })
-
     await page.goto('/reviews')
     await expect(page.getByText('Review Queue — Enterprise Feature')).toBeVisible({ timeout: 5000 })
 
-    await page.goto('/health')
-    await expect(page.getByText('OPA Health Monitor — Enterprise')).toBeVisible({ timeout: 5000 })
 
     await page.goto('/reports')
     await expect(page.getByText('Compliance Reports — Enterprise')).toBeVisible({ timeout: 5000 })

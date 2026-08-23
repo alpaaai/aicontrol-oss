@@ -3,12 +3,12 @@ truth for all demo scenario data. Every scenario must declare a known kind
 and the fields that kind's engine run-function depends on."""
 from scripts.demos.scenarios import SCENARIOS
 
-INTERCEPT_SCENARIOS = {"lending", "healthcare", "itsm", "manufacturing", "revops", "support", "insurance"}
-KNOWN_KINDS = {"intercept", "admission_scan", "mcp_gateway", "nl_policy_draft"}
+INTERCEPT_SCENARIOS = {"healthcare", "revops", "insurance"}
+KNOWN_KINDS = {"intercept"}
 
 
 def test_scenario_keys_match_expected_set():
-    assert set(SCENARIOS.keys()) == INTERCEPT_SCENARIOS | {"admission_scanning", "mcp_gateway", "nl_policy_authoring"}
+    assert set(SCENARIOS.keys()) == INTERCEPT_SCENARIOS
 
 
 def test_every_scenario_has_a_known_kind():
@@ -43,40 +43,8 @@ def test_insurance_uses_policy_name_for_deny_detail():
     assert SCENARIOS["insurance"]["deny_detail_field"] == "policy_name"
 
 
-def test_lending_calls_have_v2_feature_badges():
-    calls_with_badge = [c for c in SCENARIOS["lending"]["tool_calls"] if c.get("v2_feature")]
-    assert {c["v2_feature"] for c in calls_with_badge} == {"rate_limit", "approved_tools"}
-
-
 def test_insurance_payment_call_has_review_note():
     payment_call = next(c for c in SCENARIOS["insurance"]["tool_calls"] if c["tool_name"] == "process_claim_payment")
     assert payment_call["review_note"] == "Routed to senior adjuster via Slack for approval"
 
 
-def test_admission_scanning_steps_have_required_fields():
-    scenario = SCENARIOS["admission_scanning"]
-    assert scenario["kind"] == "admission_scan"
-    for step in scenario["steps"]:
-        assert step["kind"] in ("skill_scan", "mcp_enroll")
-        assert step["label"]
-        assert step["narrative"]
-        assert step["insight"]
-        if step["kind"] == "skill_scan":
-            assert step["target_ref"]
-        else:
-            assert step["name"]
-            assert step["base_url"]
-
-
-def test_mcp_gateway_has_setup_fields_and_steps():
-    scenario = SCENARIOS["mcp_gateway"]
-    assert scenario["kind"] == "mcp_gateway"
-    assert scenario["server_name"]
-    assert scenario["downstream_base_url"]
-    assert isinstance(scenario["approved_tools"], list)
-    for step in scenario["steps"]:
-        assert step["method"] in ("tools/list", "call_tool")
-        assert isinstance(step["body"], dict)
-        assert step["label"]
-        assert step["narrative"]
-        assert step["insight"]

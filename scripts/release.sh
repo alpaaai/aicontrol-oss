@@ -31,18 +31,8 @@ docker buildx build \
   --push \
   .
 
-# Build Dashboard
-docker buildx build \
-  --platform linux/amd64,linux/arm64 \
-  --file Dockerfile.dashboard \
-  --tag "$REGISTRY/$OWNER/aicontrol-dashboard:$VERSION" \
-  --tag "$REGISTRY/$OWNER/aicontrol-dashboard:latest" \
-  --push \
-  .
-
 echo ""
 echo "Released $VERSION to ghcr.io/$OWNER"
 echo ""
 echo "Update docker-compose.app.yml to use:"
 echo "  image: $REGISTRY/$OWNER/aicontrol-api:$VERSION"
-echo "  image: $REGISTRY/$OWNER/aicontrol-dashboard:$VERSION"
