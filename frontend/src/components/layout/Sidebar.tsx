@@ -1,245 +1,81 @@
-import { NavLink, useLocation } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
-import {
-  Lock, LayoutDashboard, List, BarChart2, Shield, Bot, Key, CheckSquare, FileCheck, LogOut, Settings, CreditCard,
-  Layers, ShieldCheck, ClipboardList, BarChart3, ChevronRight, SlidersHorizontal, Sun, Moon,
-} from "lucide-react";
+import { LogOut } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useLicense } from "../../hooks/useLicense";
-import { getSummary } from "../../api/dashboard";
+import { getLicenseFeatures, type FeatureFlags } from "../../api/license";
 import { useOrgSettings } from "../../context/OrgSettingsContext";
-import { useTheme } from "../../context/ThemeContext";
 
-const SECTION_PATHS: Record<string, string[]> = {
-  activity:     ["/overview", "/audit-log", "/metrics"],
-  governance:   ["/policies", "/agents", "/tokens"],
-  reviews:      ["/reviews"],
-  reports:      ["/reports"],
-  admin:        ["/settings", "/billing"],
-};
+type NavItem = { label: string; path: string; requires?: keyof FeatureFlags };
 
-interface NavItemProps {
-  to: string;
-  icon: React.ReactNode;
-  label: string;
-  locked?: boolean;
-  badge?: number;
-}
-
-function NavItem({ to, icon, label, locked, badge }: NavItemProps) {
-  if (locked) {
-    return (
-      <div className="flex items-center gap-2.5 px-4 py-[7px] text-[13px] text-white/30 cursor-default opacity-50">
-        <span className="text-white/25 w-[14px] shrink-0">{icon}</span>
-        <span>{label}</span>
-        <Lock className="w-2.5 h-2.5 ml-auto text-white/20" />
-      </div>
-    );
-  }
-  return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        "flex items-center gap-2.5 px-4 py-[7px] text-[13px] relative transition-all duration-150 group " +
-        (isActive
-          ? "bg-[#0284A81A] text-[#6CC3D6] font-medium before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:bg-ac-gradient-feather before:rounded-r"
-          : "text-white/55 hover:bg-white/5 hover:text-white/80 hover:translate-x-0.5")
-      }
-    >
-      <span className="w-[14px] shrink-0 transition-transform duration-150 group-hover:scale-110">{icon}</span>
-      <span>{label}</span>
-      {badge !== undefined && badge > 0 && (
-        <span className="ml-auto bg-ac-deny-bg text-ac-deny text-[10px] font-medium px-1.5 py-0.5 rounded-full">
-          {badge}
-        </span>
-      )}
-    </NavLink>
-  );
-}
-
-interface SectionHeaderProps {
-  icon: React.ReactNode;
-  label: string;
-  isOpen: boolean;
-  onClick: () => void;
-}
-
-function SectionHeader({ icon, label, isOpen, onClick }: SectionHeaderProps) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-4 pt-2.5 pb-1 text-[10px] font-medium uppercase tracking-[0.07em] transition-colors duration-150 ${
-        isOpen ? "text-white" : "text-white/35 hover:text-white/60"
-      }`}
-    >
-      <span className={`w-[14px] shrink-0 transition-opacity duration-150 ${isOpen ? "opacity-100" : "opacity-35"}`}>
-        {icon}
-      </span>
-      <span>{label}</span>
-      <ChevronRight
-        size={10}
-        strokeWidth={2}
-        className={`ml-auto transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
-      />
-    </button>
-  );
-}
+const NAV_ITEMS: NavItem[] = [
+  { label: "Overview",  path: "/overview" },
+  { label: "Agents",    path: "/agents" },
+  { label: "Policies",  path: "/policies" },
+  { label: "Audit log", path: "/audit" },
+  { label: "Reviews",   path: "/reviews", requires: "hitl" },
+  { label: "Metrics",   path: "/metrics" },
+  { label: "Reports",   path: "/reports", requires: "compliance_reports" },
+  { label: "Billing",   path: "/billing", requires: "compliance_reports" },
+  { label: "Demo",      path: "/demo" },
+];
 
 export function Sidebar() {
   const { user, logout } = useAuth();
-  const { isEnterprise } = useLicense();
   const { orgName } = useOrgSettings();
-  const { theme, toggleTheme } = useTheme();
-  const location = useLocation();
-  const iconProps = { size: 14, strokeWidth: 1.75 };
-  const [openSection, setOpenSection] = useState<string | null>(null);
-  const [pendingReviews, setPendingReviews] = useState(0);
-
-  // Auto-open section containing the active route
-  useEffect(() => {
-    const match = Object.entries(SECTION_PATHS).find(([, paths]) =>
-      paths.some(p => location.pathname === p || location.pathname.startsWith(p + "/"))
-    );
-    if (match) setOpenSection(match[0]);
-  }, [location.pathname]);
+  const [features, setFeatures] = useState<FeatureFlags | null>(null);
 
   useEffect(() => {
-    if (!isEnterprise) return;
-    const load = () => getSummary().then(d => setPendingReviews(d.pending_reviews)).catch(() => {});
-    load();
-    const timer = setInterval(load, 30000);
-    return () => clearInterval(timer);
+    getLicenseFeatures()
+      .then((r) => setFeatures(r.features))
+      .catch(() => {});
   }, []);
 
-  const toggleSection = (key: string) =>
-    setOpenSection(prev => (prev === key ? null : key));
+  const items = NAV_ITEMS.filter(
+    (item) => !item.requires || features?.[item.requires],
+  );
 
   return (
-    <div className="w-[224px] shrink-0 bg-ac-night flex flex-col h-screen sticky top-0 noise">
-      {/* Subtle radial glow behind logo area */}
-      <div
-        className="pointer-events-none absolute top-0 left-0 w-[200px] h-[120px] opacity-20"
-        style={{ background: "radial-gradient(ellipse at 30% 20%, #0284A8 0%, transparent 70%)" }}
-        aria-hidden
-      />
-
-      {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-4 border-b border-white/[0.07] relative z-10">
-        <div
-          className="w-[26px] h-[26px] bg-ac-gradient-feather rounded-[6px] flex items-center justify-center shrink-0"
-          style={{ boxShadow: "0 0 12px rgba(2,132,168,0.55), 0 0 4px rgba(2,132,168,0.3)" }}
-        >
-          <div className="w-[10px] h-[10px] bg-white/90 rounded-[2px]" />
+    <div className="w-[224px] shrink-0 bg-ac-canvas border-r border-ac-hairline flex flex-col h-screen sticky top-0">
+      <div className="flex items-center gap-2 px-4 py-4 border-b border-ac-hairline">
+        <div className="w-[26px] h-[26px] bg-ac-primary rounded-md flex items-center justify-center shrink-0">
+          <div className="w-[10px] h-[10px] bg-ac-on-primary rounded-[2px]" />
         </div>
-        <span className="text-[13.5px] font-semibold tracking-[-0.01em] text-white font-display">{orgName || "AIControl"}</span>
-        <span className="ml-auto text-[10px] text-white/30">v2</span>
+        <span className="text-title-md text-ac-ink font-display truncate">
+          {orgName || "AIControl"}
+        </span>
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden scrollbar-hide relative z-10">
-        {/* ACTIVITY */}
-        <SectionHeader
-          icon={<Layers {...iconProps} />}
-          label="Activity"
-          isOpen={openSection === "activity"}
-          onClick={() => toggleSection("activity")}
-        />
-        {openSection === "activity" && (
-          <div className="animate-fade-up pb-1">
-            <NavItem to="/overview"     icon={<LayoutDashboard {...iconProps} />} label="Dashboard" />
-            <NavItem to="/audit-log"    icon={<List {...iconProps} />}            label="Agent activity" />
-            <NavItem to="/metrics"      icon={<BarChart2 {...iconProps} />}       label="Decision metrics" />
-          </div>
-        )}
-
-        {/* GOVERNANCE */}
-        <SectionHeader
-          icon={<ShieldCheck {...iconProps} />}
-          label="Governance"
-          isOpen={openSection === "governance"}
-          onClick={() => toggleSection("governance")}
-        />
-        {openSection === "governance" && (
-          <div className="animate-fade-up pb-1">
-            <NavItem to="/policies" icon={<Shield {...iconProps} />} label="Policies" />
-            <NavItem to="/agents"   icon={<Bot {...iconProps} />}    label="Agents" />
-            <NavItem to="/tokens"   icon={<Key {...iconProps} />}    label="API tokens" />
-          </div>
-        )}
-
-        {/* MANUAL REVIEWS */}
-        <SectionHeader
-          icon={<ClipboardList {...iconProps} />}
-          label="Manual Reviews"
-          isOpen={openSection === "reviews"}
-          onClick={() => toggleSection("reviews")}
-        />
-        {openSection === "reviews" && (
-          <div className="animate-fade-up pb-1">
-            <NavItem
-              to="/reviews"
-              icon={<CheckSquare {...iconProps} />}
-              label="Review queue"
-              locked={!isEnterprise}
-              badge={isEnterprise ? pendingReviews : undefined}
-            />
-          </div>
-        )}
-
-        {/* REPORTS */}
-        <SectionHeader
-          icon={<BarChart3 {...iconProps} />}
-          label="Reports"
-          isOpen={openSection === "reports"}
-          onClick={() => toggleSection("reports")}
-        />
-        {openSection === "reports" && (
-          <div className="animate-fade-up pb-1">
-            <NavItem to="/reports" icon={<FileCheck {...iconProps} />} label="Compliance" locked={!isEnterprise} />
-          </div>
-        )}
-
-        {/* ADMIN */}
-        <SectionHeader
-          icon={<SlidersHorizontal {...iconProps} />}
-          label="Admin"
-          isOpen={openSection === "admin"}
-          onClick={() => toggleSection("admin")}
-        />
-        {openSection === "admin" && (
-          <div className="animate-fade-up pb-1">
-            <NavItem to="/settings" icon={<Settings {...iconProps} />}   label="Settings" />
-            <NavItem to="/billing"  icon={<CreditCard {...iconProps} />} label="Subscription" />
-          </div>
-        )}
-
+      <nav className="flex-1 py-2 overflow-y-auto overflow-x-hidden" aria-label="Primary">
+        {items.map((item) => (
+          <NavLink
+            key={item.path}
+            to={item.path}
+            className={({ isActive }) =>
+              "relative block mx-2 my-0.5 px-3 py-2 text-nav-link rounded-sm transition-colors duration-standard " +
+              "before:absolute before:left-0 before:top-1 before:bottom-1 before:w-[3px] before:rounded-full before:transition-opacity before:duration-standard " +
+              (isActive
+                ? "bg-ac-surface-sunk text-ac-ink before:bg-ac-primary before:opacity-100"
+                : "text-ac-body before:opacity-0 hover:text-ac-ink hover:bg-ac-surface-sunk")
+            }
+          >
+            {item.label}
+          </NavLink>
+        ))}
       </nav>
 
-      {/* User row */}
-      <div className="border-t border-white/[0.07] px-4 py-3">
+      <div className="border-t border-ac-hairline px-4 py-3">
         <div className="flex items-center gap-2">
-          <div
-            className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
-            style={{ boxShadow: "0 0 8px rgba(2,132,168,0.4)" }}
-          >
+          <div className="w-6 h-6 rounded-full bg-ac-primary flex items-center justify-center text-[10px] font-semibold text-ac-on-primary shrink-0">
             {user?.email?.[0]?.toUpperCase() ?? "A"}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[12px] text-white/50 truncate">{user?.email}</p>
-            <p className="text-[10px] text-white/25">{user?.role}</p>
+            <p className="text-caption text-ac-body truncate">{user?.email}</p>
+            <p className="text-[10px] text-ac-muted">{user?.role}</p>
           </div>
-          <button
-            data-testid="theme-toggle-btn"
-            onClick={toggleTheme}
-            className="text-white/30 hover:text-white/70 transition-colors duration-150 shrink-0"
-            title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-          >
-            {theme === "dark" ? <Sun size={14} strokeWidth={1.75} /> : <Moon size={14} strokeWidth={1.75} />}
-          </button>
           <button
             data-testid="logout-btn"
             onClick={logout}
-            className="text-white/30 hover:text-white/70 transition-colors duration-150 shrink-0"
+            className="text-ac-muted hover:text-ac-ink transition-colors duration-standard shrink-0"
             title="Logout"
           >
             <LogOut size={14} strokeWidth={1.75} />

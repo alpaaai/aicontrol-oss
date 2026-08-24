@@ -14,16 +14,16 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("locked nav items are visible in their sections", async ({ page }) => {
+test("paid destinations are absent from the nav on a community install", async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({
+      json: { tier: "free", features: { nl_authoring: false, simulation: false, hitl: false, compliance_reports: false } },
+    }),
+  );
   await page.goto("/overview");
-
-  // Open Manual Reviews — Review queue (locked) should appear
-  await page.getByText("Manual Reviews", { exact: true }).click();
-  await expect(page.getByText("Review queue", { exact: true })).toBeVisible();
-
-  // Open Reports — Compliance (locked) should appear
-  await page.getByText("Reports", { exact: true }).click();
-  await expect(page.getByText("Compliance", { exact: true })).toBeVisible();
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: "Reviews" })).toHaveCount(0);
+  await expect(nav.getByRole("link", { name: "Reports" })).toHaveCount(0);
 });
 
 test("review queue page shows enterprise lock overlay", async ({ page }) => {

@@ -44,7 +44,7 @@ export function ReviewRow({ review, onActioned }: Props) {
   }
 
   return (
-    <div className={`p-4 border-b border-gray-50 ${overdue ? 'bg-ac-deny-bg/30' : ''}`}>
+    <div className={`p-4 border-b border-gray-50 ${overdue ? 'bg-ac-decision-deny-soft/30' : ''}`}>
       <div className="flex items-start gap-3">
         <div className="flex-1 min-w-0">
           {(review.tool_name || review.tool_parameters) && (
@@ -64,13 +64,13 @@ export function ReviewRow({ review, onActioned }: Props) {
               Session: {review.session_id ? review.session_id.slice(0, 8) + '…' : '—'}
             </span>
             {overdue && (
-              <span className="flex items-center gap-1 text-[10px] text-ac-deny font-medium">
+              <span className="flex items-center gap-1 text-[10px] text-ac-decision-deny font-medium">
                 <Clock size={10} /> Overdue
               </span>
             )}
           </div>
           {review.assigned_to && (
-            <p className="text-[11px] text-ac-text-muted mb-1">
+            <p className="text-[11px] text-ac-muted mb-1">
               Assigned to: <span className="font-medium">{review.assigned_to}</span>
             </p>
           )}
@@ -80,7 +80,7 @@ export function ReviewRow({ review, onActioned }: Props) {
           <div className="flex items-center gap-3 mt-1.5 text-[11px] text-gray-400">
             <span>{timeAgo(review.created_at)}</span>
             {review.response_deadline && (
-              <span className={`${overdue ? 'text-ac-deny font-medium' : 'text-gray-400'}`}>
+              <span className={`${overdue ? 'text-ac-decision-deny font-medium' : 'text-gray-400'}`}>
                 Due {new Date(review.response_deadline).toLocaleString('en-US', {
                   month: 'short',
                   day: 'numeric',
@@ -92,8 +92,8 @@ export function ReviewRow({ review, onActioned }: Props) {
             )}
             <span
               className={`font-medium ${
-                review.status === 'pending' ? 'text-ac-review' :
-                review.status === 'approved' ? 'text-ac-allow' : 'text-ac-deny'
+                review.status === 'pending' ? 'text-ac-decision-review' :
+                review.status === 'approved' ? 'text-ac-decision-allow' : 'text-ac-decision-deny'
               }`}
             >
               {review.status}
@@ -105,7 +105,7 @@ export function ReviewRow({ review, onActioned }: Props) {
               value={note}
               onChange={e => setNote(e.target.value)}
               placeholder="Add a note (optional)"
-              className="mt-2 w-full border border-ac-border rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-ac-primary/20"
+              className="mt-2 w-full border border-ac-hairline rounded-lg px-2.5 py-1.5 text-[12px] outline-none focus:ring-2 focus:ring-ac-primary-soft"
             />
           )}
         </div>
@@ -113,19 +113,19 @@ export function ReviewRow({ review, onActioned }: Props) {
         <div className="flex items-center gap-1.5 shrink-0">
           <button
             onClick={() => setShowNote(!showNote)}
-            className="text-[11px] text-gray-400 hover:text-gray-600 border border-ac-border rounded-md px-2 py-1">
+            className="text-[11px] text-gray-400 hover:text-gray-600 border border-ac-hairline rounded-md px-2 py-1">
             {showNote ? 'Hide' : 'Note'}
           </button>
           <button
             onClick={() => handleAction('approve')} disabled={approving || denying}
-            className="flex items-center gap-1 text-[12px] bg-ac-allow text-white rounded-md px-3 py-1.5 font-medium
+            className="flex items-center gap-1 text-[12px] bg-ac-decision-allow text-white rounded-md px-3 py-1.5 font-medium
                        hover:opacity-90 disabled:opacity-50 transition-opacity">
             <CheckCircle size={12} />
             {approving ? 'Approving…' : 'Approve'}
           </button>
           <button
             onClick={() => handleAction('deny')} disabled={approving || denying}
-            className="flex items-center gap-1 text-[12px] bg-ac-deny text-white rounded-md px-3 py-1.5 font-medium
+            className="flex items-center gap-1 text-[12px] bg-ac-decision-deny text-white rounded-md px-3 py-1.5 font-medium
                        hover:opacity-90 disabled:opacity-50 transition-opacity">
             <XCircle size={12} />
             {denying ? 'Denying…' : 'Deny'}

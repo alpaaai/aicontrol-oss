@@ -20,35 +20,35 @@ export function TokensPage() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-5 animate-fade-up">
         <div>
-          <h2 className="text-[18px] font-semibold text-ac-text-primary">
+          <h2 className="text-[18px] font-semibold text-ac-ink">
             API tokens
           </h2>
-          <p className="text-sm text-ac-text-muted mt-0.5">
+          <p className="text-sm text-ac-muted mt-0.5">
             Manage agent authentication tokens
           </p>
         </div>
         <button
           onClick={() => setDialogOpen(true)}
-          className="flex items-center gap-1.5 bg-ac-primary text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-ac-primary/90"
+          className="flex items-center gap-1.5 bg-ac-primary text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-ac-primary-active"
         >
           <Plus size={14} /> New token
         </button>
       </div>
 
-      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-5 flex items-start gap-3">
-        <Info size={16} className="text-ac-text-muted shrink-0 mt-0.5" />
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card p-5 flex items-start gap-3">
+        <Info size={16} className="text-ac-muted shrink-0 mt-0.5" />
         <div>
-          <p className="text-[13px] font-medium text-ac-text-primary mb-1">
+          <p className="text-[13px] font-medium text-ac-ink mb-1">
             Tokens are shown once
           </p>
-          <p className="text-[13px] text-ac-text-muted">
+          <p className="text-[13px] text-ac-muted">
             For security, the full token value is only displayed at creation
             time and cannot be retrieved afterwards. Store tokens securely
             immediately after creating them. To rotate a token, create a new one
             — existing tokens on an agent are automatically revoked.
           </p>
           {createdCount > 0 && (
-            <p className="text-[12px] text-ac-allow mt-2">
+            <p className="text-[12px] text-ac-decision-allow mt-2">
               {createdCount} token{createdCount !== 1 ? "s" : ""} created this
               session.
             </p>
@@ -58,10 +58,10 @@ export function TokensPage() {
 
       <div className="mt-5">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-[14px] font-semibold text-ac-text-primary">
+          <h3 className="text-[14px] font-semibold text-ac-ink">
             Issued tokens
           </h3>
-          <label className="flex items-center gap-2 text-[12px] text-ac-text-muted cursor-pointer">
+          <label className="flex items-center gap-2 text-[12px] text-ac-muted cursor-pointer">
             <input
               type="checkbox"
               checked={activeOnly}
@@ -72,9 +72,9 @@ export function TokensPage() {
           </label>
         </div>
 
-        <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
+        <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
           <div
-            className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-text-muted uppercase tracking-wide border-b border-ac-border bg-gray-50"
+            className="grid gap-3 px-4 py-2.5 text-[11px] font-medium text-ac-muted uppercase tracking-wide border-b border-ac-hairline bg-gray-50"
             style={{ gridTemplateColumns: "1fr 80px 160px 80px 140px" }}
           >
             <div>Description</div>
@@ -89,7 +89,7 @@ export function TokensPage() {
           )}
 
           {!tokensLoading && tokens.length === 0 && (
-            <div className="text-center text-sm text-ac-text-muted py-8">
+            <div className="text-center text-sm text-ac-muted py-8">
               No tokens found.
             </div>
           )}
@@ -101,10 +101,10 @@ export function TokensPage() {
               style={{ gridTemplateColumns: "1fr 80px 160px 80px 140px" }}
             >
               <div>
-                <p className="font-medium text-ac-text-primary truncate">
+                <p className="font-medium text-ac-ink truncate">
                   {t.description ?? "—"}
                 </p>
-                <p className="font-mono text-[10px] text-ac-text-muted">
+                <p className="font-mono text-[10px] text-ac-muted">
                   {t.id.slice(0, 8)}…
                 </p>
               </div>
@@ -113,7 +113,7 @@ export function TokensPage() {
                   {t.role}
                 </span>
               </div>
-              <div className="flex items-center text-[12px] text-ac-text-muted truncate">
+              <div className="flex items-center text-[12px] text-ac-muted truncate">
                 {t.agent_name ?? "—"}
               </div>
               <div className="flex items-center">
@@ -122,12 +122,12 @@ export function TokensPage() {
                     Revoked
                   </span>
                 ) : (
-                  <span className="text-[11px] text-ac-allow font-medium">
+                  <span className="text-[11px] text-ac-decision-allow font-medium">
                     Active
                   </span>
                 )}
               </div>
-              <div className="flex items-center text-[12px] text-ac-text-muted">
+              <div className="flex items-center text-[12px] text-ac-muted">
                 {t.created_at
                   ? new Date(t.created_at).toLocaleDateString()
                   : "—"}

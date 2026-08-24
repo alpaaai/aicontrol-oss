@@ -8,9 +8,9 @@ interface DecisionBadgeProps {
 }
 
 const styles: Record<Decision, string> = {
-  allow:  "bg-ac-allow-bg text-ac-allow border border-ac-allow/25",
-  deny:   "bg-ac-deny-bg text-ac-deny border border-ac-deny/25",
-  review: "bg-ac-review-bg text-ac-review border border-ac-review/25",
+  allow:  "bg-ac-decision-allow-soft text-ac-decision-allow border border-ac-decision-allow/25",
+  deny:   "bg-ac-decision-deny-soft text-ac-decision-deny border border-ac-decision-deny/25",
+  review: "bg-ac-decision-review-soft text-ac-decision-review border border-ac-decision-review/25",
 };
 
 export function DecisionBadge({ decision, className }: DecisionBadgeProps) {

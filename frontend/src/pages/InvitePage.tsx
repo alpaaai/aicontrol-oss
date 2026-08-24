@@ -145,20 +145,20 @@ export function InvitePage() {
             <div className="w-7 h-7 bg-ac-night rounded-[7px] flex items-center justify-center">
               <div className="w-[11px] h-[11px] bg-ac-primary rounded-[2px]" />
             </div>
-            <span className="text-[15px] font-semibold tracking-[-0.01em] text-ac-text-primary font-display">
+            <span className="text-[15px] font-semibold tracking-[-0.01em] text-ac-ink font-display">
               AIControl
             </span>
           </div>
 
           {state.status === "loading" && (
-            <p className="text-sm text-ac-text-muted">Verifying your invite link…</p>
+            <p className="text-sm text-ac-muted">Verifying your invite link…</p>
           )}
 
           {state.status === "invalid" && (
             <>
-              <h2 className="text-[22px] font-bold text-ac-text-primary mb-2">Link invalid</h2>
-              <p className="text-sm text-ac-deny">{state.message}</p>
-              <p className="mt-4 text-sm text-ac-text-muted">
+              <h2 className="text-[22px] font-bold text-ac-ink mb-2">Link invalid</h2>
+              <p className="text-sm text-ac-decision-deny">{state.message}</p>
+              <p className="mt-4 text-sm text-ac-muted">
                 Ask your administrator to resend the invite.
               </p>
             </>
@@ -166,17 +166,17 @@ export function InvitePage() {
 
           {(state.status === "ready" || state.status === "submitting") && (
             <>
-              <h2 className="text-[22px] font-bold text-ac-text-primary mb-1">Set your password</h2>
-              <p className="text-[14px] text-ac-text-muted mb-2">
+              <h2 className="text-[22px] font-bold text-ac-ink mb-1">Set your password</h2>
+              <p className="text-[14px] text-ac-muted mb-2">
                 You&rsquo;re signing in as{" "}
-                <span className="font-medium text-ac-text-primary">{state.email}</span>.
+                <span className="font-medium text-ac-ink">{state.email}</span>.
               </p>
-              <p className="text-[13px] text-ac-text-muted mb-8">
+              <p className="text-[13px] text-ac-muted mb-8">
                 Choose a password to activate your account.
               </p>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="password" className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                  <label htmlFor="password" className="block text-[12px] font-medium text-ac-muted mb-1.5">
                     Password
                   </label>
                   <input
@@ -187,11 +187,11 @@ export function InvitePage() {
                     value={password}
                     onChange={(e) => setPasswordValue(e.target.value)}
                     placeholder="At least 8 characters"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                    className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
                   />
                 </div>
                 <div>
-                  <label htmlFor="confirm" className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                  <label htmlFor="confirm" className="block text-[12px] font-medium text-ac-muted mb-1.5">
                     Confirm password
                   </label>
                   <input
@@ -202,11 +202,11 @@ export function InvitePage() {
                     value={confirm}
                     onChange={(e) => setConfirm(e.target.value)}
                     placeholder="Repeat your password"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                    className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
                   />
                 </div>
                 {formError && (
-                  <p className="text-xs text-ac-deny bg-ac-deny-bg rounded-md px-3 py-2">{formError}</p>
+                  <p className="text-xs text-ac-decision-deny bg-ac-decision-deny-soft rounded-md px-3 py-2">{formError}</p>
                 )}
                 <button
                   type="submit"
@@ -219,7 +219,7 @@ export function InvitePage() {
             </>
           )}
 
-          <p className="mt-10 text-[11px] text-ac-text-muted/60 text-center">
+          <p className="mt-10 text-[11px] text-ac-muted/60 text-center">
             Secured by AIControl · Enterprise tier
           </p>
         </div>

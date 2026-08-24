@@ -38,7 +38,7 @@ test("audit log timestamps use org timezone", async ({ page }) => {
       }),
     })
   );
-  await page.goto("/audit-log");
+  await page.goto("/audit");
   // 2026-01-15T18:00:00Z in America/New_York is Jan 15, 13:00
   await expect(page.getByText(/Jan 15.*13:00/)).toBeVisible({ timeout: 10000 });
 });

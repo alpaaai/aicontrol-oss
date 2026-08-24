@@ -3,11 +3,19 @@ import type { AuditFilters as Filters } from "@/api/auditEvents";
 import { listAgents } from "@/api/agents";
 import type { Agent } from "@/api/agents";
 
+type GroupBy = "none" | "workflow" | "session";
+
 interface Props {
   onFilter: (f: Filters) => void;
+  groupBy: GroupBy;
+  onGroupByChange: (g: GroupBy) => void;
 }
 
-export function AuditFilters({ onFilter }: Props) {
+const inputClass =
+  "border border-ac-hairline-strong rounded-md px-3 py-1.5 text-body-sm bg-ac-surface-card text-ac-ink " +
+  "focus:outline focus:outline-2 focus:outline-ac-primary focus:outline-offset-2";
+
+export function AuditFilters({ onFilter, groupBy, onGroupByChange }: Props) {
   const [decision, setDecision] = useState("");
   const [toolName, setToolName] = useState("");
   const [dateFrom, setDateFrom] = useState("");
@@ -33,10 +41,7 @@ export function AuditFilters({ onFilter }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
-  const filteredAgents = agents.filter((a) =>
-    a.name.toLowerCase().includes(agentSearch.toLowerCase())
-  );
-
+  const filteredAgents = agents.filter((a) => a.name.toLowerCase().includes(agentSearch.toLowerCase()));
   const selectedAgent = agents.find((a) => a.id === agentId);
 
   const selectAgent = (a: Agent | null) => {
@@ -67,101 +72,86 @@ export function AuditFilters({ onFilter }: Props) {
   };
 
   return (
-    <div className="flex flex-wrap gap-3 items-end mb-4">
-      <div>
-        <label className="text-[11px] text-ac-text-muted block mb-1">Decision</label>
-        <select
-          value={decision}
-          onChange={(e) => setDecision(e.target.value)}
-          className="border border-ac-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 bg-white"
-        >
-          <option value="">All</option>
-          <option value="allow">Allow</option>
-          <option value="deny">Deny</option>
-          <option value="review">Review</option>
-        </select>
+    <div className="space-y-3 mb-4">
+      <div className="flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="text-caption text-ac-muted block mb-1">Decision</label>
+          <select value={decision} onChange={(e) => setDecision(e.target.value)} className={inputClass}>
+            <option value="">All</option>
+            <option value="allow">Allow</option>
+            <option value="deny">Deny</option>
+            <option value="review">Review</option>
+          </select>
+        </div>
+
+        <div ref={agentRef} className="relative">
+          <label className="text-caption text-ac-muted block mb-1">Agent</label>
+          <input
+            value={agentId ? (selectedAgent?.name ?? agentSearch) : agentSearch}
+            onChange={(e) => { setAgentSearch(e.target.value); setAgentId(""); setAgentOpen(true); }}
+            onFocus={() => setAgentOpen(true)}
+            placeholder="All agents"
+            className={inputClass + " w-44"}
+          />
+          {agentOpen && filteredAgents.length > 0 && (
+            <div className="absolute z-20 top-full mt-1 left-0 w-44 bg-ac-surface-card border border-ac-hairline rounded-lg overflow-y-auto max-h-48">
+              {agentId && (
+                <button onClick={() => selectAgent(null)} className="w-full text-left px-3 py-2 text-body-sm text-ac-muted hover:bg-ac-surface-sunk border-b border-ac-hairline">
+                  Clear
+                </button>
+              )}
+              {filteredAgents.map((a) => (
+                <button
+                  key={a.id}
+                  onClick={() => selectAgent(a)}
+                  className={`w-full text-left px-3 py-2 text-body-sm hover:bg-ac-surface-sunk ${a.id === agentId ? "text-ac-primary-active" : "text-ac-ink"}`}
+                >
+                  {a.name}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="text-caption text-ac-muted block mb-1">Tool name</label>
+          <input value={toolName} onChange={(e) => setToolName(e.target.value)} placeholder="e.g. read_file" className={inputClass} />
+        </div>
+
+        <div>
+          <label className="text-caption text-ac-muted block mb-1">From</label>
+          <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={inputClass} />
+        </div>
+        <div>
+          <label className="text-caption text-ac-muted block mb-1">To</label>
+          <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={inputClass} />
+        </div>
+
+        <button onClick={apply} className="h-9 px-4 rounded-md text-button bg-ac-primary text-ac-on-primary hover:bg-ac-primary-active">
+          Apply
+        </button>
+        <button onClick={reset} className="text-body-sm text-ac-muted hover:text-ac-ink px-2">
+          Reset
+        </button>
       </div>
 
-      {/* Agent searchable dropdown */}
-      <div ref={agentRef} className="relative">
-        <label className="text-[11px] text-ac-text-muted block mb-1">Agent</label>
-        <input
-          value={agentId ? (selectedAgent?.name ?? agentSearch) : agentSearch}
-          onChange={(e) => {
-            setAgentSearch(e.target.value);
-            setAgentId("");
-            setAgentOpen(true);
-          }}
-          onFocus={() => setAgentOpen(true)}
-          placeholder="All agents"
-          className="border border-ac-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 w-44"
-        />
-        {agentOpen && filteredAgents.length > 0 && (
-          <div className="absolute z-20 top-full mt-1 left-0 w-44 bg-ac-card border border-ac-border rounded-lg shadow-ac-modal overflow-y-auto max-h-48 [scrollbar-width:thin]">
-            {agentId && (
-              <button
-                onClick={() => selectAgent(null)}
-                className="w-full text-left px-3 py-2 text-[12px] text-ac-text-muted hover:bg-ac-peacock-50 border-b border-ac-border"
-              >
-                Clear
-              </button>
-            )}
-            {filteredAgents.map((a) => (
-              <button
-                key={a.id}
-                onClick={() => selectAgent(a)}
-                className={`w-full text-left px-3 py-2 text-[12px] hover:bg-ac-peacock-50 ${
-                  a.id === agentId ? "text-ac-primary font-medium" : "text-ac-text-primary"
-                }`}
-              >
-                {a.name}
-              </button>
-            ))}
-          </div>
-        )}
+      <div className="flex gap-2">
+        <span className="text-caption text-ac-muted self-center mr-1">Group by</span>
+        {(["none", "workflow", "session"] as GroupBy[]).map((g) => (
+          <button
+            key={g}
+            data-testid={g === "none" ? undefined : `group-by-${g}`}
+            onClick={() => onGroupByChange(g)}
+            className={`px-3 py-1 rounded-full text-caption border ${
+              groupBy === g
+                ? "bg-ac-primary-soft text-ac-primary-active border-transparent"
+                : "border-ac-hairline-strong text-ac-body hover:bg-ac-surface-sunk"
+            }`}
+          >
+            {g === "none" ? "Flat" : g === "workflow" ? "Workflow" : "Session"}
+          </button>
+        ))}
       </div>
-
-      <div>
-        <label className="text-[11px] text-ac-text-muted block mb-1">Tool name</label>
-        <input
-          value={toolName}
-          onChange={(e) => setToolName(e.target.value)}
-          placeholder="e.g. read_file"
-          className="border border-ac-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
-        />
-      </div>
-
-      <div>
-        <label className="text-[11px] text-ac-text-muted block mb-1">From</label>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => setDateFrom(e.target.value)}
-          className="border border-ac-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
-        />
-      </div>
-      <div>
-        <label className="text-[11px] text-ac-text-muted block mb-1">To</label>
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => setDateTo(e.target.value)}
-          className="border border-ac-border rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
-        />
-      </div>
-
-      <button
-        onClick={apply}
-        className="bg-ac-primary text-white rounded-lg px-4 py-1.5 text-sm font-medium hover:bg-ac-primary/90"
-      >
-        Apply
-      </button>
-      <button
-        onClick={reset}
-        className="text-sm text-ac-text-muted hover:text-ac-text-primary px-2"
-      >
-        Reset
-      </button>
     </div>
   );
 }

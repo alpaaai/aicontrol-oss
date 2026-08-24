@@ -12,6 +12,90 @@ from app.models.policy_warning import PolicyWarning
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
 
 
+def _parse_window(window: str) -> datetime:
+    now = datetime.utcnow()
+    if window.endswith("d"):
+        return now - timedelta(days=int(window[:-1]))
+    if window.endswith("h"):
+        return now - timedelta(hours=int(window[:-1]))
+    return now - timedelta(days=7)
+
+
+def _tool_shape(tool_name: str) -> str:
+    name = tool_name.lower()
+    if any(w in name for w in ("payment", "charge", "refund")):
+        return "payment"
+    if any(w in name for w in ("export", "bulk")):
+        return "export"
+    if any(w in name for w in ("query", "read", "lookup", "search")):
+        return "read"
+    return "other"
+
+
+# The kind is derived from the fired policy's tool shape and effect, never
+# from free text. Kept as one module-level map so the phrasing is defined once.
+def _outcome_kind(decision: str, tool_name: str) -> str:
+    shape = _tool_shape(tool_name)
+    if decision == "review" and shape == "payment":
+        return "payment_held"
+    if decision == "deny" and shape == "read":
+        return "record_access_denied"
+    if decision == "deny" and shape == "export":
+        return "export_blocked"
+    return "action_blocked"
+
+
+@router.get("/outcomes")
+async def get_outcomes(window: str = Query("7d"), _=Depends(require_human)):
+    since = _parse_window(window)
+
+    async with async_session_factory() as db:
+        rows = (await db.execute(
+            select(
+                AuditEvent.workflow,
+                AuditEvent.agent_id,
+                AuditEvent.decision,
+                AuditEvent.tool_name,
+            ).where(AuditEvent.created_at >= since)
+        )).all()
+
+    groups: dict[str, dict] = {}
+    for workflow, agent_id, decision, tool_name in rows:
+        key = workflow or "unassigned"
+        group = groups.setdefault(key, {
+            "workflow": key,
+            "agents": set(),
+            "calls": 0,
+            "held_for_approval": 0,
+            "denied": 0,
+            "outcome_counts": {},
+        })
+        group["calls"] += 1
+        if agent_id:
+            group["agents"].add(agent_id)
+        if decision == "review":
+            group["held_for_approval"] += 1
+        if decision == "deny":
+            group["denied"] += 1
+        if decision in ("review", "deny"):
+            kind = _outcome_kind(decision, tool_name)
+            group["outcome_counts"][kind] = group["outcome_counts"].get(kind, 0) + 1
+
+    workflows = [
+        {
+            "workflow": g["workflow"],
+            "agents": len(g["agents"]),
+            "calls": g["calls"],
+            "held_for_approval": g["held_for_approval"],
+            "denied": g["denied"],
+            "outcomes": [{"kind": k, "count": c} for k, c in g["outcome_counts"].items()],
+        }
+        for g in groups.values()
+    ]
+
+    return {"window": window, "workflows": workflows}
+
+
 @router.get("/summary")
 async def get_summary(_=Depends(require_human)):
     now = datetime.utcnow()

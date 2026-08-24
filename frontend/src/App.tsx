@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import { LicenseProvider } from "./context/LicenseContext";
 import { OrgSettingsProvider } from "./context/OrgSettingsContext";
-import { ThemeProvider } from "./context/ThemeContext";
 import { Layout } from "./components/layout/Layout";
 import { LoginPage } from "./pages/LoginPage";
 import { SetupPage } from "./pages/SetupPage";
@@ -14,13 +13,16 @@ import { OverviewPage } from "./pages/overview/OverviewPage";
 import { AuditLogPage } from "./pages/audit/AuditLogPage";
 import { MetricsPage } from "./pages/metrics/MetricsPage";
 import { PoliciesPage } from "./pages/policies/PoliciesPage";
+import { PolicyDetailPage } from "./pages/policies/PolicyDetailPage";
 import { AgentsPage } from "./pages/agents/AgentsPage";
+import { AgentDetailPage } from "./pages/agents/AgentDetailPage";
 import { TokensPage } from "./pages/tokens/TokensPage";
 import { ReviewQueuePage } from "./pages/reviews/ReviewQueuePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
 import { SettingsPage } from "./pages/settings/SettingsPage";
 import BillingPage from "./pages/BillingPage";
 import { DemoPage } from "./pages/demo/DemoPage";
+import { Gallery } from "./components/primitives/Gallery";
 
 function RequireSetupOrAuth({ children }: { children: React.ReactElement }) {
   const auth = getStoredAuth();
@@ -42,7 +44,6 @@ function RequireSetupOrAuth({ children }: { children: React.ReactElement }) {
 
 export default function App() {
   return (
-    <ThemeProvider>
     <LicenseProvider>
     <OrgSettingsProvider>
     <BrowserRouter>
@@ -50,6 +51,7 @@ export default function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/setup" element={<SetupPage />} />
         <Route path="/invite" element={<InvitePage />} />
+        <Route path="/gallery" element={<Gallery />} />
         <Route
           path="/"
           element={
@@ -60,10 +62,12 @@ export default function App() {
         >
           <Route index element={<Navigate to="/overview" replace />} />
           <Route path="overview"      element={<OverviewPage />} />
-          <Route path="audit-log"     element={<AuditLogPage />} />
+          <Route path="audit"         element={<AuditLogPage />} />
           <Route path="metrics"       element={<MetricsPage />} />
           <Route path="policies"      element={<PoliciesPage />} />
+          <Route path="policies/:id"  element={<PolicyDetailPage />} />
           <Route path="agents"        element={<AgentsPage />} />
+          <Route path="agents/:id"    element={<AgentDetailPage />} />
           <Route path="tokens"        element={<TokensPage />} />
           <Route path="reviews"       element={<ReviewQueuePage />} />
           <Route path="reports"       element={<ReportsPage />} />
@@ -75,6 +79,5 @@ export default function App() {
     </BrowserRouter>
     </OrgSettingsProvider>
     </LicenseProvider>
-    </ThemeProvider>
   );
 }

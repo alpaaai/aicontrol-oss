@@ -1,4 +1,7 @@
 import { apiClient } from "./client";
+import type { PolicyScope } from "./policies";
+
+export type CoverageState = "governed" | "installed_not_firing" | "unknown";
 
 export interface Agent {
   id: string;
@@ -14,7 +17,19 @@ export interface Agent {
   created_at: string | null;
   last_active: string | null;
   deny_rate: number | null;
+  hook: string | null;
+  sdk_version: string | null;
+  workflow: string | null;
+  coverage_state: CoverageState;
+  silent_noop_warnings: string[];
+  unresolved_systems: string[];
 }
+
+export const COVERAGE_LABEL: Record<CoverageState, string> = {
+  governed: "Governed",
+  installed_not_firing: "Installed, no calls arriving",
+  unknown: "Not connected",
+};
 
 export const listAgents = () =>
   apiClient.get<Agent[]>("/agents").then((r) => r.data);
@@ -22,19 +37,8 @@ export const listAgents = () =>
 export const getAgent = (id: string) =>
   apiClient.get<Agent>(`/agents/${id}`).then((r) => r.data);
 
-export const patchApprovedTools = (id: string, tools: string[]) =>
-  apiClient
-    .patch(`/agents/${id}/approved-tools`, { approved_tools: tools })
-    .then((r) => r.data);
-
-export function computeToolCoverage(
-  tools: string[],
-  policies: { name: string; condition: Record<string, unknown> }[]
-): Array<{ tool: string; governed: boolean; policy_name: string | null }> {
-  return tools.map((tool) => {
-    const match = policies.find((p) =>
-      JSON.stringify(p.condition).includes(tool)
-    );
-    return { tool, governed: !!match, policy_name: match?.name ?? null };
-  });
-}
+// This endpoint already returns PolicyScope shape -- it exists to feed the
+// agent's governing-policies list directly, so it skips the mapper every
+// other policy consumer uses.
+export const getAgentPolicies = (id: string): Promise<PolicyScope[]> =>
+  apiClient.get<PolicyScope[]>(`/agents/${id}/policies`).then((r) => r.data);

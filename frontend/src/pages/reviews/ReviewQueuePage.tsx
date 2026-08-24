@@ -18,13 +18,13 @@ function ReviewQueueContent() {
       <div className="flex items-center gap-2 mb-4">
         <h3 className="text-[14px] font-medium text-gray-700">Pending Reviews</h3>
         {reviews.length > 0 && (
-          <span className="bg-ac-deny-bg text-ac-deny text-[11px] font-medium px-2 py-0.5 rounded-full">
+          <span className="bg-ac-decision-deny-soft text-ac-decision-deny text-[11px] font-medium px-2 py-0.5 rounded-full">
             {reviews.length}
           </span>
         )}
       </div>
 
-      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
         {reviews.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">
             No pending reviews. Queue is clear.
@@ -59,10 +59,10 @@ function ResolvedReviews() {
         {show ? 'Hide resolved' : 'Show resolved reviews'}
       </button>
       {show && (
-        <div className="mt-2 bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
+        <div className="mt-2 bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
           {data.map(r => (
             <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 text-[13px]">
-              <span className={`text-[12px] font-medium ${r.status === 'approved' ? 'text-ac-allow' : 'text-ac-deny'}`}>
+              <span className={`text-[12px] font-medium ${r.status === 'approved' ? 'text-ac-decision-allow' : 'text-ac-decision-deny'}`}>
                 {r.status}
               </span>
               <span className="font-mono text-[12px] text-gray-600">
@@ -84,7 +84,7 @@ export function ReviewQueuePage() {
   if (!isEnterprise) {
     return (
       <div className="p-6">
-        <h2 className="text-[18px] font-semibold text-ac-text-primary mb-4">Review queue</h2>
+        <h2 className="text-[18px] font-semibold text-ac-ink mb-4">Review queue</h2>
         <EnterpriseLock
           title="Review Queue — Enterprise Feature"
           description="In-dashboard review approvals require an Enterprise license. Reviews are available via Slack integration on all plans."
@@ -105,7 +105,7 @@ export function ReviewQueuePage() {
   return (
     <div className="p-6">
       <div className="mb-5">
-        <h2 className="text-[18px] font-semibold text-ac-text-primary">Review queue</h2>
+        <h2 className="text-[18px] font-semibold text-ac-ink">Review queue</h2>
         <p className="text-sm text-gray-400 mt-0.5">Pending HITL decisions · updates every 15s</p>
       </div>
       <ReviewQueueContent />

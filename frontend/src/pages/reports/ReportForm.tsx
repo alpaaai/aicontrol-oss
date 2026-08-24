@@ -55,20 +55,20 @@ export function ReportForm({ onGenerated }: Props) {
   }
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-5">
-      <h3 className="text-[14px] font-semibold text-ac-text-primary mb-4">Generate Compliance Report</h3>
+    <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card p-5">
+      <h3 className="text-[14px] font-semibold text-ac-ink mb-4">Generate Compliance Report</h3>
       <form onSubmit={handleGenerate} className="space-y-4">
 
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-[12px] text-gray-500 block mb-1">From</label>
             <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
-              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20" />
+              className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft" />
           </div>
           <div>
             <label className="text-[12px] text-gray-500 block mb-1">To</label>
             <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
-              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20" />
+              className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft" />
           </div>
         </div>
 
@@ -81,7 +81,7 @@ export function ReportForm({ onGenerated }: Props) {
                 className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                   frameworks.includes(fw.value)
                     ? 'bg-purple-600 text-white border-purple-600'
-                    : 'border-ac-border text-gray-600 hover:border-purple-400/40'
+                    : 'border-ac-hairline text-gray-600 hover:border-purple-400/40'
                 }`}>
                 {fw.label}
               </button>
@@ -98,7 +98,7 @@ export function ReportForm({ onGenerated }: Props) {
                 className={`px-3 py-1.5 rounded-lg text-[12px] font-medium border transition-colors ${
                   format === f
                     ? 'bg-ac-primary text-white border-ac-primary'
-                    : 'border-ac-border text-gray-600 hover:border-ac-primary/40'
+                    : 'border-ac-hairline text-gray-600 hover:border-ac-primary/40'
                 }`}>
                 {f === 'both' ? 'PDF + MD' : f.toUpperCase()}
               </button>

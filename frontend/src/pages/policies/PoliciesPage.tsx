@@ -1,166 +1,52 @@
-import { useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
-import { listPolicies, listLibraryPolicies, deletePolicy } from "@/api/policies";
-import type { Policy } from "@/api/policies";
-import { PolicyTable } from "./PolicyTable";
-import { PolicyEditor } from "./PolicyEditor";
-import { PolicyLibrary } from "./PolicyLibrary";
-import { DriftWarnings } from "./DriftWarnings";
-import { BaselineActivationDialog } from "./BaselineActivationDialog";
-import { Plus } from "lucide-react";
-
-type Tab = "active" | "library" | "drift";
+import { useEffect, useState } from "react";
+import { listPolicies, type Policy } from "@/api/policies";
+import { getLicenseFeatures, type FeatureFlags } from "@/api/license";
+import { NLComposer } from "./NLComposer";
+import { StructuredEditor } from "./StructuredEditor";
+import { PolicyRow } from "./PolicyRow";
+import { EmptyState } from "@/components/primitives/EmptyState";
 
 export function PoliciesPage() {
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState<Tab>(() => {
-    const t = searchParams.get("tab");
-    return t === "drift" || t === "library" ? (t as Tab) : "active";
-  });
-  const [policies, setPolicies] = useState<Policy[]>([]);
-  const [libraryPolicies, setLibraryPolicies] = useState<Policy[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [libraryLoading, setLibraryLoading] = useState(false);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<Policy | null>(null);
-  const [showBaseline, setShowBaseline] = useState(() => {
-    return (
-      sessionStorage.getItem("show_baseline_dialog") === "true" &&
-      !sessionStorage.getItem("baseline_offered")
-    );
-  });
+  const [policies, setPolicies] = useState<Policy[] | null>(null);
+  const [features, setFeatures] = useState<FeatureFlags | null>(null);
 
-  const loadActive = () => {
-    setLoading(true);
-    listPolicies()
-      .then(setPolicies)
-      .finally(() => setLoading(false));
-  };
-
-  const loadLibrary = () => {
-    setLibraryLoading(true);
-    listLibraryPolicies()
-      .then(setLibraryPolicies)
-      .finally(() => setLibraryLoading(false));
-  };
+  const reload = () => listPolicies().then(setPolicies).catch(() => setPolicies([]));
 
   useEffect(() => {
-    loadActive();
+    reload();
+    getLicenseFeatures()
+      .then((r) => setFeatures(r.features))
+      .catch(() => {});
   }, []);
 
-  useEffect(() => {
-    if (tab === "library" && libraryPolicies.length === 0) {
-      loadLibrary();
-    }
-  }, [tab]);
-
-  const handleDelete = async (p: Policy) => {
-    if (!confirm(`Delete policy "${p.name}"? This cannot be undone.`)) return;
-    await deletePolicy(p.id);
-    loadActive();
-  };
-
-  const handleActivateLibrary = (policy: Policy) => {
-    setEditTarget({
-      ...policy,
-      id: "",
-      active: true,
-      library: false,
-    } as Policy);
-    setDialogOpen(true);
-  };
-
   return (
-    <div className="p-6">
-      {/* Page header */}
-      <div className="flex items-center justify-between mb-5 animate-fade-up">
-        <div>
-          <h2 className="text-[18px] font-semibold text-ac-text-primary">Policies</h2>
-          <p className="text-sm text-ac-text-muted mt-0.5">
-            {tab === "active"
-              ? loading ? "—" : `${policies.length} active polic${policies.length !== 1 ? "ies" : "y"}`
-              : tab === "library"
-              ? `${libraryPolicies.length} templates available`
-              : "Drift monitoring"}
-          </p>
-        </div>
+    <div className="p-6 space-y-8">
+      <div>
+        <h1 className="text-title-lg text-ac-ink">Policies</h1>
+        <p className="text-body-sm text-ac-muted mt-0.5">
+          {policies === null ? "—" : `${policies.length} active polic${policies.length === 1 ? "y" : "ies"}`}
+        </p>
+      </div>
 
-        {tab === "active" && (
-          <button
-            onClick={() => {
-              setEditTarget(null);
-              setDialogOpen(true);
-            }}
-            className="flex items-center gap-1.5 bg-ac-primary text-white rounded-lg px-4 py-2 text-sm font-medium hover:bg-ac-primary/90"
-          >
-            <Plus size={14} /> New policy
-          </button>
+      <div className={features?.nl_authoring ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}>
+        {features?.nl_authoring && <NLComposer onCreated={reload} />}
+        <StructuredEditor onCreated={reload} />
+      </div>
+
+      <div>
+        <h2 className="text-title-md text-ac-ink mb-3">Active policies</h2>
+        {policies === null ? (
+          <div className="h-40 bg-ac-surface-sunk rounded-lg animate-pulse" />
+        ) : policies.length === 0 ? (
+          <EmptyState title="No policies yet — describe one in plain English." />
+        ) : (
+          <ul data-testid="policy-list" className="space-y-3 max-h-[560px] overflow-y-auto">
+            {policies.map((p) => (
+              <PolicyRow key={p.id} policy={p} />
+            ))}
+          </ul>
         )}
       </div>
-
-      {/* Tabs */}
-      <div className="flex gap-0 mb-5 border-b border-ac-border">
-        {(["active", "library", "drift"] as Tab[]).map((t) => (
-          <button
-            key={t}
-            role="tab"
-            onClick={() => setTab(t)}
-            className={`px-4 py-2.5 text-[13px] font-medium border-b-2 -mb-px transition-colors ${
-              tab === t
-                ? "border-ac-primary text-ac-primary"
-                : "border-transparent text-ac-text-muted hover:text-ac-text-primary"
-            }`}
-          >
-            {t === "active" ? "Active policies" : t === "library" ? "Policy library" : "Policy drift warnings"}
-          </button>
-        ))}
-      </div>
-
-      {/* Tab content */}
-      {tab === "active" ? (
-        <>
-          {loading ? (
-            <div className="h-40 bg-gray-50 rounded animate-pulse" />
-          ) : (
-            <PolicyTable
-              policies={policies}
-              onEdit={(p) => {
-                setEditTarget(p);
-                setDialogOpen(true);
-              }}
-              onDelete={handleDelete}
-            />
-          )}
-        </>
-      ) : tab === "library" ? (
-        <PolicyLibrary
-          policies={libraryPolicies}
-          loading={libraryLoading}
-          onActivate={handleActivateLibrary}
-        />
-      ) : (
-        <DriftWarnings />
-      )}
-
-      <PolicyEditor
-        open={dialogOpen}
-        policy={editTarget}
-        onClose={() => setDialogOpen(false)}
-        onSaved={() => {
-          setDialogOpen(false);
-          loadActive();
-        }}
-      />
-
-      {showBaseline && (
-        <BaselineActivationDialog
-          onClose={() => setShowBaseline(false)}
-          onDone={() => {
-            setShowBaseline(false);
-            loadActive();
-          }}
-        />
-      )}
     </div>
   );
 }

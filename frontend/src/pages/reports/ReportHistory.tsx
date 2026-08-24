@@ -34,8 +34,8 @@ export function ReportHistory({ refreshKey }: Props) {
 
   return (
     <div className="mt-5">
-      <h3 className="text-[14px] font-semibold text-ac-text-primary mb-3">Report History</h3>
-      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
+      <h3 className="text-[14px] font-semibold text-ac-ink mb-3">Report History</h3>
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
         {loading && <div className="h-10 bg-gray-50 animate-pulse m-4 rounded" />}
         {!loading && reports.length === 0 && (
           <div className="text-center text-sm text-gray-400 py-8">No reports generated yet.</div>

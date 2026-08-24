@@ -1,15 +1,16 @@
 """Policy CRUD endpoints — admin only."""
 import uuid
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel, Field, field_validator
-from sqlalchemy import select
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
 from app.models.database import get_db
-from app.models.schemas import Policy
+from app.models.schemas import AuditEvent, Policy
 from app.services.activity_log_service import write_activity_log
 from app.services.cedar_client import invalidate_policy_set_cache
 from app.services.policy_compiler import compile_policy
@@ -291,14 +292,20 @@ class PolicyUpdate(BaseModel):
 
 
 class PolicyResponse(BaseModel):
+    # Scope columns carry a camelCase alias -- frontend/src/api/policies.ts's
+    # PolicyScope consumes them directly, matching the shape already
+    # established by GET /agents/{id}/policies. populate_by_name keeps
+    # ORM-instance validation (which sees the snake_case attributes) working.
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
     id: uuid.UUID
     name: str
     description: Optional[str]
     condition: dict[str, Any]
-    principal_type: Optional[str] = None
-    principal_id: Optional[str] = None
-    action_tool: Optional[str] = None
-    resource_system: Optional[str] = None
+    principal_type: Optional[str] = Field(None, alias="principalType")
+    principal_id: Optional[str] = Field(None, alias="principalId")
+    action_tool: Optional[str] = Field(None, alias="actionTool")
+    resource_system: Optional[str] = Field(None, alias="resourceSystem")
     effect: Optional[str] = None
     cedar_text: Optional[str] = None
     severity: Optional[str]
@@ -309,12 +316,9 @@ class PolicyResponse(BaseModel):
     library: bool = False
     category: Optional[str] = None
 
-    class Config:
-        from_attributes = True
 
 
-
-@router.get("", response_model=list[PolicyResponse])
+@router.get("", response_model=list[PolicyResponse], response_model_by_alias=True)
 async def list_policies(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_admin),
@@ -323,7 +327,7 @@ async def list_policies(
     return result.scalars().all()
 
 
-@router.get("/library", response_model=list[PolicyResponse])
+@router.get("/library", response_model=list[PolicyResponse], response_model_by_alias=True)
 async def list_library_policies(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_admin),
@@ -392,7 +396,7 @@ async def activate_baseline(
     return BaselineActivateResponse(mode=body.mode, activated=activated)
 
 
-@router.get("/{policy_id}", response_model=PolicyResponse)
+@router.get("/{policy_id}", response_model=PolicyResponse, response_model_by_alias=True)
 async def get_policy(
     policy_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -405,7 +409,7 @@ async def get_policy(
     return policy
 
 
-@router.post("", response_model=PolicyResponse, status_code=201)
+@router.post("", response_model=PolicyResponse, status_code=201, response_model_by_alias=True)
 async def create_policy(
     body: PolicyCreate,
     db: AsyncSession = Depends(get_db),
@@ -439,7 +443,7 @@ async def create_policy(
     return policy
 
 
-@router.put("/{policy_id}", response_model=PolicyResponse)
+@router.put("/{policy_id}", response_model=PolicyResponse, response_model_by_alias=True)
 async def update_policy(
     policy_id: uuid.UUID,
     body: PolicyUpdate,
@@ -485,3 +489,54 @@ async def delete_policy(
         raise HTTPException(status_code=404, detail="Policy not found")
     await db.delete(policy)
     invalidate_policy_set_cache()
+
+
+def _parse_window(window: str) -> datetime:
+    now = datetime.utcnow()
+    if window.endswith("d"):
+        return now - timedelta(days=int(window[:-1]))
+    if window.endswith("h"):
+        return now - timedelta(hours=int(window[:-1]))
+    return now - timedelta(days=7)
+
+
+class PolicyActivityResponse(BaseModel):
+    window: str
+    fired: int
+    calls_evaluated: int
+
+
+@router.get("/{policy_id}/activity", response_model=PolicyActivityResponse)
+async def get_policy_activity(
+    policy_id: uuid.UUID,
+    window: str = Query("7d"),
+    db: AsyncSession = Depends(get_db),
+    _token: dict = Depends(require_admin),
+) -> PolicyActivityResponse:
+    """What this policy did last week: how many calls fell in its scope, and
+    how many it fired on. `calls_evaluated` matches on agent + tool scope only
+    -- resource_system isn't persisted on audit_events (it's resolved at
+    intercept time, not stored), so a system-scoped policy's count is an
+    upper bound on calls actually in scope."""
+    policy = await db.get(Policy, policy_id)
+    if not policy:
+        raise HTTPException(status_code=404, detail="Policy not found")
+    since = _parse_window(window)
+
+    fired = (await db.execute(
+        select(func.count()).select_from(AuditEvent).where(
+            AuditEvent.policy_id == policy_id,
+            AuditEvent.created_at >= since,
+        )
+    )).scalar()
+
+    scope_filters = [AuditEvent.created_at >= since]
+    if policy.principal_type == "agent" and policy.principal_id:
+        scope_filters.append(AuditEvent.agent_name == policy.principal_id)
+    if policy.action_tool:
+        scope_filters.append(AuditEvent.tool_name == policy.action_tool)
+    calls_evaluated = (await db.execute(
+        select(func.count()).select_from(AuditEvent).where(*scope_filters)
+    )).scalar()
+
+    return PolicyActivityResponse(window=window, fired=fired or 0, calls_evaluated=calls_evaluated or 0)

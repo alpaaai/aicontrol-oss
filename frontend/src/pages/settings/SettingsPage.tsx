@@ -65,17 +65,17 @@ function MagicLinkDisplay({
     <>
       <div className="flex items-center gap-2 mb-3">
         <CheckCircle size={16} className="text-green-600" />
-        <h3 className="text-[16px] font-semibold text-ac-text-primary">Invite link ready</h3>
+        <h3 className="text-[16px] font-semibold text-ac-ink">Invite link ready</h3>
       </div>
-      <p className="text-sm text-ac-text-muted mb-1">
+      <p className="text-sm text-ac-muted mb-1">
         Send this link to <span className="font-medium">{email}</span>. It expires in 24 hours.
       </p>
-      <p className="text-xs text-ac-text-muted mb-3">This link will not be shown again after you close this dialog.</p>
-      <div className="bg-gray-50 border border-ac-border rounded-lg px-3 py-2.5 flex items-center gap-2 mb-4">
-        <code className="text-[11px] font-mono text-ac-text-primary flex-1 break-all">{magicLink}</code>
+      <p className="text-xs text-ac-muted mb-3">This link will not be shown again after you close this dialog.</p>
+      <div className="bg-gray-50 border border-ac-hairline rounded-lg px-3 py-2.5 flex items-center gap-2 mb-4">
+        <code className="text-[11px] font-mono text-ac-ink flex-1 break-all">{magicLink}</code>
         <button
           onClick={handleCopy}
-          className="text-ac-text-muted hover:text-ac-primary shrink-0"
+          className="text-ac-muted hover:text-ac-primary shrink-0"
           title="Copy link"
         >
           {copied ? (
@@ -154,43 +154,43 @@ function InviteUserDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-ac-card rounded-[12px] border border-ac-border w-full max-w-md p-6 shadow-xl">
+      <div className="bg-ac-surface-card rounded-[12px] border border-ac-hairline w-full max-w-md p-6 shadow-xl">
         {!result ? (
           <>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[16px] font-semibold text-ac-text-primary">Invite User</h3>
-              <button onClick={handleClose} className="text-ac-text-muted hover:text-ac-text-primary">
+              <h3 className="text-[16px] font-semibold text-ac-ink">Invite User</h3>
+              <button onClick={handleClose} className="text-ac-muted hover:text-ac-ink">
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="text-[12px] text-ac-text-muted block mb-1">Full Name *</label>
+                <label className="text-[12px] text-ac-muted block mb-1">Full Name *</label>
                 <input
                   required
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Jane Smith"
-                  className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
+                  className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft"
                 />
               </div>
               <div>
-                <label className="text-[12px] text-ac-text-muted block mb-1">Email *</label>
+                <label className="text-[12px] text-ac-muted block mb-1">Email *</label>
                 <input
                   required
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="jane@example.com"
-                  className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
+                  className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft"
                 />
               </div>
               <div>
-                <label className="text-[12px] text-ac-text-muted block mb-1">Role</label>
+                <label className="text-[12px] text-ac-muted block mb-1">Role</label>
                 <select
                   value={role}
                   onChange={(e) => setRole(e.target.value)}
-                  className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
+                  className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft"
                 >
                   <option value="admin">admin</option>
                   <option value="analyst">analyst</option>
@@ -202,7 +202,7 @@ function InviteUserDialog({
                 <button
                   type="button"
                   onClick={handleClose}
-                  className="flex-1 border border-ac-border rounded-lg py-2 text-sm text-ac-text-muted hover:bg-gray-50"
+                  className="flex-1 border border-ac-hairline rounded-lg py-2 text-sm text-ac-muted hover:bg-gray-50"
                 >
                   Cancel
                 </button>
@@ -265,16 +265,16 @@ function ResendInviteDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-ac-card rounded-[12px] border border-ac-border w-full max-w-md p-6 shadow-xl">
+      <div className="bg-ac-surface-card rounded-[12px] border border-ac-hairline w-full max-w-md p-6 shadow-xl">
         {error ? (
           <>
             <p className="text-sm text-red-500 mb-4">{error}</p>
-            <button onClick={handleClose} className="w-full border border-ac-border rounded-lg py-2 text-sm">Close</button>
+            <button onClick={handleClose} className="w-full border border-ac-hairline rounded-lg py-2 text-sm">Close</button>
           </>
         ) : result ? (
           <MagicLinkDisplay magicLink={result.magic_link} email={email} onDone={handleClose} />
         ) : (
-          <p className="text-sm text-ac-text-muted">Generating new invite link…</p>
+          <p className="text-sm text-ac-muted">Generating new invite link…</p>
         )}
       </div>
     </div>
@@ -317,16 +317,16 @@ function DeleteConfirmDialog({
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-ac-card rounded-[12px] border border-ac-border w-full max-w-sm p-6 shadow-xl">
-        <h3 className="text-[16px] font-semibold text-ac-text-primary mb-2">Delete user?</h3>
-        <p className="text-sm text-ac-text-muted mb-4">
+      <div className="bg-ac-surface-card rounded-[12px] border border-ac-hairline w-full max-w-sm p-6 shadow-xl">
+        <h3 className="text-[16px] font-semibold text-ac-ink mb-2">Delete user?</h3>
+        <p className="text-sm text-ac-muted mb-4">
           This will permanently remove <span className="font-medium">{user.email}</span>. This cannot be undone.
         </p>
         {error && <p className="text-xs text-red-500 mb-3">{error}</p>}
         <div className="flex gap-2">
           <button
             onClick={onClose}
-            className="flex-1 border border-ac-border rounded-lg py-2 text-sm text-ac-text-muted hover:bg-gray-50"
+            className="flex-1 border border-ac-hairline rounded-lg py-2 text-sm text-ac-muted hover:bg-gray-50"
           >
             Cancel
           </button>
@@ -378,7 +378,7 @@ function OrgSection({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mt-4">
+    <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card px-4 mt-4">
       <div className="flex items-center justify-between py-2.5 border-b border-gray-50">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide">Organization</p>
         {isAdmin && !editing && (
@@ -400,7 +400,7 @@ function OrgSection({ isAdmin }: { isAdmin: boolean }) {
               required
               value={nameInput}
               onChange={(e) => setNameInput(e.target.value)}
-              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
+              className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft"
             />
           </div>
           <div>
@@ -408,7 +408,7 @@ function OrgSection({ isAdmin }: { isAdmin: boolean }) {
             <select
               value={tzInput}
               onChange={(e) => setTzInput(e.target.value)}
-              className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 bg-white"
+              className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft bg-white"
             >
               {TIMEZONES.map((tz) => (
                 <option key={tz} value={tz}>{tz}</option>
@@ -420,7 +420,7 @@ function OrgSection({ isAdmin }: { isAdmin: boolean }) {
             <button
               type="button"
               onClick={() => setEditing(false)}
-              className="flex-1 border border-ac-border rounded-lg py-2 text-sm text-ac-text-muted hover:bg-gray-50"
+              className="flex-1 border border-ac-hairline rounded-lg py-2 text-sm text-ac-muted hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -480,14 +480,14 @@ function UsersSection({ currentUserId }: { currentUserId: string | undefined }) 
   }
 
   return (
-    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mt-4">
+    <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card px-4 mt-4">
       <div className="flex items-center justify-between py-2.5 border-b border-gray-50">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide">
           Users {!loading && `(${users.length})`}
         </p>
         <button
           onClick={() => setInviteOpen(true)}
-          className="flex items-center gap-1 px-2.5 py-1 bg-ac-primary text-white rounded-md text-[11px] font-medium hover:bg-ac-primary/90"
+          className="flex items-center gap-1 px-2.5 py-1 bg-ac-primary text-white rounded-md text-[11px] font-medium hover:bg-ac-primary-active"
         >
           <UserPlus size={12} />
           Invite User
@@ -611,12 +611,12 @@ export function SettingsPage() {
   return (
     <div className="p-6 max-w-3xl">
       <div className="mb-6 animate-fade-up">
-        <h2 className="text-[18px] font-semibold text-ac-text-primary">Settings</h2>
+        <h2 className="text-[18px] font-semibold text-ac-ink">Settings</h2>
         <p className="text-sm text-gray-400 mt-0.5">View and manage your account settings.</p>
       </div>
 
       {/* License */}
-      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mb-4">
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card px-4 mb-4">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           License
         </p>
@@ -639,7 +639,7 @@ export function SettingsPage() {
       </div>
 
       {/* Auth */}
-      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mb-4">
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card px-4 mb-4">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           Authentication
         </p>
@@ -648,7 +648,7 @@ export function SettingsPage() {
       </div>
 
       {/* Current user */}
-      <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card px-4 mb-4">
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card px-4 mb-4">
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           Current session
         </p>
