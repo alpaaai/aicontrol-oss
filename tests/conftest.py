@@ -86,6 +86,24 @@ async def db_session():
 # ── Integration test fixtures (live API at localhost:8001) ────────────────────
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
+async def _seed_demo_policies():
+    """The demo harness tests (test_demo_insurance.py etc.) drive real Cedar
+    evaluation against the insurance/healthcare/gtm demo-seed policies. Those
+    files are loaded into Postgres only by scripts/seed.py's demo-seed glob,
+    never by app startup (load_all() loads only the shipped policies.yaml) --
+    so the test suite must seed them itself, the same way scripts/seed.py
+    does, or the demo tests would only pass on a machine that happened to
+    have already run seed.py."""
+    from app.models.database import async_session_factory
+    from app.services.policy_loader import DEMO_SEEDS_DIR, load_yaml, upsert_policies
+
+    async with async_session_factory() as session:
+        for name in ("insurance.yaml", "healthcare.yaml", "gtm.yaml"):
+            await upsert_policies(session, load_yaml(DEMO_SEEDS_DIR / name))
+    yield
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
 async def _cleanup_test_policies():
     """Session setup + teardown: remove test_ and not_lib_ policies so they don't
     accumulate across pytest runs. Runs cleanup both before and after."""

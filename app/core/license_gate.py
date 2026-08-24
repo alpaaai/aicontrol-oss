@@ -44,6 +44,13 @@ def get_license_info() -> LicenseInfo:
         )
 
 
+def has_enterprise_license() -> bool:
+    """Plain boolean check for call sites that need to branch on plan rather
+    than raise -- e.g. the demo harness, which must decide whether to run a
+    paid-tier beat at all instead of letting it 402."""
+    return get_license_info().is_enterprise
+
+
 def require_enterprise_license() -> None:
     """
     FastAPI dependency. Raises HTTP 402 if plan is not 'enterprise'.
