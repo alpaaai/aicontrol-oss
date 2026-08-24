@@ -1,0 +1,60 @@
+{
+  "name": "GTM — Sales Outreach",
+  "description": "An SDR agent personalises outreach for a named campaign segment. Misreading the personalisation instruction as a request for the whole account table is the realistic misstep the demo shows getting caught.",
+  "agent_name": "sdr-agent",
+  "agent_id": "10000000-0000-0000-0000-000000000003",
+  "owner": "revops@company.com",
+  "workflow": "sales_outreach",
+  "tools": {
+    "read_campaign_brief": "Reads the campaign brief naming the target segment.",
+    "salesforce_query": "Queries Salesforce accounts."
+  },
+  "beats": [
+    {
+      "name": "scoped_segment_query",
+      "requires_license": null,
+      "narrative": "The agent reads the campaign brief for the 'Q3 Mid-Market Renewal' segment and queries only that segment.",
+      "steps": [
+        {
+          "tool": "read_campaign_brief",
+          "args": {
+            "campaign_id": "CMP-2026-Q3-MIDMARKET"
+          },
+          "result": "Campaign CMP-2026-Q3-MIDMARKET — segment: mid-market accounts renewing in Q3, ~40 accounts. Personalise outreach per account."
+        },
+        {
+          "tool": "salesforce_query",
+          "args": {
+            "segment": "mid_market_q3_renewal",
+            "row_limit": 40
+          },
+          "result": "40 accounts returned for segment mid_market_q3_renewal."
+        }
+      ],
+      "final_message": "Outreach drafted for the Q3 mid-market renewal segment."
+    },
+    {
+      "name": "unscoped_export_attempt",
+      "requires_license": null,
+      "narrative": "Asked to personalise outreach 'for our customers', the agent misreads the instruction as the whole account table rather than the named segment.",
+      "steps": [
+        {
+          "tool": "read_campaign_brief",
+          "args": {
+            "campaign_id": "CMP-2026-Q3-GENERAL"
+          },
+          "result": "Campaign CMP-2026-Q3-GENERAL — personalise outreach for our customers."
+        },
+        {
+          "tool": "salesforce_query",
+          "args": {
+            "segment": "all_accounts",
+            "row_limit": 50000
+          },
+          "result": null
+        }
+      ],
+      "final_message": "The unscoped account export was denied — outreach must stay within a named segment."
+    }
+  ]
+}

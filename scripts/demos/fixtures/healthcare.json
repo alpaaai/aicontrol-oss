@@ -1,0 +1,62 @@
+{
+  "name": "Healthcare — Care Coordination",
+  "description": "A care-coordination agent summarises a patient's care history. A shared care-plan record references other patients' encounters; following that reference is the realistic misstep the demo shows getting caught.",
+  "agent_name": "care-coordinator",
+  "agent_id": "10000000-0000-0000-0000-000000000002",
+  "owner": "clinical-ops@hospital.org",
+  "workflow": "care_coordination",
+  "tools": {
+    "read_care_plan": "Reads the shared care-plan record for the assigned patient.",
+    "fetch_encounter": "Fetches a single clinical encounter by patient and encounter id."
+  },
+  "beats": [
+    {
+      "name": "cross_encounter_attempt",
+      "requires_license": null,
+      "narrative": "The care plan's household-member reference leads the agent to follow it and fetch the other patient's encounter directly — a cross-encounter PHI access outside the coordinator's assignment.",
+      "steps": [
+        {
+          "tool": "read_care_plan",
+          "args": {
+            "patient_id": "PT-2024-118847"
+          },
+          "result": "Care plan for PT-2024-118847 — active diabetes management, last reviewed with care team including a note referencing shared intake encounter for household member PT-2024-098234."
+        },
+        {
+          "tool": "fetch_encounter",
+          "args": {
+            "patient_id": "PT-2024-098234",
+            "encounter_id": "ENC-20240315-002",
+            "system": "epic"
+          },
+          "result": null
+        }
+      ],
+      "final_message": "Access to PT-2024-098234's encounter was denied — outside the coordinator's assigned cohort."
+    },
+    {
+      "name": "assigned_patient_summary",
+      "requires_license": null,
+      "narrative": "The coordinator summarises the assigned patient's care history: reads the shared care plan, then fetches that patient's own encounter.",
+      "steps": [
+        {
+          "tool": "read_care_plan",
+          "args": {
+            "patient_id": "PT-2024-118847"
+          },
+          "result": "Care plan for PT-2024-118847 — active diabetes management, last reviewed with care team including a note referencing shared intake encounter for household member PT-2024-098234."
+        },
+        {
+          "tool": "fetch_encounter",
+          "args": {
+            "patient_id": "PT-2024-118847",
+            "encounter_id": "ENC-20240315-001",
+            "system": "epic"
+          },
+          "result": "Encounter ENC-20240315-001 for PT-2024-118847 — routine follow-up, A1C stable."
+        }
+      ],
+      "final_message": "Care summary for PT-2024-118847 completed."
+    }
+  ]
+}

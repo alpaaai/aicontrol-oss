@@ -40,6 +40,33 @@ async def test_openai_adapter_on_tool_start_calls_intercept():
 
 
 @pytest.mark.asyncio
+async def test_openai_adapter_parses_json_string_tool_arguments():
+    """ToolContext.tool_arguments is a raw JSON string on the real SDK
+    (agents/tool_context.py: "The raw arguments string of the tool call"),
+    not a dict -- a hand-built MagicMock with a dict attribute never caught
+    this. intercept() requires tool_parameters: dict, so an unparsed string
+    would 422 against the real API on every real invocation."""
+    from aicontrol_sdk.adapters.openai_agents_sdk import OpenAIAgentsSDKAdapter
+
+    client = AsyncMock()
+    client.intercept = AsyncMock(return_value={"decision": "allow"})
+
+    adapter = OpenAIAgentsSDKAdapter()
+    adapter.patch(client)
+    hooks = adapter.build_hooks(session_id="s1")
+
+    fake_tool = MagicMock()
+    fake_tool.name = "query_database"
+    fake_context = MagicMock()
+    fake_context.tool_arguments = '{"table": "customers", "limit": 10}'
+
+    await hooks.on_tool_start(fake_context, MagicMock(), fake_tool)
+
+    call_kwargs = client.intercept.call_args.kwargs
+    assert call_kwargs["tool_parameters"] == {"table": "customers", "limit": 10}
+
+
+@pytest.mark.asyncio
 async def test_openai_adapter_propagates_policy_denied():
     from aicontrol_sdk.adapters.openai_agents_sdk import OpenAIAgentsSDKAdapter
     from aicontrol_sdk.exceptions import PolicyDeniedError

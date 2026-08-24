@@ -1,29 +1,30 @@
 policies:
   - name: review_high_value_claim_payment
-    description: "Route claim payments above $5,000 to senior adjuster for human review — insurance demo"
-    principal_type: null
-    principal_id: null
-    action_tool: process_claim_payment
-    resource_system: null
+    description: A settlement above the adjuster's authority limit needs a human.
+    principal_type: agent
+    principal_id: claims-adjuster
+    action_tool: release_payment
+    resource_system: guidewire
     effect: review
     condition:
       numeric_conditions:
         amount:
-          gt: 5000
+          gt: 50000
     severity: high
     active: true
-    compliance_frameworks: ["SOC2", "NAIC", "EU_AI_ACT"]
+    compliance_frameworks: ["soc2"]
 
   - name: deny_unscoped_claims_query
-    description: "Block wildcard insured_id in claims database queries — prevents bulk data access via prompt injection — insurance demo"
-    principal_type: null
-    principal_id: null
-    action_tool: query_claims_database
-    resource_system: null
+    description: The adjuster may query only the claim it is assigned to.
+    principal_type: agent
+    principal_id: claims-adjuster
+    action_tool: db_query
+    resource_system: guidewire
     effect: deny
     condition:
-      parameter_match:
-        insured_id: "*"
+      numeric_conditions:
+        row_limit:
+          gt: 1
     severity: critical
     active: true
-    compliance_frameworks: ["SOC2", "NAIC", "GDPR"]
+    compliance_frameworks: ["soc2", "iso_42001"]

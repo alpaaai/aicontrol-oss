@@ -98,7 +98,9 @@ def test_all_demo_seed_files_load_and_have_valid_effects():
     from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
     valid_effects = {"deny", "review"}
     seed_files = sorted(DEMO_SEEDS_DIR.glob("*.yaml"))
-    assert len(seed_files) == 6, f"expected 6 demo seed files, found {len(seed_files)}"
+    # 6 pre-phase-6 scenario files plus gtm.yaml (task 6.4 -- GTM sales
+    # outreach, the demo-harness successor to the revops.yaml scenario).
+    assert len(seed_files) == 7, f"expected 7 demo seed files, found {len(seed_files)}"
     for path in seed_files:
         for p in load_yaml(path):
             assert p["effect"] in valid_effects, f"{path.name}: invalid effect {p['effect']}"

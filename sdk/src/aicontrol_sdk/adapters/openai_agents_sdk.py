@@ -6,6 +6,7 @@ raising PolicyDeniedError/ReviewPendingError directly from on_tool_start,
 which aborts the run before the tool executes.
 """
 import itertools
+import json
 import logging
 import uuid
 from typing import Any
@@ -111,6 +112,20 @@ class OpenAIAgentsSDKAdapter(WorkflowResolution, CoverageReporting):
         if name and name != "Agent workflow":
             self._framework_workflow = name
 
+    def parse_tool_arguments(self, context: Any) -> dict:
+        """ToolContext.tool_arguments is documented as "the raw arguments
+        string of the tool call" (agents/tool_context.py) -- a JSON-encoded
+        str, not a dict. Every real invocation reaches this as a str; unit
+        tests that hand-build a fake context with a dict must keep working
+        too, so both are accepted."""
+        raw = getattr(context, "tool_arguments", {}) or {}
+        if isinstance(raw, str):
+            try:
+                return json.loads(raw)
+            except json.JSONDecodeError:
+                return {}
+        return raw
+
     def build_hooks(self, session_id: str):
         """Build a RunHooks instance to pass as `Runner.run(..., hooks=...)`.
 
@@ -150,7 +165,7 @@ class OpenAIAgentsSDKAdapter(WorkflowResolution, CoverageReporting):
                 usage_accumulator["output_tokens"] = 0
                 await client.intercept(
                     tool_name=getattr(tool, "name", str(tool)),
-                    tool_parameters=getattr(context, "tool_arguments", {}) or {},
+                    tool_parameters=self.parse_tool_arguments(context),
                     session_id=session_id,
                     sequence_number=next(counter),
                     workflow=self.resolve_workflow(),

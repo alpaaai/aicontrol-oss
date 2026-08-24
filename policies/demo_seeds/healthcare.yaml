@@ -1,14 +1,14 @@
 policies:
   - name: deny_cross_encounter_phi_access
-    description: "Block PHI access to patients outside authorized encounter cohort — healthcare demo"
-    principal_type: null
-    principal_id: null
-    action_tool: read_patient_record
-    resource_system: null
+    description: The care coordinator may fetch encounters only for its assigned patient, not others referenced by a shared care-plan record.
+    principal_type: agent
+    principal_id: care-coordinator
+    action_tool: fetch_encounter
+    resource_system: epic
     effect: deny
     condition:
       parameter_match:
-        patient_id: "PT-2024-09*"
-    active: true
+        patient_id: "PT-2024-098*"
     severity: critical
-    compliance_frameworks: ["HIPAA", "SOC2"]
+    active: true
+    compliance_frameworks: ["hipaa", "soc2"]

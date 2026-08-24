@@ -1,0 +1,15 @@
+policies:
+  - name: deny_unscoped_crm_query
+    description: The SDR agent may query only the segment it was given, not the whole account table.
+    principal_type: agent
+    principal_id: sdr-agent
+    action_tool: salesforce_query
+    resource_system: salesforce
+    effect: deny
+    condition:
+      numeric_conditions:
+        row_limit:
+          gt: 100
+    severity: high
+    active: true
+    compliance_frameworks: ["soc2", "gdpr"]
