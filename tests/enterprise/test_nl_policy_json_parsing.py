@@ -37,10 +37,11 @@ def test_raises_on_genuinely_unparseable_output():
         _parse_llm_json("I cannot help with that request.")
 
 
-def test_system_prompt_pins_the_tool_denylist_condition_key():
-    """The prompt said 'a dict matching that rule_type's existing condition
-    shape' without ever stating the shape, so the model returned {"tools": [...]}
-    while every consumer reads condition["blocked_tools"]."""
+def test_system_prompt_pins_the_accepted_condition_keys():
+    """A prompt that names the condition shape loosely lets the model invent
+    field names the compiler rejects. Pin the accepted vocabulary explicitly."""
     from enterprise.app.services.policy_authoring.prompt_builder import SYSTEM_PROMPT
+    from app.services import policy_compiler
 
-    assert "blocked_tools" in SYSTEM_PROMPT
+    for key in policy_compiler.supported_condition_keys():
+        assert key in SYSTEM_PROMPT, key

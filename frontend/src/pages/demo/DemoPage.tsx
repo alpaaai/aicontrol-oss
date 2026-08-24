@@ -387,7 +387,7 @@ export function DemoPage() {
         <button
           onClick={handleReset}
           disabled={resetLoading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-ac-border hover:border-ac-peacock-300 rounded-md transition-colors"
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 border border-ac-hairline hover:border-ac-surface-sunk rounded-md transition-colors"
         >
           <RefreshCw size={12} className={resetLoading ? "animate-spin" : ""} />
           Reset
@@ -398,7 +398,7 @@ export function DemoPage() {
         {/* Left panel */}
         <div className="w-[40%] shrink-0 flex flex-col gap-4 overflow-y-auto">
           {/* Selectors */}
-          <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4 space-y-3">
+          <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card p-4 space-y-3">
             <div>
               <label className="block text-xs text-gray-500 mb-1">Industry</label>
               <select
@@ -409,7 +409,7 @@ export function DemoPage() {
                   setScenarioName("");
                   setScenario(null);
                 }}
-                className="w-full bg-ac-card border border-ac-border rounded-md px-3 py-1.5 text-sm text-gray-800 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
+                className="w-full bg-ac-surface-card border border-ac-hairline rounded-md px-3 py-1.5 text-sm text-gray-800 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
               >
                 <option value="">Select industry…</option>
                 {INDUSTRIES.map((ind) => (
@@ -431,7 +431,7 @@ export function DemoPage() {
                       scenariosForIndustry.find((s) => s.scenario_name === name) ?? null
                     );
                   }}
-                  className="w-full bg-ac-card border border-ac-border rounded-md px-3 py-1.5 text-sm text-gray-800 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
+                  className="w-full bg-ac-surface-card border border-ac-hairline rounded-md px-3 py-1.5 text-sm text-gray-800 disabled:opacity-50 focus:outline-none focus:border-ac-primary"
                 >
                   <option value="">Select scenario…</option>
                   {scenariosForIndustry.map((s) => (
@@ -446,7 +446,7 @@ export function DemoPage() {
 
           {/* Incident headline card */}
           {scenario && (
-            <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4">
+            <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card p-4">
               <p className="text-xs leading-relaxed text-gray-700 italic">
                 {scenario.incident_headline}
               </p>
@@ -458,7 +458,7 @@ export function DemoPage() {
             <button
               onClick={handleSeed}
               disabled={seedLoading || running}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-ac-peacock-50 hover:bg-ac-peacock-100 border border-ac-border text-gray-700 hover:text-gray-900 rounded-md transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs bg-ac-surface-sunk hover:bg-ac-surface-sunk border border-ac-hairline text-gray-700 hover:text-gray-900 rounded-md transition-colors disabled:opacity-50"
             >
               <Leaf size={12} />
               {seedLoading ? "Seeding…" : "Seed"}
@@ -469,7 +469,7 @@ export function DemoPage() {
             <button
               onClick={handleRun}
               disabled={!canRun || running}
-              className="flex items-center gap-1.5 px-4 py-2 text-xs bg-ac-primary hover:bg-ac-primary/90 text-white rounded font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
+              className="flex items-center gap-1.5 px-4 py-2 text-xs bg-ac-primary hover:bg-ac-primary-active text-white rounded font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed ml-auto"
             >
               <Play size={12} />
               Run
@@ -478,7 +478,7 @@ export function DemoPage() {
 
           {/* Step-by-step runner */}
           {running && scenario && (
-            <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4 space-y-3">
+            <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card p-4 space-y-3">
               <div className="text-xs text-gray-500">
                 Step {currentStep + 1} of {scenario.tool_calls.length}
               </div>
@@ -521,7 +521,7 @@ export function DemoPage() {
               <button
                 onClick={handleCallNextTool}
                 disabled={callInFlight || denyPause}
-                className="w-full py-2 text-sm font-medium bg-ac-primary hover:bg-ac-primary/90 text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full py-2 text-sm font-medium bg-ac-primary hover:bg-ac-primary-active text-white rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {callInFlight ? "Sending…" : denyPause ? "Processing…" : log.some(e => e.step === currentStep + 1 && !e.pending) ? "Next Step →" : "Call Next Tool"}
               </button>
@@ -530,13 +530,13 @@ export function DemoPage() {
 
           {/* Custom tool call section */}
           {completed && (
-            <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4 space-y-3">
+            <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card p-4 space-y-3">
               {!showCustomForm && showCustomPrompt && (
                 <div className="space-y-2">
                   <p className="text-xs text-gray-700">Want to add a tool call with your own policy?</p>
                   <button
                     onClick={() => setShowCustomForm(true)}
-                    className="px-3 py-1.5 text-xs bg-ac-peacock-50 hover:bg-ac-peacock-100 border border-ac-border text-gray-700 hover:text-gray-900 rounded-md transition-colors"
+                    className="px-3 py-1.5 text-xs bg-ac-surface-sunk hover:bg-ac-surface-sunk border border-ac-hairline text-gray-700 hover:text-gray-900 rounded-md transition-colors"
                   >
                     Yes, show me
                   </button>
@@ -551,7 +551,7 @@ export function DemoPage() {
                     <input
                       value={customPolicyName}
                       onChange={(e) => setCustomPolicyName(e.target.value)}
-                      className="w-full bg-ac-surface border border-ac-border rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-ac-surface border border-ac-hairline rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                       placeholder="my-custom-policy"
                     />
                   </div>
@@ -560,7 +560,7 @@ export function DemoPage() {
                     <select
                       value={customRuleType}
                       onChange={(e) => setCustomRuleType(e.target.value)}
-                      className="w-full bg-ac-surface border border-ac-border rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-ac-surface border border-ac-hairline rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                     >
                       <option value="tool_denylist">tool_denylist</option>
                       <option value="parameter_match">parameter_match</option>
@@ -574,13 +574,13 @@ export function DemoPage() {
                       value={customCondition}
                       onChange={(e) => setCustomCondition(e.target.value)}
                       rows={4}
-                      className="w-full bg-ac-surface border border-ac-border rounded-md px-3 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-ac-primary resize-none"
+                      className="w-full bg-ac-surface border border-ac-hairline rounded-md px-3 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-ac-primary resize-none"
                     />
                   </div>
                   <button
                     onClick={handleSavePolicy}
                     disabled={!customPolicyName}
-                    className="w-full py-2 text-xs font-medium bg-ac-primary hover:bg-ac-primary/90 text-white rounded transition-colors disabled:opacity-40"
+                    className="w-full py-2 text-xs font-medium bg-ac-primary hover:bg-ac-primary-active text-white rounded transition-colors disabled:opacity-40"
                   >
                     Save Policy
                   </button>
@@ -595,7 +595,7 @@ export function DemoPage() {
                     <input
                       value={customToolName}
                       onChange={(e) => setCustomToolName(e.target.value)}
-                      className="w-full bg-ac-surface border border-ac-border rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-ac-surface border border-ac-hairline rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                       placeholder="my_tool_name"
                     />
                   </div>
@@ -605,7 +605,7 @@ export function DemoPage() {
                       value={customToolParams}
                       onChange={(e) => setCustomToolParams(e.target.value)}
                       rows={4}
-                      className="w-full bg-ac-surface border border-ac-border rounded-md px-3 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-ac-primary resize-none"
+                      className="w-full bg-ac-surface border border-ac-hairline rounded-md px-3 py-1.5 text-xs font-mono text-gray-800 focus:outline-none focus:border-ac-primary resize-none"
                     />
                   </div>
                   <div>
@@ -613,14 +613,14 @@ export function DemoPage() {
                     <input
                       value={customToolLabel}
                       onChange={(e) => setCustomToolLabel(e.target.value)}
-                      className="w-full bg-ac-surface border border-ac-border rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
+                      className="w-full bg-ac-surface border border-ac-hairline rounded-md px-3 py-1.5 text-sm text-gray-800 focus:outline-none focus:border-ac-primary"
                       placeholder="e.g. Exfiltrate customer data"
                     />
                   </div>
                   <button
                     onClick={handleCustomRun}
                     disabled={!customToolName || customRunning}
-                    className="w-full py-2 text-xs font-medium bg-ac-primary hover:bg-ac-primary/90 text-white rounded transition-colors disabled:opacity-40"
+                    className="w-full py-2 text-xs font-medium bg-ac-primary hover:bg-ac-primary-active text-white rounded transition-colors disabled:opacity-40"
                   >
                     {customRunning ? "Running…" : "Add & Run"}
                   </button>

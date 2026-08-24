@@ -1,386 +1,93 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
-const MOCK_POLICIES: never[] = [];
+const POLICIES = [
+  { id: "p1", name: "review_high_value_payment", active: true,
+    principalType: "agent", principalId: "claims-adjuster",
+    actionTool: "release_payment", resourceSystem: "guidewire",
+    effect: "review", condition: { numeric_conditions: { amount: { gt: 50000 } } } },
+  { id: "p2", name: "deny_bulk_claims_query", active: true,
+    principalType: "agent", principalId: "claims-adjuster",
+    actionTool: "db_query", resourceSystem: "guidewire",
+    effect: "deny", condition: { numeric_conditions: { row_limit: { gt: 100 } } } },
+];
 
 test.beforeEach(async ({ page }) => {
-  await page.route("http://localhost:8001/policies*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify(MOCK_POLICIES) })
+  // Scoped to the API call, not the SPA route of the same name: the glob
+  // "**/policies" also matches the browser's document navigation to /policies.
+  await page.route("**/policies", (route) =>
+    route.request().resourceType() === "document"
+      ? route.continue()
+      : route.fulfill({ json: POLICIES }),
   );
   await page.goto("/login");
   await page.evaluate(() => {
     sessionStorage.setItem(
       "ac_auth",
-      JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" })
+      JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" }),
     );
   });
 });
 
-test("policies page renders table and new policy button", async ({ page }) => {
+test("each list row is the policy sentence, not a name and a rule type", async ({ page }) => {
   await page.goto("/policies");
-  await expect(page.getByRole("heading", { name: "Policies" })).toBeVisible();
-  await expect(page.getByText("New policy")).toBeVisible();
+  const row = page.getByTestId("policy-row-p1");
+  await expect(row).toContainText("claims-adjuster");
+  await expect(row).toContainText("release a payment");
+  await expect(row).not.toContainText("tool_denylist");
 });
 
-test("drift warnings section shows enterprise lock", async ({ page }) => {
-  await page.goto("/policies");
-  await expect(page.getByRole("heading", { name: "Policy Drift Warnings" })).toBeVisible();
-  await expect(page.getByText("Drift Detection — Enterprise")).toBeVisible();
+test("no raw rule text is visible by default", async ({ page }) => {
+  await page.goto("/policies/p1");
+  await expect(page.getByTestId("raw-rule")).toBeHidden();
+  await expect(page.getByRole("button", { name: /view rule/i })).toBeVisible();
 });
 
-test("library endpoint returns policy list with library=true items", async ({ page }) => {
-  const mockLibrary = [
-    {
-      id: "lib-001",
-      name: "block_shell_execution",
-      description: "Block all shell tools",
-      rule_type: "tool_denylist",
-      condition: { blocked_tools: ["bash"] },
-      action: "deny",
-      severity: "critical",
-      active: false,
-      library: true,
-      priority: 10,
-      category: "Dangerous Operations",
-      compliance_frameworks: ["SOC2"],
-      applies_to_agents: 0,
-      created_by: null,
-    },
-  ];
+test("view rule discloses the rule text", async ({ page }) => {
+  await page.goto("/policies/p1");
+  await page.getByRole("button", { name: /view rule/i }).click();
+  await expect(page.getByTestId("raw-rule")).toBeVisible();
+});
 
-  await page.route("http://localhost:8001/policies/library*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify(mockLibrary) })
+test("the composer is the primary input and the editor is its peer", async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({ json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } } }),
   );
-
-  // Navigate to policies — the library tab will call this endpoint
   await page.goto("/policies");
-  await page.getByRole("tab", { name: "Policy Library" }).click();
-  await expect(page.getByText("block_shell_execution")).toBeVisible();
+  await expect(page.getByTestId("nl-composer")).toBeVisible();
+  await expect(page.getByTestId("structured-editor")).toBeVisible();
+  const composerBox = await page.getByTestId("nl-composer").boundingBox();
+  const editorBox = await page.getByTestId("structured-editor").boundingBox();
+  expect(Math.abs(composerBox!.y - editorBox!.y)).toBeLessThan(200);
 });
 
-test("ToolDenylistForm renders tag input and adds tools", async ({ page }) => {
-  // This is tested via the PolicyEditor in Part 6.
-  // For now just verify the file exists and the component imports cleanly.
-  const response = await page.request.get(
-    "http://localhost:5173/src/pages/policies/condition-form/ToolDenylistForm.tsx"
+test("a free install shows the structured editor alone", async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({ json: { tier: "free", features: { nl_authoring: false, simulation: false, hitl: false, compliance_reports: false } } }),
   );
-  // 200 means Vite serves it; 404 means file missing
-  expect(response.status()).toBe(200);
-});
-
-const MOCK_EMPTY: never[] = [];
-
-test("Active Policies table shows action badge and priority", async ({ page }) => {
-  const mockPolicies = [
-    {
-      id: "p1",
-      name: "block_shell_execution",
-      description: "Block shells",
-      rule_type: "tool_denylist",
-      condition: { blocked_tools: ["bash"] },
-      action: "deny",
-      severity: "critical",
-      active: true,
-      library: false,
-      priority: 10,
-      category: "Dangerous Operations",
-      compliance_frameworks: ["SOC2"],
-      applies_to_agents: 0,
-      created_by: null,
-    },
-  ];
-
-  await page.route("http://localhost:8001/policies*", (route) => {
-    if (route.request().url().includes("/library")) {
-      route.fulfill({ status: 200, body: JSON.stringify([]) });
-    } else {
-      route.fulfill({ status: 200, body: JSON.stringify(mockPolicies) });
-    }
-  });
-
   await page.goto("/policies");
-  await expect(page.getByText("block_shell_execution")).toBeVisible();
-  // Action badge
-  await expect(page.getByText("deny", { exact: true })).toBeVisible();
-  // Priority
-  await expect(page.getByText("10", { exact: true })).toBeVisible();
-  // Condition type badge
-  await expect(page.getByText("Tool Denylist")).toBeVisible();
+  await expect(page.getByTestId("nl-composer")).toHaveCount(0);
+  await expect(page.getByTestId("structured-editor")).toBeVisible();
 });
 
-test.describe("PolicyEditor slide-over", () => {
-  test.beforeEach(async ({ page }) => {
-    await page.route("http://localhost:8001/policies*", (route) => {
-      if (route.request().method() === "GET") {
-        route.fulfill({ status: 200, body: JSON.stringify(MOCK_EMPTY) });
-      } else if (route.request().method() === "POST") {
-        const body = JSON.parse(route.request().postData() ?? "{}");
-        route.fulfill({
-          status: 201,
-          body: JSON.stringify({
-            id: "new-001",
-            ...body,
-            active: true,
-            library: false,
-            priority: body.priority ?? 100,
-            applies_to_agents: 0,
-            created_by: null,
-          }),
-        });
-      } else {
-        route.continue();
-      }
-    });
-    await page.goto("/login");
-    await page.evaluate(() => {
-      sessionStorage.setItem(
-        "ac_auth",
-        JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" })
-      );
-    });
-    await page.goto("/policies");
-  });
-
-  test("opens as slide-over when New policy is clicked", async ({ page }) => {
-    await page.getByRole("button", { name: /new policy/i }).click();
-    await expect(page.getByRole("heading", { name: /create policy/i })).toBeVisible();
-    // Slide-over should be visible (not a centered modal)
-    const panel = page.locator("[data-testid='policy-editor-panel']");
-    await expect(panel).toBeVisible();
-  });
-
-  test("Form/JSON toggle switches between modes", async ({ page }) => {
-    await page.getByRole("button", { name: /new policy/i }).click();
-    // Default is Form mode — JSON panel is read-only
-    await expect(page.getByTestId("json-panel")).toBeVisible();
-    // Click JSON toggle
-    await page.getByRole("button", { name: "JSON" }).click();
-    await expect(page.getByTestId("json-textarea")).toBeVisible();
-    // Click Form toggle
-    await page.getByRole("button", { name: "Form" }).click();
-    await expect(page.getByTestId("json-panel")).toBeVisible();
-  });
-
-  test("condition type selector switches sub-form", async ({ page }) => {
-    await page.getByRole("button", { name: /new policy/i }).click();
-    // Default condition type is tool_denylist
-    await expect(page.getByTestId("tool-denylist-input")).toBeVisible();
-    // Switch to Parameter Match
-    await page.getByTestId("condition-type-select").selectOption("parameter_match");
-    await expect(page.getByTestId("param-key-0")).toBeVisible();
-    // Switch to Numeric Conditions
-    await page.getByTestId("condition-type-select").selectOption("numeric_conditions");
-    await expect(page.getByTestId("numeric-field-0")).toBeVisible();
-  });
-
-  test("JSON panel updates live as tool denylist form is filled", async ({ page }) => {
-    await page.getByRole("button", { name: /new policy/i }).click();
-    // Add a tool
-    await page.getByTestId("tool-denylist-input").fill("bash");
-    await page.getByTestId("tool-denylist-input").press("Enter");
-    // JSON panel should contain "bash"
-    const jsonText = await page.getByTestId("json-panel").textContent();
-    expect(jsonText).toContain("bash");
-  });
-
-  test("live match preview shows checkmarks and crosses", async ({ page }) => {
-    await page.getByRole("button", { name: /new policy/i }).click();
-    await page.getByTestId("tool-denylist-input").fill("bash");
-    await page.getByTestId("tool-denylist-input").press("Enter");
-    // bash example should match (✓) and read_file should not (✗)
-    await expect(page.getByTestId("match-preview")).toBeVisible();
-  });
-
-  test("saves new policy and calls onSaved", async ({ page }) => {
-    await page.getByRole("button", { name: /new policy/i }).click();
-    // Fill name
-    await page.getByTestId("policy-name-input").fill("my_test_policy");
-    // Add a blocked tool
-    await page.getByTestId("tool-denylist-input").fill("bash");
-    await page.getByTestId("tool-denylist-input").press("Enter");
-    // Save
-    await page.getByRole("button", { name: /save policy/i }).click();
-    // Editor should close
-    await expect(page.getByTestId("policy-editor-panel")).not.toBeVisible();
-  });
-
-  test("shows unknown condition type notice for unrecognised JSON", async ({ page }) => {
-    await page.getByRole("button", { name: /new policy/i }).click();
-    // Switch to JSON mode and enter an unrecognised condition type
-    await page.getByRole("button", { name: "JSON" }).click();
-    const textarea = page.getByTestId("json-textarea");
-    await textarea.fill(JSON.stringify({ geo_restriction: { allowed: ["US"] } }));
-    // Switch back to Form
-    await page.getByRole("button", { name: "Form" }).click();
-    await expect(page.getByText(/condition type not supported/i)).toBeVisible();
-  });
+test("the activate button keeps its word through the flow", async ({ page }) => {
+  await page.goto("/policies/p1");
+  const button = page.getByRole("button", { name: "Activate" });
+  await button.click();
+  await expect(page.getByRole("button", { name: "Activated" })).toBeVisible();
 });
 
-test("Policy Library tab shows cards grouped by category", async ({ page }) => {
-  const mockLibrary = [
-    {
-      id: "lib-1",
-      name: "block_shell_execution",
-      description: "Block all shell tools",
-      rule_type: "tool_denylist",
-      condition: { blocked_tools: ["bash"] },
-      action: "deny",
-      severity: "critical",
-      active: false,
-      library: true,
-      priority: 10,
-      category: "Dangerous Operations",
-      compliance_frameworks: ["SOC2"],
-      applies_to_agents: 0,
-      created_by: null,
-    },
-    {
-      id: "lib-2",
-      name: "review_write_operations",
-      description: "Review write ops",
-      rule_type: "tool_pattern",
-      condition: { tool_name_contains: ["write"] },
-      action: "review",
-      severity: "medium",
-      active: false,
-      library: true,
-      priority: 30,
-      category: "Human Review Gates",
-      compliance_frameworks: [],
-      applies_to_agents: 0,
-      created_by: null,
-    },
-  ];
-
-  await page.route("http://localhost:8001/policies/library*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify(mockLibrary) })
+test("policy detail shows what the policy did last week", async ({ page }) => {
+  await page.route("**/policies/p1/activity*", (route) =>
+    route.fulfill({ json: { window: "7d", fired: 3, calls_evaluated: 412 } }),
   );
+  await page.goto("/policies/p1");
+  await expect(page.getByTestId("policy-activity")).toContainText("3");
+  await expect(page.getByTestId("policy-activity")).toContainText("412");
+});
 
+test("the policy list scrolls rather than clipping", async ({ page }) => {
   await page.goto("/policies");
-  await page.getByRole("tab", { name: "Policy Library" }).click();
-
-  await expect(page.getByText("Dangerous Operations")).toBeVisible();
-  await expect(page.getByText("block_shell_execution")).toBeVisible();
-  await expect(page.getByText("Human Review Gates")).toBeVisible();
-  await expect(page.getByText("review_write_operations")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Preview" }).first()).toBeVisible();
-  await expect(page.getByRole("button", { name: "Activate" }).first()).toBeVisible();
-});
-
-test("Policy Library preview toggle shows condition JSON inline", async ({ page }) => {
-  const mockLibrary = [
-    {
-      id: "lib-1",
-      name: "block_shell_execution",
-      description: "Block all shell tools",
-      rule_type: "tool_denylist",
-      condition: { blocked_tools: ["bash", "exec_command"] },
-      action: "deny",
-      severity: "critical",
-      active: false,
-      library: true,
-      priority: 10,
-      category: "Dangerous Operations",
-      compliance_frameworks: [],
-      applies_to_agents: 0,
-      created_by: null,
-    },
-  ];
-
-  await page.route("http://localhost:8001/policies/library*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify(mockLibrary) })
-  );
-
-  await page.goto("/policies");
-  await page.getByRole("tab", { name: "Policy Library" }).click();
-  await page.getByRole("button", { name: "Preview" }).click();
-  await expect(page.getByText("exec_command")).toBeVisible();
-});
-
-test("BaselineActivationDialog shows Standard and Strict options", async ({ page }) => {
-  await page.route("http://localhost:8001/policies*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify([]) })
-  );
-  await page.route("http://localhost:8001/policies/activate-baseline", (route) =>
-    route.fulfill({
-      status: 200,
-      body: JSON.stringify({ mode: "standard", activated: ["block_shell_execution"] }),
-    })
-  );
-
-  await page.goto("/login");
-  await page.evaluate(() => {
-    sessionStorage.setItem(
-      "ac_auth",
-      JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" })
-    );
-    // Simulate: setup just completed, baseline not yet offered
-    sessionStorage.removeItem("baseline_offered");
-    sessionStorage.setItem("show_baseline_dialog", "true");
-  });
-  await page.goto("/policies");
-
-  await expect(page.getByTestId("baseline-dialog")).toBeVisible();
-  await expect(page.getByText("Standard").first()).toBeVisible();
-  await expect(page.getByText("Strict").first()).toBeVisible();
-});
-
-test("BaselineActivationDialog activates standard baseline on confirm", async ({ page }) => {
-  await page.route("http://localhost:8001/policies/activate-baseline", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({ mode: "standard", activated: ["block_shell_execution"] }),
-    })
-  );
-
-  await page.goto("/login");
-  await page.evaluate(() => {
-    sessionStorage.setItem(
-      "ac_auth",
-      JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" })
-    );
-    sessionStorage.removeItem("baseline_offered");
-    sessionStorage.setItem("show_baseline_dialog", "true");
-  });
-  await page.goto("/policies");
-
-  const [activateRequest] = await Promise.all([
-    page.waitForRequest((req) => req.url().includes("activate-baseline")),
-    page.getByTestId("baseline-standard-btn").click(),
-  ]);
-  await expect(page.getByTestId("baseline-dialog")).not.toBeVisible();
-  const activateBody = JSON.parse(activateRequest.postData() ?? "{}");
-  expect(activateBody.mode).toBe("standard");
-});
-
-test("Policy Library Activate opens PolicyEditor pre-filled", async ({ page }) => {
-  const mockLibrary = [
-    {
-      id: "lib-1",
-      name: "block_shell_execution",
-      description: "Block all shell tools",
-      rule_type: "tool_denylist",
-      condition: { blocked_tools: ["bash"] },
-      action: "deny",
-      severity: "critical",
-      active: false,
-      library: true,
-      priority: 10,
-      category: "Dangerous Operations",
-      compliance_frameworks: [],
-      applies_to_agents: 0,
-      created_by: null,
-    },
-  ];
-
-  await page.route("http://localhost:8001/policies/library*", (route) =>
-    route.fulfill({ status: 200, body: JSON.stringify(mockLibrary) })
-  );
-
-  await page.goto("/policies");
-  await page.getByRole("tab", { name: "Policy Library" }).click();
-  await page.getByRole("button", { name: "Activate" }).click();
-  // PolicyEditor should open with the library policy's name pre-filled
-  await expect(page.getByTestId("policy-editor-panel")).toBeVisible();
-  await expect(page.getByTestId("policy-name-input")).toHaveValue("block_shell_execution");
+  const overflow = await page.getByTestId("policy-list")
+    .evaluate((el) => getComputedStyle(el).overflowY);
+  expect(overflow).toBe("auto");
 });

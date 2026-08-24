@@ -5,14 +5,14 @@ from datetime import datetime
 from typing import Any, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Response
-from pydantic import BaseModel, ConfigDict, field_validator
-from sqlalchemy import case, func, select, text, update
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from sqlalchemy import and_, case, func, or_, select, text, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin, require_agent
 from app.core.logging import get_logger
 from app.models.database import get_db
-from app.models.schemas import Agent, APIToken, AuditEvent
+from app.models.schemas import Agent, APIToken, AuditEvent, Policy
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 logger = get_logger("agents_api")
@@ -270,6 +270,55 @@ async def get_agent(
     response.silent_noop_warnings = agent.silent_noop_warnings or []
     response.unresolved_systems = agent.unresolved_systems or []
     return response
+
+
+class AgentPolicyResponse(BaseModel):
+    """Shaped as the frontend's PolicyScope, not the raw `policies` columns --
+    this endpoint feeds the agent's governing-policies list directly, so it
+    skips the snake_case-to-camelCase mapper every other policy consumer uses."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    id: uuid.UUID
+    principal_type: Optional[str] = Field(None, alias="principalType")
+    principal_id: Optional[str] = Field(None, alias="principalId")
+    action_tool: Optional[str] = Field(None, alias="actionTool")
+    resource_system: Optional[str] = Field(None, alias="resourceSystem")
+    effect: str
+    condition: dict[str, Any]
+
+
+@router.get("/{agent_id}/policies", response_model=list[AgentPolicyResponse], response_model_by_alias=True)
+async def get_agent_policies(
+    agent_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    _token: dict = Depends(require_admin),
+) -> list[AgentPolicyResponse]:
+    """Every policy whose principal matches this agent -- the same scope the
+    /intercept pre-filter applies, minus the tool and system filters."""
+    agent = await db.get(Agent, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+
+    principal_match = or_(
+        Policy.principal_id.is_(None),
+        and_(Policy.principal_type == "agent", Policy.principal_id == agent.name),
+    )
+    result = await db.execute(
+        select(Policy).where(Policy.active == True, principal_match)  # noqa: E712
+    )
+    return [
+        AgentPolicyResponse(
+            id=p.id,
+            principal_type=p.principal_type,
+            principal_id=p.principal_id,
+            action_tool=p.action_tool,
+            resource_system=p.resource_system,
+            effect=p.effect or "deny",
+            condition=p.condition,
+        )
+        for p in result.scalars().all()
+    ]
 
 
 @router.post("", response_model=AgentResponse, status_code=201)

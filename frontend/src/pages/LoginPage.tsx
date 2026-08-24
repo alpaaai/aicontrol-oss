@@ -122,19 +122,19 @@ export function LoginPage() {
             <div className="w-7 h-7 bg-ac-night rounded-[7px] flex items-center justify-center">
               <div className="w-[11px] h-[11px] bg-ac-primary rounded-[2px]" />
             </div>
-            <span className="text-[15px] font-semibold tracking-[-0.01em] text-ac-text-primary font-display">
+            <span className="text-[15px] font-semibold tracking-[-0.01em] text-ac-ink font-display">
               AIControl
             </span>
           </div>
 
-          <h2 className="text-[22px] font-bold text-ac-text-primary mb-1">Sign in</h2>
-          <p className="text-[14px] text-ac-text-muted mb-8">
+          <h2 className="text-[22px] font-bold text-ac-ink mb-1">Sign in</h2>
+          <p className="text-[14px] text-ac-muted mb-8">
             Enter your credentials to access AIControl.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+              <label className="block text-[12px] font-medium text-ac-muted mb-1.5">
                 Work email
               </label>
               <input
@@ -143,11 +143,11 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
               />
             </div>
             <div>
-              <label className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+              <label className="block text-[12px] font-medium text-ac-muted mb-1.5">
                 Password
               </label>
               <input
@@ -156,11 +156,11 @@ export function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
               />
             </div>
             {error && (
-              <p className="text-xs text-ac-deny bg-ac-deny-bg rounded-md px-3 py-2">{error}</p>
+              <p className="text-xs text-ac-decision-deny bg-ac-decision-deny-soft rounded-md px-3 py-2">{error}</p>
             )}
             <button
               type="submit"
@@ -171,7 +171,7 @@ export function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-10 text-[11px] text-ac-text-muted/60 text-center">
+          <p className="mt-10 text-[11px] text-ac-muted/60 text-center">
             Secured by AIControl · Enterprise tier
           </p>
         </div>

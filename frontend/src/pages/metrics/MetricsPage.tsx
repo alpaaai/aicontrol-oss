@@ -15,10 +15,8 @@ export function MetricsPage() {
 
   return (
     <div className="p-6 space-y-5">
-      <div className="animate-fade-up">
-        <h2 className="text-[18px] font-semibold text-ac-text-primary">
-          Decision metrics
-        </h2>
+      <div>
+        <h1 className="text-title-lg text-ac-ink">Decision metrics</h1>
       </div>
 
       <div className="flex gap-4 flex-wrap">
@@ -30,31 +28,26 @@ export function MetricsPage() {
         />
         <StatCard
           index={1}
-          accentColor="#534AB7"
           label="Intercepts (30 days)"
           value={loading ? "—" : (data?.intercepts_30d.toLocaleString() ?? "—")}
         />
         <StatCard
           index={2}
-          accentColor="#0F7A54"
           label="Active agents"
           value={loading ? "—" : (data?.active_agents ?? "—")}
         />
         <StatCard
           index={3}
-          accentColor="#8F5710"
           label="Active policies"
           value={loading ? "—" : (data?.active_policies ?? "—")}
         />
         <StatCard
           index={4}
-          accentColor="#0F7A54"
           label="Policy hit rate (7d)"
           value={metricsLoading ? "—" : `${metrics?.policy_hit_rate ?? 0}%`}
         />
         <StatCard
           index={5}
-          accentColor="#534AB7"
           label="Avg review time"
           value={
             metricsLoading || metrics?.avg_review_seconds == null
@@ -74,29 +67,25 @@ export function MetricsPage() {
       )}
 
       {metrics && metrics.top_agents_by_deny_rate.length > 0 && (
-        <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card overflow-hidden">
-          <div className="px-4 py-3 border-b border-ac-border">
-            <p className="text-[13px] font-semibold text-ac-text-primary">
-              Top agents by deny rate (7d)
-            </p>
+        <div className="bg-ac-surface-card border border-ac-hairline rounded-lg overflow-hidden">
+          <div className="px-4 py-3 border-b border-ac-hairline">
+            <p className="text-title-sm text-ac-ink">Top agents by deny rate (7d)</p>
           </div>
           {metrics.top_agents_by_deny_rate.map((a) => (
             <div
               key={a.agent_name}
-              className="flex items-center justify-between px-4 py-2.5 border-b border-gray-50 text-[13px]"
+              className="flex items-center justify-between px-4 py-2.5 border-b border-ac-hairline-soft text-body-sm"
             >
-              <span className="text-ac-text-primary">{a.agent_name}</span>
+              <span className="text-ac-ink">{a.agent_name}</span>
               <div className="flex items-center gap-4">
-                <span className="text-ac-text-muted text-[12px]">
-                  {a.total} calls
-                </span>
+                <span className="text-ac-muted text-caption">{a.total} calls</span>
                 <span
                   className={`font-medium ${
                     a.deny_rate > 20
-                      ? "text-red-500"
+                      ? "text-ac-error"
                       : a.deny_rate > 5
-                      ? "text-amber-500"
-                      : "text-ac-text-primary"
+                      ? "text-ac-warning"
+                      : "text-ac-ink"
                   }`}
                 >
                   {a.deny_rate}% deny

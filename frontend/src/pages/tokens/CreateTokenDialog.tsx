@@ -54,15 +54,15 @@ export function CreateTokenDialog({ open, onClose, onCreated }: Props) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-ac-card rounded-[12px] border border-ac-border w-full max-w-md p-6 shadow-xl">
+      <div className="bg-ac-surface-card rounded-[12px] border border-ac-hairline w-full max-w-md p-6 shadow-xl">
         {!result ? (
           <>
-            <h3 className="text-[16px] font-semibold text-ac-text-primary mb-4">
+            <h3 className="text-[16px] font-semibold text-ac-ink mb-4">
               Create API Token
             </h3>
             <form onSubmit={handleCreate} className="space-y-3">
               <div>
-                <label className="text-[12px] text-ac-text-muted block mb-1">
+                <label className="text-[12px] text-ac-muted block mb-1">
                   Description *
                 </label>
                 <input
@@ -70,11 +70,11 @@ export function CreateTokenDialog({ open, onClose, onCreated }: Props) {
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="e.g. lending-agent-prod"
-                  className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
+                  className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft"
                 />
               </div>
               <div>
-                <label className="text-[12px] text-ac-text-muted block mb-1">
+                <label className="text-[12px] text-ac-muted block mb-1">
                   Role
                 </label>
                 <select
@@ -82,18 +82,18 @@ export function CreateTokenDialog({ open, onClose, onCreated }: Props) {
                   onChange={(e) =>
                     setRole(e.target.value as "agent" | "admin")
                   }
-                  className="w-full border border-ac-border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20"
+                  className="w-full border border-ac-hairline rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft"
                 >
                   <option value="agent">agent</option>
                   <option value="admin">admin</option>
                 </select>
               </div>
-              {error && <p className="text-xs text-ac-deny">{error}</p>}
+              {error && <p className="text-xs text-ac-decision-deny">{error}</p>}
               <div className="flex gap-2 pt-1">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="flex-1 border border-ac-border rounded-lg py-2 text-sm text-ac-text-muted hover:bg-ac-peacock-50"
+                  className="flex-1 border border-ac-hairline rounded-lg py-2 text-sm text-ac-muted hover:bg-ac-surface-sunk"
                 >
                   Cancel
                 </button>
@@ -110,30 +110,30 @@ export function CreateTokenDialog({ open, onClose, onCreated }: Props) {
         ) : (
           <>
             <div className="flex items-center gap-2 mb-3">
-              <CheckCircle size={16} className="text-ac-allow" />
-              <h3 className="text-[16px] font-semibold text-ac-text-primary">
+              <CheckCircle size={16} className="text-ac-decision-allow" />
+              <h3 className="text-[16px] font-semibold text-ac-ink">
                 Token created
               </h3>
             </div>
-            <p className="text-sm text-ac-text-muted mb-3">
+            <p className="text-sm text-ac-muted mb-3">
               Copy this token now. It will not be shown again.
             </p>
-            <div className="bg-gray-50 border border-ac-border rounded-lg px-3 py-2.5 flex items-center gap-2 mb-4">
-              <code className="text-[12px] font-mono text-ac-text-primary flex-1 truncate">
+            <div className="bg-gray-50 border border-ac-hairline rounded-lg px-3 py-2.5 flex items-center gap-2 mb-4">
+              <code className="text-[12px] font-mono text-ac-ink flex-1 truncate">
                 {result.token}
               </code>
               <button
                 onClick={handleCopy}
-                className="text-ac-text-muted hover:text-ac-primary shrink-0"
+                className="text-ac-muted hover:text-ac-primary shrink-0"
               >
                 {copied ? (
-                  <CheckCircle size={14} className="text-ac-allow" />
+                  <CheckCircle size={14} className="text-ac-decision-allow" />
                 ) : (
                   <Copy size={14} />
                 )}
               </button>
             </div>
-            <div className="text-[12px] text-ac-text-muted space-y-0.5 mb-4">
+            <div className="text-[12px] text-ac-muted space-y-0.5 mb-4">
               <p>
                 Role: <span className="font-mono">{result.role}</span>
               </p>

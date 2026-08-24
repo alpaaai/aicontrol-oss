@@ -13,6 +13,13 @@ const MOCK_EMPTY: never[] = []
 test.beforeEach(async ({ page }) => {
   await page.route('http://localhost:8001/dashboard/summary*', route =>
     route.fulfill({ status: 200, body: JSON.stringify(MOCK_SUMMARY) }))
+  await page.route('**/dashboard/outcomes*', route =>
+    route.fulfill({ status: 200, body: JSON.stringify({ window: '7d', workflows: [] }) }))
+  await page.route('**/license/features', route =>
+    route.fulfill({
+      status: 200,
+      body: JSON.stringify({ tier: 'enterprise', features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } }),
+    }))
   await page.route('http://localhost:8001/audit-events*', route =>
     route.fulfill({ status: 200, body: JSON.stringify(MOCK_AUDIT) }))
   await page.route('http://localhost:8001/policies*', route =>
@@ -46,31 +53,27 @@ test.describe('P1-8 Demo Walkthrough', () => {
     await page.fill('input[type="email"]', 'admin@aicontrol.dev')
     await page.fill('input[type="password"]', 'password123')
     await page.click('button[type="submit"]')
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible({ timeout: 10000 })
+    await expect(page.getByRole('heading', { name: 'Overview' })).toBeVisible({ timeout: 10000 })
   })
 
-  test('2. Overview — stat cards visible, live feed running', async ({ page }) => {
+  test('2. Overview — outcome summary and decision feed visible', async ({ page }) => {
     await page.goto('/overview')
-    await expect(page.getByText('Intercepts today')).toBeVisible()
-    await expect(page.getByText('Deny rate', { exact: true })).toBeVisible()
-    await expect(page.getByText('Active sessions')).toBeVisible()
-    await expect(page.getByText('Pending reviews', { exact: true })).toBeVisible()
-    await expect(page.getByText('Live intercepts')).toBeVisible()
+    await expect(page.getByTestId('outcome-summary')).toBeVisible()
+    await expect(page.getByTestId('decision-feed')).toBeVisible()
   })
 
   test('3. Audit Log — filter by deny, see results', async ({ page }) => {
-    await page.goto('/audit-log')
-    await expect(page.getByRole('heading', { name: 'Agent activity' })).toBeVisible()
+    await page.goto('/audit')
+    await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible()
     await page.selectOption('select', 'deny')
     await page.getByRole('button', { name: 'Apply' }).click()
     await expect(page.locator('select')).toHaveValue('deny')
   })
 
-  test('4. Policies — table and drift warnings section visible', async ({ page }) => {
+  test('4. Policies — list and structured editor visible', async ({ page }) => {
     await page.goto('/policies')
-    await expect(page.getByRole('heading', { name: 'Policies' })).toBeVisible()
-    await expect(page.getByText('New policy')).toBeVisible()
-    await expect(page.getByRole('heading', { name: 'Policy Drift Warnings' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Policies', exact: true })).toBeVisible()
+    await expect(page.getByTestId('structured-editor')).toBeVisible()
   })
 
   test('5. Agents — registry visible', async ({ page }) => {
@@ -87,13 +90,14 @@ test.describe('P1-8 Demo Walkthrough', () => {
     await expect(page.getByText('Compliance Reports — Enterprise')).toBeVisible({ timeout: 5000 })
   })
 
-  test('7. Sidebar — all nav sections visible', async ({ page }) => {
+  test('7. Sidebar — flat nav destinations visible', async ({ page }) => {
     await page.goto('/overview')
-    await expect(page.getByText('Activity', { exact: true })).toBeVisible()
-    await expect(page.getByText('Governance', { exact: true })).toBeVisible()
-    await expect(page.getByText('Manual Reviews', { exact: true })).toBeVisible()
-    await expect(page.getByText('Intelligence', { exact: true })).toBeVisible()
-    await expect(page.getByText('Reports', { exact: true })).toBeVisible()
+    const nav = page.getByRole('navigation')
+    await expect(nav.getByRole('link', { name: 'Overview' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Agents' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Policies' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Audit log' })).toBeVisible()
+    await expect(nav.getByRole('link', { name: 'Metrics' })).toBeVisible()
   })
 
   test('8. Settings — license and auth info visible', async ({ page }) => {

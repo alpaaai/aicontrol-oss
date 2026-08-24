@@ -33,3 +33,25 @@ export interface DashboardSummary {
 
 export const getSummary = () =>
   apiClient.get<DashboardSummary>("/dashboard/summary").then((r) => r.data);
+
+export interface WorkflowOutcome {
+  kind: string;
+  count: number;
+}
+
+export interface WorkflowOutcomes {
+  workflow: string;
+  agents: number;
+  calls: number;
+  held_for_approval: number;
+  denied: number;
+  outcomes: WorkflowOutcome[];
+}
+
+export interface DashboardOutcomes {
+  window: string;
+  workflows: WorkflowOutcomes[];
+}
+
+export const getOutcomes = (window: string = "7d") =>
+  apiClient.get<DashboardOutcomes>(`/dashboard/outcomes?window=${window}`).then((r) => r.data);

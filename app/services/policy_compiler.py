@@ -28,6 +28,22 @@ _NUMERIC_OPS.update({symbol: symbol for symbol in set(_NUMERIC_OPS.values())})
 # this name and the wildcard compiles to a match against it.
 ALL_PARAMS_FIELD = "all_params_text"
 
+# The modern condition vocabulary a human-facing draft may name -- deliberately
+# narrower than everything compile_condition accepts, since tool_name_in,
+# blocked_tools, tool_aliases, tools and budget are base.rego compatibility
+# spellings kept only so pre-existing conditions keep compiling.
+SUPPORTED_CONDITION_KEYS = frozenset({
+    "tool_name_contains", "parameter_match", "numeric_conditions",
+    "rate_limit", "token_budget", "time_conditions", "all_of", "any_of",
+})
+
+
+def supported_condition_keys() -> frozenset[str]:
+    """The single source of truth for what a condition may contain. The NL
+    service derives its accepted set from this rather than restating it --
+    two hand-maintained lists is how they drift apart."""
+    return SUPPORTED_CONDITION_KEYS
+
 
 def _guard(expr: str) -> str:
     """Prefix every context attribute this expression reads with a `has` check.

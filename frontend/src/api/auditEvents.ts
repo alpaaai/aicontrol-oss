@@ -1,4 +1,5 @@
 import { apiClient } from "./client";
+import type { PolicyScope } from "./policies";
 
 export interface AuditEvent {
   id: string;
@@ -11,6 +12,11 @@ export interface AuditEvent {
   decision_reason: string | null;
   policy_id: string | null;
   policy_name: string | null;
+  workflow: string | null;
+  // Shaped as PolicyScope directly -- the fifth and last place the one
+  // policy representation appears (list, agent detail, NL draft, simulation,
+  // audit event). null when the call was allowed with no policy firing.
+  policy: PolicyScope | null;
   duration_ms: number | null;
   sequence_number: number;
   created_at: string;

@@ -1,71 +1,62 @@
-import { test, expect } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+
+const FREE_ITEMS = ["Overview", "Agents", "Policies", "Audit log", "Metrics", "Demo"];
+const PAID_ONLY = ["Reviews", "Reports", "Billing"];
 
 test.beforeEach(async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({
+      json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } },
+    }),
+  );
   await page.goto("/login");
   await page.evaluate(() => {
     sessionStorage.setItem(
       "ac_auth",
-      JSON.stringify({
-        email: "admin@aicontrol.dev",
-        role: "admin",
-        token: "test-token",
-      })
+      JSON.stringify({ email: "admin@aicontrol.dev", role: "admin", token: "test-token" }),
     );
   });
 });
 
-test("sidebar renders all section labels", async ({ page }) => {
-  await page.goto("/overview");
-  await expect(page.getByText("Activity", { exact: true })).toBeVisible();
-  await expect(page.getByText("Governance", { exact: true })).toBeVisible();
-  await expect(page.getByText("Intelligence", { exact: true })).toBeVisible();
-  await expect(page.getByText("Reports", { exact: true })).toBeVisible();
-  await expect(page.getByText("Manual Reviews", { exact: true })).toBeVisible();
+test("free install shows only free destinations", async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({
+      json: { tier: "free", features: { nl_authoring: false, simulation: false, hitl: false, compliance_reports: false } },
+    }),
+  );
+  await page.goto("/");
+  const nav = page.getByRole("navigation");
+  for (const item of FREE_ITEMS) {
+    await expect(nav.getByRole("link", { name: item })).toBeVisible();
+  }
+  for (const item of PAID_ONLY) {
+    await expect(nav.getByRole("link", { name: item })).toHaveCount(0);
+  }
 });
 
-test("activity section auto-opens on /overview and shows sub-items", async ({ page }) => {
-  await page.goto("/overview");
-  await expect(page.getByRole("link", { name: "Dashboard" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Agent activity" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Decision metrics" })).toBeVisible();
+test("nav has no section headers or accordions", async ({ page }) => {
+  await page.goto("/");
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("button", { expanded: false })).toHaveCount(0);
+  await expect(nav.locator("[data-section-header]")).toHaveCount(0);
 });
 
-test("clicking a section header expands it and collapses others", async ({ page }) => {
-  await page.goto("/overview");
-  // Activity is open; Governance is closed — its sub-items should not be visible
-  await expect(page.getByRole("link", { name: "Policies" })).not.toBeVisible();
-  // Click Governance to open it
-  await page.getByText("Governance", { exact: true }).click();
-  await expect(page.getByRole("link", { name: "Policies" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Agents" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "API tokens" })).toBeVisible();
-  // Activity sub-items should now be collapsed
-  await expect(page.getByRole("link", { name: "Dashboard" })).not.toBeVisible();
+test("the active item carries the magenta edge marker", async ({ page }) => {
+  await page.goto("/agents");
+  const active = page.getByRole("navigation").getByRole("link", { name: "Agents" });
+  await expect(active).toHaveAttribute("aria-current", "page");
+  const marker = await active.evaluate((el) =>
+    getComputedStyle(el, "::before").backgroundColor,
+  );
+  expect(marker).toBe("rgb(255, 45, 122)");
 });
 
-test("user panel opens on user row click and shows Settings, Subscription, Logout", async ({ page }) => {
-  await page.goto("/overview");
-  await page.getByText("admin@aicontrol.dev").click();
-  await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Subscription" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Logout" })).toBeVisible();
-});
-
-test("user panel closes after selecting an item", async ({ page }) => {
-  await page.goto("/overview");
-  await page.getByText("admin@aicontrol.dev").click();
-  await expect(page.getByRole("link", { name: "Settings" })).toBeVisible();
-  await page.getByRole("link", { name: "Settings" }).click();
-  await expect(page.getByRole("link", { name: "Settings" })).not.toBeVisible();
-});
-
-test("authenticated user sees overview page content", async ({ page }) => {
-  await page.goto("/overview");
-  await expect(page).not.toHaveURL(/\/login/);
-  await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
-});
-
-test("navigating to policies shows policies page", async ({ page }) => {
-  await page.goto("/policies");
-  await expect(page.getByRole("heading", { name: "Policies" })).toBeVisible();
+test("every nav item is reachable by keyboard with a visible focus ring", async ({ page }) => {
+  await page.goto("/");
+  await page.keyboard.press("Tab");
+  const outline = await page.evaluate(() => {
+    const el = document.activeElement as HTMLElement;
+    return getComputedStyle(el).outlineStyle;
+  });
+  expect(outline).not.toBe("none");
 });

@@ -38,7 +38,7 @@ export default function BillingPage() {
 
   if (loading) {
     return (
-      <div className="p-8 text-ac-text-muted animate-pulse">Loading billing data...</div>
+      <div className="p-8 text-ac-muted animate-pulse">Loading billing data...</div>
     );
   }
 
@@ -69,11 +69,11 @@ export default function BillingPage() {
       {/* Page header */}
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-ac-text-primary">
+          <h1 className="text-2xl font-semibold text-ac-ink">
             Subscription and usage
           </h1>
           {usage.company && (
-            <p className="text-ac-text-muted mt-1">{usage.company}</p>
+            <p className="text-ac-muted mt-1">{usage.company}</p>
           )}
         </div>
         {isCommunity && (
@@ -89,7 +89,7 @@ export default function BillingPage() {
       </div>
 
       {/* Plan details */}
-      <div className="bg-ac-card border border-ac-border rounded-lg p-6 space-y-4">
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg p-6 space-y-4">
         <PlanPill plan={usage.plan} />
 
         {usage.retention_days !== null && (
@@ -101,7 +101,7 @@ export default function BillingPage() {
 
         <ul className="space-y-1">
           {usage.features.map((f) => (
-            <li key={f} className="flex items-center gap-2 text-sm text-ac-text-primary">
+            <li key={f} className="flex items-center gap-2 text-sm text-ac-ink">
               <span className="text-green-500">&#10003;</span> {f}
             </li>
           ))}
@@ -110,14 +110,14 @@ export default function BillingPage() {
         {!isCommunity && (
           <button
             disabled
-            className="mt-2 px-4 py-2 border border-ac-border rounded-md text-sm
-                       text-ac-text-muted opacity-50 cursor-not-allowed"
+            className="mt-2 px-4 py-2 border border-ac-hairline rounded-md text-sm
+                       text-ac-muted opacity-50 cursor-not-allowed"
             title="Subscription management coming soon"
           >
             Manage Subscription
           </button>
         )}
-        <p className="text-xs text-ac-text-muted">
+        <p className="text-xs text-ac-muted">
           Self-serve subscription management coming soon. Contact{' '}
           <a href="mailto:hello@aictl.io" className="underline">
             hello@aictl.io
@@ -127,19 +127,19 @@ export default function BillingPage() {
       </div>
 
       {/* Usage chart */}
-      <div className="bg-ac-card border border-ac-border rounded-lg p-6 space-y-4">
-        <h2 className="text-lg font-semibold text-ac-text-primary">Intercept Usage</h2>
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-ac-ink">Intercept Usage</h2>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <p className="text-xs text-ac-text-muted uppercase tracking-wide">This month</p>
-            <p className="text-2xl font-bold text-ac-text-primary">
+            <p className="text-xs text-ac-muted uppercase tracking-wide">This month</p>
+            <p className="text-2xl font-bold text-ac-ink">
               {formatNumber(usage.this_month.intercepts)}
             </p>
           </div>
           <div>
-            <p className="text-xs text-ac-text-muted uppercase tracking-wide">Last month</p>
-            <p className="text-2xl font-bold text-ac-text-primary">
+            <p className="text-xs text-ac-muted uppercase tracking-wide">Last month</p>
+            <p className="text-2xl font-bold text-ac-ink">
               {formatNumber(usage.last_month.intercepts)}
             </p>
           </div>
@@ -156,7 +156,7 @@ export default function BillingPage() {
         </ResponsiveContainer>
 
         {isCommunity && (
-          <p className="text-xs text-ac-text-muted">
+          <p className="text-xs text-ac-muted">
             Upgrade for Slack HITL, longer retention, and compliance features.
           </p>
         )}

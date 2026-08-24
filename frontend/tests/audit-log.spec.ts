@@ -21,7 +21,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("audit log renders filter bar and table", async ({ page }) => {
-  await page.goto("/audit-log");
-  await expect(page.getByRole("heading", { name: "Agent activity" })).toBeVisible();
+  await page.goto("/audit");
+  await expect(page.getByRole("heading", { name: "Audit log" })).toBeVisible();
   await expect(page.locator("select")).toBeVisible();
 });

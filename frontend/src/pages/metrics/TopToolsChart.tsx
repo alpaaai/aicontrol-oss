@@ -15,10 +15,8 @@ interface Props {
 
 export function TopToolsChart({ data }: Props) {
   return (
-    <div className="bg-ac-card border border-ac-border rounded-lg shadow-ac-card p-4">
-      <p className="text-[13px] font-medium text-ac-text-primary mb-4">
-        Top tools — last 24h
-      </p>
+    <div className="bg-ac-surface-card border border-ac-hairline rounded-lg p-4">
+      <p className="text-title-sm text-ac-ink mb-4">Top tools — last 24h</p>
       <ResponsiveContainer width="100%" height={Math.max(220, data.length * 28)}>
         <BarChart
           data={data}
@@ -27,7 +25,7 @@ export function TopToolsChart({ data }: Props) {
         >
           <XAxis
             type="number"
-            tick={{ fontSize: 10, fill: "#9CA3AF" }}
+            tick={{ fontSize: 10, fill: "var(--ac-muted-soft)" }}
             tickLine={false}
             axisLine={false}
           />
@@ -37,8 +35,8 @@ export function TopToolsChart({ data }: Props) {
             interval={0}
             tick={{
               fontSize: 11,
-              fill: "#4B5563",
-              fontFamily: "Geist Mono, monospace",
+              fill: "var(--ac-body)",
+              fontFamily: "JetBrains Mono, monospace",
             }}
             tickLine={false}
             axisLine={false}
@@ -48,12 +46,12 @@ export function TopToolsChart({ data }: Props) {
             contentStyle={{
               fontSize: 12,
               borderRadius: 8,
-              border: "1px solid #DDE9EC",
+              border: "1px solid var(--ac-hairline)",
             }}
           />
           <Bar dataKey="count" radius={[0, 4, 4, 0]} maxBarSize={14}>
             {data.map((_, i) => (
-              <Cell key={i} fill="#0284A8" opacity={1 - i * 0.06} />
+              <Cell key={i} fill="var(--ac-body-strong)" opacity={1 - i * 0.06} />
             ))}
           </Bar>
         </BarChart>

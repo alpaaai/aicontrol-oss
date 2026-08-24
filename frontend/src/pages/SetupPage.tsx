@@ -166,7 +166,7 @@ export function SetupPage() {
                     step === s
                       ? "bg-ac-primary text-white"
                       : i < (step === "admin" ? 1 : 0)
-                      ? "bg-ac-primary/20 text-ac-primary"
+                      ? "bg-ac-primary-soft text-ac-primary"
                       : "bg-gray-100 text-gray-400"
                   }`}
                 >
@@ -179,15 +179,15 @@ export function SetupPage() {
 
           {step === "org" ? (
             <>
-              <h2 className="text-[22px] font-bold text-ac-text-primary mb-1">
+              <h2 className="text-[22px] font-bold text-ac-ink mb-1">
                 Set up your organization
               </h2>
-              <p className="text-[14px] text-ac-text-muted mb-8">
+              <p className="text-[14px] text-ac-muted mb-8">
                 This information helps configure your workspace.
               </p>
               <form onSubmit={handleOrgContinue} className="space-y-4">
                 <div>
-                  <label htmlFor="org-name" className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                  <label htmlFor="org-name" className="block text-[12px] font-medium text-ac-muted mb-1.5">
                     Organization name
                   </label>
                   <input
@@ -197,18 +197,18 @@ export function SetupPage() {
                     value={orgName}
                     onChange={(e) => setOrgName(e.target.value)}
                     placeholder="Acme Corp"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                    className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
                   />
                 </div>
                 <div>
-                  <label htmlFor="timezone" className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                  <label htmlFor="timezone" className="block text-[12px] font-medium text-ac-muted mb-1.5">
                     Timezone
                   </label>
                   <select
                     id="timezone"
                     value={timezone}
                     onChange={(e) => setTimezone(e.target.value)}
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow bg-white"
+                    className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow bg-white"
                   >
                     {TIMEZONES.map((tz) => (
                       <option key={tz} value={tz}>{tz}</option>
@@ -225,15 +225,15 @@ export function SetupPage() {
             </>
           ) : (
             <>
-              <h2 className="text-[22px] font-bold text-ac-text-primary mb-1">
+              <h2 className="text-[22px] font-bold text-ac-ink mb-1">
                 Create your admin account
               </h2>
-              <p className="text-[14px] text-ac-text-muted mb-8">
-                This will be the root admin for <span className="font-medium text-ac-text-primary">{orgName}</span>.
+              <p className="text-[14px] text-ac-muted mb-8">
+                This will be the root admin for <span className="font-medium text-ac-ink">{orgName}</span>.
               </p>
               <form onSubmit={handleFinish} className="space-y-4">
                 <div>
-                  <label htmlFor="full-name" className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                  <label htmlFor="full-name" className="block text-[12px] font-medium text-ac-muted mb-1.5">
                     Full name
                   </label>
                   <input
@@ -243,11 +243,11 @@ export function SetupPage() {
                     value={fullName}
                     onChange={(e) => setFullName(e.target.value)}
                     placeholder="Jane Smith"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                    className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
                   />
                 </div>
                 <div>
-                  <label htmlFor="email" className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                  <label htmlFor="email" className="block text-[12px] font-medium text-ac-muted mb-1.5">
                     Work email
                   </label>
                   <input
@@ -257,11 +257,11 @@ export function SetupPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="jane@company.com"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                    className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
                   />
                 </div>
                 <div>
-                  <label htmlFor="password" className="block text-[12px] font-medium text-ac-text-muted mb-1.5">
+                  <label htmlFor="password" className="block text-[12px] font-medium text-ac-muted mb-1.5">
                     Password
                   </label>
                   <input
@@ -272,11 +272,11 @@ export function SetupPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="At least 8 characters"
-                    className="w-full border border-ac-border rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary/20 focus:border-ac-primary transition-shadow"
+                    className="w-full border border-ac-hairline rounded-lg px-3.5 py-2.5 text-sm outline-none focus:ring-2 focus:ring-ac-primary-soft focus:border-ac-primary transition-shadow"
                   />
                 </div>
                 {error && (
-                  <p className="text-xs text-ac-deny bg-ac-deny-bg rounded-md px-3 py-2">{error}</p>
+                  <p className="text-xs text-ac-decision-deny bg-ac-decision-deny-soft rounded-md px-3 py-2">{error}</p>
                 )}
                 <button
                   type="submit"
@@ -288,7 +288,7 @@ export function SetupPage() {
                 <button
                   type="button"
                   onClick={() => setStep("org")}
-                  className="w-full text-sm text-ac-text-muted hover:text-ac-text-primary transition-colors"
+                  className="w-full text-sm text-ac-muted hover:text-ac-ink transition-colors"
                 >
                   Back
                 </button>
@@ -296,7 +296,7 @@ export function SetupPage() {
             </>
           )}
 
-          <p className="mt-10 text-[11px] text-ac-text-muted/60 text-center">
+          <p className="mt-10 text-[11px] text-ac-muted/60 text-center">
             Secured by AIControl · Enterprise tier
           </p>
         </div>

@@ -5,6 +5,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import and_, func, select
+from sqlalchemy.orm import selectinload
 
 from app.core.auth import require_human
 from app.core import license_gate as _lg
@@ -109,6 +110,7 @@ async def list_audit_events(
         )).scalar()
         rows = (await session.execute(
             select(AuditEvent).where(where)
+            .options(selectinload(AuditEvent.policy))
             .order_by(AuditEvent.created_at.desc())
             .limit(limit).offset(offset)
         )).scalars().all()
@@ -126,6 +128,19 @@ async def list_audit_events(
                 "decision_reason": r.decision_reason,
                 "policy_id": str(r.policy_id) if r.policy_id else None,
                 "policy_name": r.policy_name,
+                "workflow": r.workflow,
+                # Shaped as PolicyScope -- the same object the policy list, the
+                # agent's governing-policies list, and the NL draft review use.
+                # The audit event is the fifth and last place it appears.
+                "policy": {
+                    "id": str(r.policy.id),
+                    "principalType": r.policy.principal_type,
+                    "principalId": r.policy.principal_id,
+                    "actionTool": r.policy.action_tool,
+                    "resourceSystem": r.policy.resource_system,
+                    "effect": r.policy.effect or "deny",
+                    "condition": r.policy.condition,
+                } if r.policy else None,
                 "duration_ms": r.duration_ms,
                 "sequence_number": r.sequence_number,
                 "created_at": r.created_at.isoformat(),
