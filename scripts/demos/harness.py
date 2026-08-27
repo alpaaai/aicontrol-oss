@@ -237,6 +237,31 @@ class DemoHarness:
             )
         return list(tools.values())
 
+    async def _call_coverage_handshake(self) -> None:
+        """Register agent framework and hook coverage with the API."""
+        from httpx import AsyncClient
+
+        coverage_payload = {
+            "framework": self.spec.get("framework", "openai-agents-sdk"),
+            "hook": self.spec.get("hook", "aicontrol-sdk"),
+            "sdk_version": self.spec.get("sdk_version", "1.0.0"),
+            "workflow": self.spec.get("workflow", "unassigned"),
+            "agent_name": self.spec["agent_name"],
+            "silent_noop_warnings": [],
+        }
+        try:
+            async with AsyncClient(transport=ASGITransport(app=app)) as client:
+                resp = await client.post(
+                    f"/agents/{self.spec['agent_id']}/coverage",
+                    headers={"Authorization": f"Bearer {self._client._config.token}"},
+                    json=coverage_payload,
+                    timeout=10.0,
+                )
+            if resp.status_code != 200:
+                print(f"[warning] Coverage handshake returned {resp.status_code}")
+        except Exception as e:
+            print(f"[warning] Coverage handshake failed: {e}")
+
     async def _run_beat(self, beat: dict) -> None:
         """One beat == one Runner.run(). A deny/review raises from
         on_tool_start and aborts the run before the tool executes (the
@@ -270,6 +295,7 @@ class DemoHarness:
 
     async def run(self, mode: str = "fast") -> list[dict]:
         await self._register_agent_and_token()
+        await self._call_coverage_handshake()
         self.adapter.patch(self._client, workflow=self.spec["workflow"])
 
         for beat in self.spec["beats"]:

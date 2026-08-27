@@ -22,6 +22,7 @@ SCENARIOS = {
         "framework": "langchain",
         "hook": "aicontrol-sdk",
         "sdk_version": "1.0.0",
+        "workflow": "clinical_documentation",
         "tool_calls": [
             {
                 "tool_name": "read_patient_record",
@@ -65,6 +66,7 @@ SCENARIOS = {
         "framework": "crewai",
         "hook": "aicontrol-sdk",
         "sdk_version": "1.0.0",
+        "workflow": "sales_automation",
         "tool_calls": [
             {
                 "tool_name": "update_deal_stage",
@@ -112,6 +114,7 @@ SCENARIOS = {
         "framework": "langgraph",
         "hook": "aicontrol-sdk",
         "sdk_version": "1.0.0",
+        "workflow": "claims_processing",
         "tool_calls": [
             {
                 "tool_name": "validate_policy_coverage",
