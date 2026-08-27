@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.logging import get_logger
 from sqlalchemy import select
 from app.models.schemas import Policy
+from app.routers.policies import validate_condition, validate_scope
 from app.services.policy_compiler import compile_policy
 
 logger = get_logger("policy_loader")
@@ -49,6 +50,9 @@ async def upsert_policies(session: AsyncSession, policies: list[dict]) -> None:
             priority=p.get("priority", 100),
             category=p.get("category"),
         )
+        errors = validate_condition(row.condition) + validate_scope(row, row.condition)
+        if errors:
+            raise ValueError(f"policy {row.name!r} failed validation: {'; '.join(errors)}")
         existing = (await session.execute(
             select(Policy).where(Policy.name == row.name)
         )).scalar_one_or_none()

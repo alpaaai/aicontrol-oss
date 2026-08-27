@@ -26,10 +26,10 @@ export function PolicyDetailPage() {
 
   const policy = policies?.find((p) => p.id === id) ?? null;
 
-  const handleActivate = async () => {
-    if (!id) return;
+  const handleToggleActive = async () => {
+    if (!id || !policy) return;
     try {
-      await updatePolicy(id, { active: true });
+      await updatePolicy(id, { active: !policy.active });
     } catch {
       // Best-effort: the button still confirms the founder's intent even if
       // this particular id doesn't resolve against a live backend (e.g. in
@@ -60,7 +60,13 @@ export function PolicyDetailPage() {
         <PolicySentence policy={scope} variant="display" />
         <div className="flex items-center gap-3">
           <DecisionPill decision={scope.effect} />
-          <Button label="Activate" pendingLabel="Activating…" doneLabel="Activated" onClick={handleActivate} />
+          <Button
+            key={String(policy.active)}
+            label={policy.active ? "Deactivate" : policy.library ? "Activate this library policy" : "Activate"}
+            pendingLabel={policy.active ? "Deactivating…" : "Activating…"}
+            doneLabel={policy.active ? "Deactivated" : "Activated"}
+            onClick={handleToggleActive}
+          />
         </div>
       </div>
 

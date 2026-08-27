@@ -2,8 +2,11 @@
 import uuid
 import pytest
 from contextlib import contextmanager
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
+
+from app.routers.policies import validate_rate_limit_condition, validate_scope
 
 
 @contextmanager
@@ -222,6 +225,126 @@ async def test_create_tool_denylist_rejects_empty_blocked_tools():
     assert response.status_code == 422
 
 
+def test_validate_rate_limit_condition_does_not_require_tools_key():
+    """A rate_limit condition scoped entirely by the policy's action_tool (Cedar
+    scope), with no condition.tools list at all, must not be rejected here --
+    that binding requirement belongs to validate_scope, which is action_tool-aware."""
+    condition = {"rate_limit": {"max_calls": 20, "window": "session"}}
+    errors = validate_rate_limit_condition(condition)
+    assert errors == []
+
+
+def test_validate_rate_limit_condition_still_validates_max_calls_and_window():
+    condition = {"rate_limit": {"max_calls": 0, "window": "not-a-window"}}
+    errors = validate_rate_limit_condition(condition)
+    assert errors
+
+
+def test_validate_scope_accepts_rate_limit_bound_via_action_tool():
+    """rate_limit's tool binding may come from action_tool scope instead of a
+    condition.tools list -- e.g. example_rate_limit_sensitive_reads, which
+    scopes via action_tool='read_record' with no 'tools' key at all."""
+    body = SimpleNamespace(principal_id=None, action_tool="read_record", resource_system=None)
+    condition = {"rate_limit": {"max_calls": 20, "window": "session"}}
+    errors = validate_scope(body, condition)
+    assert errors == []
+
+
+def test_validate_scope_accepts_rate_limit_bound_via_tool_name_in():
+    """rate_limit_external_api_calls binds its tool list via tool_name_in, not
+    the 'tools'/'blocked_tools' spellings validate_scope's bound check used to
+    recognize exclusively."""
+    body = SimpleNamespace(principal_id=None, action_tool=None, resource_system=None)
+    condition = {
+        "rate_limit": {"max_calls": 20, "window": "60m"},
+        "tool_name_in": ["http_request", "post_webhook"],
+    }
+    errors = validate_scope(body, condition)
+    assert errors == []
+
+
+def test_validate_scope_rejects_condition_that_compiles_to_no_when_clause():
+    """Defense in depth: even if validate_condition somehow let a degenerate
+    condition through, validate_scope must still catch it by checking what the
+    condition actually compiles to -- not just whether the dict is non-empty."""
+    body = SimpleNamespace(principal_id=None, action_tool=None, resource_system=None)
+    errors = validate_scope(body, {"tool_name_in": []})
+    assert errors
+
+
+def test_validate_scope_accepts_condition_that_compiles_to_a_when_clause():
+    body = SimpleNamespace(principal_id=None, action_tool=None, resource_system=None)
+    errors = validate_scope(body, {"tool_name_in": ["bash"]})
+    assert errors == []
+
+
+@pytest.mark.asyncio
+async def test_create_tool_name_in_valid():
+    from app.main import app
+    payload = {
+        "name": f"test_tni_{uuid.uuid4().hex[:6]}",
+        "condition": {"tool_name_in": ["bash", "exec_command"]},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
+async def test_create_tool_name_in_rejects_empty_list():
+    """An empty tool_name_in list compiles to no Cedar `when` clause at all --
+    the policy would forbid every call from every agent. See validate_scope's
+    compiled-emptiness check."""
+    from app.main import app
+    payload = {
+        "name": f"test_tni_bad_{uuid.uuid4().hex[:6]}",
+        "condition": {"tool_name_in": []},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_tool_aliases_rejects_empty_list():
+    from app.main import app
+    payload = {
+        "name": f"test_talias_bad_{uuid.uuid4().hex[:6]}",
+        "condition": {"tool_aliases": []},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_tools_rejects_empty_list():
+    from app.main import app
+    payload = {
+        "name": f"test_tools_bad_{uuid.uuid4().hex[:6]}",
+        "condition": {"tools": []},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+
+
 @pytest.mark.asyncio
 async def test_create_parameter_match_valid():
     from app.main import app
@@ -339,6 +462,42 @@ async def test_create_numeric_conditions_valid():
         ) as client:
             response = await client.post("/policies", json=payload)
     assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_create_numeric_conditions_compact_form_valid():
+    """The compact {"amount": {"gt": 50000}} spelling (op as the key) is what
+    policy_compiler._numeric_conditions and the demo seeds actually use --
+    review_high_value_claim_payment among them. Not just the long
+    {"op": ..., "value": ...} form."""
+    from app.main import app
+    payload = {
+        "name": f"test_nc_compact_{uuid.uuid4().hex[:6]}",
+        "condition": {"numeric_conditions": {"amount": {"gt": 50000}}},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201, response.text
+
+
+@pytest.mark.asyncio
+async def test_create_numeric_conditions_compact_form_rejects_bad_op():
+    from app.main import app
+    payload = {
+        "name": f"test_nc_compact_bad_{uuid.uuid4().hex[:6]}",
+        "condition": {"numeric_conditions": {"amount": {"neq": 100}}},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
 
 
 @pytest.mark.asyncio

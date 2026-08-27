@@ -13,7 +13,7 @@ from app.models.database import get_db
 from app.models.schemas import AuditEvent, Policy
 from app.services.activity_log_service import write_activity_log
 from app.services.cedar_client import invalidate_policy_set_cache
-from app.services.policy_compiler import compile_policy
+from app.services.policy_compiler import compile_condition, compile_policy
 
 router = APIRouter(prefix="/policies", tags=["policies"])
 
@@ -22,12 +22,15 @@ VALID_ON_EXCEED = {"deny", "review"}
 
 
 def validate_rate_limit_condition(condition: dict) -> list[str]:
+    """A rate_limit condition's tool binding may come from condition.tools, or
+    from the policy's action_tool scope -- validate_scope enforces that a tool
+    is bound one way or another; this only checks the shape of what's given."""
     errors = []
     rl = condition.get("rate_limit", {})
-    tools = condition.get("tools", [])
+    tools = condition.get("tools")
 
-    if not tools or not isinstance(tools, list):
-        errors.append("rate_limit condition requires non-empty 'tools' array")
+    if tools is not None and not isinstance(tools, list):
+        errors.append("rate_limit.tools must be an array")
 
     max_calls = rl.get("max_calls")
     if not isinstance(max_calls, int) or max_calls < 1:
@@ -52,6 +55,18 @@ def validate_tool_denylist_condition(condition: dict) -> list[str]:
         return ["tool_denylist condition requires non-empty 'blocked_tools' array"]
     if not all(isinstance(t, str) for t in blocked):
         return ["tool_denylist.blocked_tools must be an array of strings"]
+    return []
+
+
+def validate_exact_tool_match_condition(key: str, condition: dict) -> list[str]:
+    """tool_name_in, tool_aliases and tools are synonyms policy_compiler merges
+    into the same exact-match handler as blocked_tools -- an empty list compiles
+    to no Cedar `when` clause at all, silently forbidding every call."""
+    values = condition.get(key, [])
+    if not isinstance(values, list) or not values:
+        return [f"{key} condition requires a non-empty array"]
+    if not all(isinstance(t, str) for t in values):
+        return [f"{key} must be an array of strings"]
     return []
 
 
@@ -110,25 +125,44 @@ def validate_tool_pattern_condition(condition: dict) -> list[str]:
 
 
 VALID_NUMERIC_OPS = {">", ">=", "<", "<=", "=="}
+# policy_compiler._numeric_conditions also accepts the word spellings
+# (gt/gte/lt/lte/eq) via its own _NUMERIC_OPS map -- validate against the same
+# combined vocabulary or a legitimate seed policy written in words gets rejected.
+VALID_NUMERIC_OPS_ALL_SPELLINGS = VALID_NUMERIC_OPS | {"gt", "gte", "lt", "lte", "eq"}
 
 
 def validate_numeric_conditions_condition(condition: dict) -> list[str]:
+    """Two shapes both compile via policy_compiler._numeric_conditions and must
+    both validate: the long {"op": ">", "value": 5} form, and the compact
+    {"gt": 5} form (op as the key) that the demo seeds actually use -- e.g.
+    review_high_value_claim_payment's {"amount": {"gt": 50000}}."""
     nc = condition.get("numeric_conditions", {})
     if not nc or not isinstance(nc, dict):
         return ["numeric_conditions requires non-empty 'numeric_conditions' object"]
     errors: list[str] = []
     for field, spec in nc.items():
-        if not isinstance(spec, dict):
+        if not isinstance(spec, dict) or not spec:
             errors.append(
-                f"numeric_conditions[{field!r}] must be an object with 'op' and 'value'"
+                f"numeric_conditions[{field!r}] must be a non-empty object"
             )
             continue
-        if spec.get("op") not in VALID_NUMERIC_OPS:
-            errors.append(
-                f"numeric_conditions[{field!r}].op must be one of {sorted(VALID_NUMERIC_OPS)}"
-            )
-        if "value" not in spec or not isinstance(spec.get("value"), (int, float)):
-            errors.append(f"numeric_conditions[{field!r}].value must be a number")
+        if "op" in spec and "value" in spec:
+            if spec["op"] not in VALID_NUMERIC_OPS_ALL_SPELLINGS:
+                errors.append(
+                    f"numeric_conditions[{field!r}].op must be one of "
+                    f"{sorted(VALID_NUMERIC_OPS_ALL_SPELLINGS)}"
+                )
+            if not isinstance(spec["value"], (int, float)):
+                errors.append(f"numeric_conditions[{field!r}].value must be a number")
+            continue
+        for op, value in spec.items():
+            if op not in VALID_NUMERIC_OPS_ALL_SPELLINGS:
+                errors.append(
+                    f"numeric_conditions[{field!r}] has unsupported operator {op!r}, "
+                    f"must be one of {sorted(VALID_NUMERIC_OPS_ALL_SPELLINGS)}"
+                )
+            if not isinstance(value, (int, float)):
+                errors.append(f"numeric_conditions[{field!r}][{op!r}] must be a number")
     return errors
 
 
@@ -196,6 +230,9 @@ def validate_condition(condition: dict) -> list[str]:
     errors: list[str] = []
     if "blocked_tools" in condition:
         errors += validate_tool_denylist_condition(condition)
+    for key in ("tool_name_in", "tool_aliases", "tools"):
+        if key in condition:
+            errors += validate_exact_tool_match_condition(key, condition)
     if "tool_name_contains" in condition:
         errors += validate_tool_pattern_condition(condition)
     if condition.get("token_budget"):
@@ -235,6 +272,8 @@ def validate_scope(body: "PolicyCreate | PolicyUpdate", condition: dict) -> list
             getattr(body, "action_tool", None)
             or condition.get("blocked_tools")
             or condition.get("tools")
+            or condition.get("tool_name_in")
+            or condition.get("tool_aliases")
         )
         if not bound:
             return [
@@ -242,7 +281,17 @@ def validate_scope(body: "PolicyCreate | PolicyUpdate", condition: dict) -> list
                 "action_tool or a blocked_tools/tools list"
             ]
 
-    if condition:
+    # A non-empty condition dict is not proof the policy is actually scoped --
+    # e.g. {"tool_name_in": []} compiles to no `when` clause at all. Check what
+    # the condition actually compiles to, not just whether the dict is truthy.
+    # A malformed/unknown-key condition (unknown key, or a shape validate_condition
+    # already flags, e.g. deny_hours missing 'from'/'to') is left to validate_condition's
+    # own errors and to compile_policy raising later -- not this guard's job.
+    try:
+        compiled = compile_condition(condition)
+    except (ValueError, KeyError, TypeError):
+        return []
+    if compiled:
         return []
     if any([
         getattr(body, "principal_id", None),

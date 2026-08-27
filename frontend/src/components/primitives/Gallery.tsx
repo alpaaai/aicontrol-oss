@@ -36,6 +36,26 @@ const ANY_SYSTEM: PolicyScope = {
   condition: {},
 };
 
+const TOOL_DENYLIST: PolicyScope = {
+  id: "gallery-tool-denylist",
+  principalType: null,
+  principalId: null,
+  actionTool: null,
+  resourceSystem: null,
+  effect: "deny",
+  condition: { tool_name_in: ["bash", "exec_command"] },
+};
+
+const PARAMETER_MATCH_NESTED: PolicyScope = {
+  id: "gallery-parameter-match-nested",
+  principalType: null,
+  principalId: null,
+  actionTool: null,
+  resourceSystem: null,
+  effect: "deny",
+  condition: { parameter_match: { url: { contains_any: ["169.254.169.254"] } } },
+};
+
 export function Gallery() {
   return (
     <div className="p-8 space-y-8 bg-ac-canvas min-h-screen">
@@ -51,6 +71,12 @@ export function Gallery() {
           />
           <PolicySentence policy={DENY_BULK} editable data-testid="policy-sentence-deny-bulk" />
           <PolicySentence policy={ANY_SYSTEM} editable data-testid="policy-sentence-any-system" />
+          <PolicySentence policy={TOOL_DENYLIST} editable data-testid="policy-sentence-tool-denylist" />
+          <PolicySentence
+            policy={PARAMETER_MATCH_NESTED}
+            editable
+            data-testid="policy-sentence-parameter-match-nested"
+          />
         </div>
       </section>
 

@@ -1,14 +1,18 @@
 import { expect, test } from "@playwright/test";
 
 const POLICIES = [
-  { id: "p1", name: "review_high_value_payment", active: true,
+  { id: "p1", name: "review_high_value_payment", active: true, library: false,
     principalType: "agent", principalId: "claims-adjuster",
     actionTool: "release_payment", resourceSystem: "guidewire",
     effect: "review", condition: { numeric_conditions: { amount: { gt: 50000 } } } },
-  { id: "p2", name: "deny_bulk_claims_query", active: true,
+  { id: "p2", name: "deny_bulk_claims_query", active: true, library: false,
     principalType: "agent", principalId: "claims-adjuster",
     actionTool: "db_query", resourceSystem: "guidewire",
     effect: "deny", condition: { numeric_conditions: { row_limit: { gt: 100 } } } },
+  { id: "p3", name: "block_shell_execution", active: false, library: true,
+    principalType: null, principalId: null,
+    actionTool: null, resourceSystem: null,
+    effect: "deny", condition: { tool_name_in: ["bash", "exec_command"] } },
 ];
 
 test.beforeEach(async ({ page }) => {
@@ -69,9 +73,16 @@ test("a free install shows the structured editor alone", async ({ page }) => {
   await expect(page.getByTestId("structured-editor")).toBeVisible();
 });
 
-test("the activate button keeps its word through the flow", async ({ page }) => {
+test("an already-active policy shows Deactivate, not Activate", async ({ page }) => {
   await page.goto("/policies/p1");
-  const button = page.getByRole("button", { name: "Activate" });
+  const button = page.getByRole("button", { name: "Deactivate" });
+  await button.click();
+  await expect(page.getByRole("button", { name: "Deactivated" })).toBeVisible();
+});
+
+test("an inactive library policy shows Activate, and keeps its word through the flow", async ({ page }) => {
+  await page.goto("/policies/p3");
+  const button = page.getByRole("button", { name: /Activate/ });
   await button.click();
   await expect(page.getByRole("button", { name: "Activated" })).toBeVisible();
 });
@@ -83,6 +94,22 @@ test("policy detail shows what the policy did last week", async ({ page }) => {
   await page.goto("/policies/p1");
   await expect(page.getByTestId("policy-activity")).toContainText("3");
   await expect(page.getByTestId("policy-activity")).toContainText("412");
+});
+
+test("the Active tab shows only active policies, with an accurate count", async ({ page }) => {
+  await page.goto("/policies");
+  await expect(page.getByTestId("policy-row-p1")).toBeVisible();
+  await expect(page.getByTestId("policy-row-p2")).toBeVisible();
+  await expect(page.getByTestId("policy-row-p3")).toHaveCount(0);
+  await expect(page.getByText("2 active policies")).toBeVisible();
+});
+
+test("the Library tab shows inactive/library policies, not active ones", async ({ page }) => {
+  await page.goto("/policies");
+  await page.getByRole("tab", { name: /Library/ }).click();
+  await expect(page.getByTestId("policy-row-p3")).toBeVisible();
+  await expect(page.getByTestId("policy-row-p1")).toHaveCount(0);
+  await expect(page.getByTestId("policy-row-p2")).toHaveCount(0);
 });
 
 test("the policy list scrolls rather than clipping", async ({ page }) => {
