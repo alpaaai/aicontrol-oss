@@ -56,6 +56,26 @@ async def test_upsert_policies_compiles_cedar_text(db_session):
     PolicySet.from_str(row.cedar_text + "\npermit (principal, action, resource);")
 
 
+@pytest.mark.asyncio
+async def test_upsert_policies_rejects_degenerate_condition(db_session):
+    """A policy seeded with an empty tool_name_in list (or any condition that
+    compiles to no `when` clause, with no scope binding it) must fail loudly at
+    seed time rather than silently loading as an unconditional forbid. Mirrors
+    the router's validate_condition/validate_scope guards, which don't run on
+    the seed/reseed path since it never goes through the API."""
+    from app.services.policy_loader import upsert_policies
+
+    with pytest.raises(ValueError):
+        await upsert_policies(db_session, [{
+            "name": "test_loader_rejects_empty_tool_name_in",
+            "description": "",
+            "effect": "deny",
+            "condition": {"tool_name_in": []},
+            "severity": "low",
+            "compliance_frameworks": [],
+        }])
+
+
 def test_load_yaml_never_uses_compliance_tags_key():
     """Every policy in policies.yaml must use 'compliance_frameworks' (the key
     policy_loader.upsert_policies actually reads) -- not the unread

@@ -40,6 +40,21 @@ test("a deny policy has no consequence clause", async ({ page }) => {
     .not.toContainText("instead:");
 });
 
+test("tool_name_in renders the actual tool names, not the raw condition key", async ({ page }) => {
+  const sentence = page.getByTestId("policy-sentence-tool-denylist");
+  await expect(sentence).toContainText("bash");
+  await expect(sentence).toContainText("exec_command");
+  const text = (await sentence.textContent()) ?? "";
+  expect(text).not.toContain("tool_name_in matches");
+});
+
+test("parameter_match with a nested operator object renders readable text, not [object Object]", async ({ page }) => {
+  const sentence = page.getByTestId("policy-sentence-parameter-match-nested");
+  const text = (await sentence.textContent()) ?? "";
+  expect(text).not.toContain("[object Object]");
+  await expect(sentence).toContainText("169.254.169.254");
+});
+
 test("an unscoped system renders as everywhere, not as a chip", async ({ page }) => {
   const sentence = page.getByTestId("policy-sentence-any-system");
   await expect(sentence).toContainText("anywhere");

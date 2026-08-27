@@ -12,6 +12,23 @@ import { PolicyChip } from "./PolicyChip";
 
 const SYMBOL: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤", eq: "=" };
 
+// Mirrors app/services/policy_compiler.py's _parameter_match: a nested
+// operator object ({contains_any: [...]} or {equals: X}) must be unwrapped,
+// not stringified directly -- `${val}` on an object renders "[object Object]".
+function parameterMatchValue(value: unknown): string {
+  if (value && typeof value === "object") {
+    const spec = value as { contains_any?: unknown[]; equals?: unknown };
+    if (Array.isArray(spec.contains_any)) {
+      return `contains one of ${spec.contains_any.join(", ")}`;
+    }
+    if ("equals" in spec) {
+      return `is ${spec.equals}`;
+    }
+    return "matches";
+  }
+  return `is ${value}`;
+}
+
 const CONDITION_PHRASES: Record<string, (v: any) => string> = {
   numeric_conditions: (v) =>
     Object.entries(v as Record<string, Record<string, number>>)
@@ -20,9 +37,12 @@ const CONDITION_PHRASES: Record<string, (v: any) => string> = {
       )
       .join(" and "),
   tool_name_contains: (v) => `the tool name contains ${(v as string[]).join(" or ")}`,
+  tool_name_in: (v) => `the tool is ${(v as string[]).join(" or ")}`,
   rate_limit: (v) => `called more than ${(v as any).max_calls} times`,
   parameter_match: (v) =>
-    Object.entries(v as Record<string, unknown>).map(([k, val]) => `${k} is ${val}`).join(" and "),
+    Object.entries(v as Record<string, unknown>)
+      .map(([k, val]) => `${k} ${parameterMatchValue(val)}`)
+      .join(" and "),
   time_conditions: (v) => `outside ${(v as any).hours[0]}:00-${(v as any).hours[1]}:00`,
   token_budget: (v) => `the budget of ${(v as any).max_tokens?.toLocaleString()} tokens is exceeded`,
 };

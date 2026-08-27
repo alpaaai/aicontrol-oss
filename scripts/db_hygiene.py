@@ -39,8 +39,11 @@ async def _clean_agents(session: AsyncSession) -> None:
     # discovery row. audit_events is append-only, so its rows are never deleted:
     # the nullable FK columns are cleared instead.
     await session.execute(text(
-        "UPDATE audit_events SET agent_id = NULL "
+        "UPDATE audit_events SET agent_id = NULL, agent_name = NULL "
         "WHERE agent_id IN (SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
+    ))
+    await session.execute(text(
+        "UPDATE audit_events SET agent_name = NULL WHERE agent_name LIKE 'test-agent-%'"
     ))
     await session.execute(text(
         "UPDATE audit_events SET session_id = NULL WHERE session_id IN "
@@ -85,6 +88,10 @@ async def _clean_policies(session: AsyncSession) -> None:
         "WHERE policy_id IN (SELECT id FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%')"
     ))
     await session.execute(text(
+        "UPDATE audit_events SET policy_name = NULL "
+        "WHERE policy_name LIKE 'test_%' OR policy_name LIKE 'not_lib_%'"
+    ))
+    await session.execute(text(
         "DELETE FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%'"
     ))
 
@@ -109,12 +116,18 @@ async def _clean_tokens(session: AsyncSession) -> None:
 SWEEPS = [
     Sweep(
         label="agents",
-        count_sql="SELECT count(*) FROM agents WHERE name LIKE 'test-agent-%'",
+        count_sql=(
+            "SELECT (SELECT count(*) FROM agents WHERE name LIKE 'test-agent-%')"
+            " + (SELECT count(*) FROM audit_events WHERE agent_name LIKE 'test-agent-%')"
+        ),
         clean=_clean_agents,
     ),
     Sweep(
         label="policies",
-        count_sql="SELECT count(*) FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%'",
+        count_sql=(
+            "SELECT (SELECT count(*) FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%')"
+            " + (SELECT count(*) FROM audit_events WHERE policy_name LIKE 'test_%' OR policy_name LIKE 'not_lib_%')"
+        ),
         clean=_clean_policies,
     ),
     Sweep(
