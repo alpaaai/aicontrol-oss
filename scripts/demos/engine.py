@@ -69,9 +69,38 @@ def print_scenario_header(scenario: dict) -> None:
     console.print()
 
 
+async def _call_coverage_handshake(scenario: dict, token: str) -> None:
+    """Register agent framework and hook coverage before running tool calls."""
+    coverage_payload = {
+        "framework": scenario.get("framework", "unknown"),
+        "hook": scenario.get("hook", "aicontrol-sdk"),
+        "sdk_version": scenario.get("sdk_version", "1.0.0"),
+        "workflow": scenario.get("workflow", "unassigned"),
+        "agent_name": scenario["agent_name"],
+        "silent_noop_warnings": [],
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.post(
+                f"{API_BASE}/agents/{scenario['agent_id']}/coverage",
+                headers={"Authorization": f"Bearer {token}"},
+                json=coverage_payload,
+                timeout=10.0,
+            )
+        if resp.status_code == 200:
+            console.print("[dim]✓ Coverage handshake sent[/dim]")
+        else:
+            console.print(f"[yellow]⚠ Coverage handshake returned {resp.status_code}[/yellow]")
+    except Exception as e:
+        console.print(f"[yellow]⚠ Coverage handshake failed: {e}[/yellow]")
+
+
 async def _run_intercept(scenario: dict, token: str, mode: str) -> None:
     session_id = str(uuid.uuid4())
     print_scenario_header(scenario)
+
+    await _call_coverage_handshake(scenario, token)
+    console.print()
 
     results = []
     tool_calls = scenario["tool_calls"]

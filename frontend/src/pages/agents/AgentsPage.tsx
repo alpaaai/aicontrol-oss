@@ -28,16 +28,16 @@ function AgentRow({ agent }: { agent: Agent }) {
         <p className="text-body-md text-ac-body-strong truncate">{agent.name}</p>
         <p className="text-caption text-ac-muted truncate">{agent.workflow ?? "unassigned"}</p>
       </div>
-      <div className="text-body-sm text-ac-body truncate">{agent.framework ?? "—"}</div>
-      <div className="text-identifier text-ac-muted truncate">{agent.hook ?? "—"}</div>
-      <div data-testid={`coverage-${agent.id}`}>
+      <div className="min-w-0 text-body-sm text-ac-body truncate">{agent.framework ?? "—"}</div>
+      <div className="min-w-0 text-identifier text-ac-muted truncate">{agent.hook ?? "—"}</div>
+      <div className="min-w-0" data-testid={`coverage-${agent.id}`}>
         <span
           className={`inline-flex items-center rounded-full px-[10px] py-[3px] text-label-uc ${COVERAGE_STYLE[agent.coverage_state]}`}
         >
           {COVERAGE_LABEL[agent.coverage_state]}
         </span>
       </div>
-      <div className="text-caption text-ac-warning space-y-0.5">
+      <div className="min-w-0 text-caption text-ac-warning space-y-0.5">
         {agent.silent_noop_warnings.map((w) => (
           <p key={w} className="truncate">{w}</p>
         ))}
