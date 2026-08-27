@@ -48,9 +48,17 @@ export interface WorkflowOutcomes {
   outcomes: WorkflowOutcome[];
 }
 
+export interface AgentOutcome {
+  agent_name: string;
+  calls: number;
+  held_for_approval: number;
+  denied: number;
+}
+
 export interface DashboardOutcomes {
   window: string;
   workflows: WorkflowOutcomes[];
+  agents: AgentOutcome[];
 }
 
 export const getOutcomes = (window: string = "7d") =>

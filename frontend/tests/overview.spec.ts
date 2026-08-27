@@ -6,7 +6,7 @@ test.beforeEach(async ({ page }) => {
       json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } },
     }),
   );
-  await page.route("**/dashboard/outcomes*", (route) =>
+  await page.route("http://localhost:8001/dashboard/outcomes*", (route) =>
     route.fulfill({
       json: {
         window: "7d",
@@ -23,10 +23,36 @@ test.beforeEach(async ({ page }) => {
             ],
           },
         ],
+        agents: [
+          {
+            agent_name: "claims-processor",
+            calls: 142,
+            held_for_approval: 2,
+            denied: 3,
+          },
+          {
+            agent_name: "document-extractor",
+            calls: 98,
+            held_for_approval: 1,
+            denied: 1,
+          },
+          {
+            agent_name: "risk-assessor",
+            calls: 87,
+            held_for_approval: 0,
+            denied: 1,
+          },
+          {
+            agent_name: "payment-initiator",
+            calls: 85,
+            held_for_approval: 0,
+            denied: 0,
+          },
+        ],
       },
     }),
   );
-  await page.route("**/audit-events*", (route) =>
+  await page.route("http://localhost:8001/audit-events*", (route) =>
     route.fulfill({ json: { events: [], total: 0 } }),
   );
   await page.goto("/login");
@@ -38,39 +64,54 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test("the first viewport is prose, not a tile grid", async ({ page }) => {
+test("the overview shows stat rail with totals", async ({ page }) => {
   await page.goto("/");
-  const summary = page.getByTestId("outcome-summary");
-  await expect(summary).toBeVisible();
-  const text = (await summary.textContent()) ?? "";
-  expect(text.length).toBeGreaterThan(60);
-  await expect(page.getByTestId("stat-tile")).toHaveCount(0);
+  await expect(page.getByText("Tool calls", { exact: true })).toBeVisible();
+  await expect(page.getByText("Active agents", { exact: true })).toBeVisible();
+  await expect(page.getByText("Approval Needed", { exact: true })).toBeVisible();
+  await expect(page.getByText("Denied", { exact: true })).toBeVisible();
 });
 
-test("outcomes are phrased in business terms", async ({ page }) => {
+test("stat rail computes totals from agent data", async ({ page }) => {
   await page.goto("/");
-  const summary = page.getByTestId("outcome-summary");
-  await expect(summary).toContainText(/held for approval|denied|blocked/);
+  // Total calls: 142+98+87+85=412
+  await expect(page.getByRole("heading", { level: 1, name: /412/ })).toBeVisible();
+  // Active agents: 4
+  await expect(page.getByText("4", { exact: true })).toBeVisible();
+  // Approval needed: 2+1+0+0=3
+  await expect(page.getByText("3", { exact: true })).toBeVisible();
+  // Denied: 3+1+1+0=5
+  await expect(page.getByText("5", { exact: true })).toBeVisible();
 });
 
-test("outcomes are grouped by workflow", async ({ page }) => {
+test("agent outcome table shows agent names not counts", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByTestId("workflow-group").first()).toBeVisible();
+  await expect(page.getByText("claims-processor")).toBeVisible();
+  await expect(page.getByText("document-extractor")).toBeVisible();
+  await expect(page.getByText("risk-assessor")).toBeVisible();
 });
 
-test("the decision feed sits beneath the summary", async ({ page }) => {
+test("agent outcome table shows calls approval-needed and denied columns", async ({ page }) => {
   await page.goto("/");
-  const summaryBox = await page.getByTestId("outcome-summary").boundingBox();
+  await expect(page.getByText("Approval Needed", { exact: true })).toBeVisible();
+  // Each agent row should have its counts
+  await expect(page.getByText("142")).toBeVisible(); // claims-processor calls
+  await expect(page.getByText("98")).toBeVisible(); // document-extractor calls
+});
+
+test("the decision feed sits beneath the agent table", async ({ page }) => {
+  await page.goto("/");
+  const tableBox = await page.getByText("claims-processor").boundingBox();
   const feedBox = await page.getByTestId("decision-feed").boundingBox();
-  expect(feedBox!.y).toBeGreaterThan(summaryBox!.y);
+  expect(feedBox!.y).toBeGreaterThan(tableBox!.y);
 });
 
 test("the empty state is an invitation", async ({ page }) => {
-  await page.route("**/dashboard/outcomes*", (route) =>
-    route.fulfill({ json: { window: "7d", workflows: [] } }),
+  await page.route("http://localhost:8001/dashboard/outcomes*", (route) =>
+    route.fulfill({ json: { window: "7d", workflows: [], agents: [] } }),
   );
   await page.goto("/");
-  await expect(page.getByTestId("outcome-summary")).toContainText(/No governed activity yet/i);
+  await expect(page.getByText(/No governed activity yet/i)).toBeVisible();
 });
 
 test("the decision feed scrolls rather than clipping", async ({ page }) => {

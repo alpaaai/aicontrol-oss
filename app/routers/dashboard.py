@@ -93,7 +93,44 @@ async def get_outcomes(window: str = Query("7d"), _=Depends(require_human)):
         for g in groups.values()
     ]
 
-    return {"window": window, "workflows": workflows}
+    # Per-agent breakdown
+    async with async_session_factory() as db:
+        # Query 1: tool calls per agent
+        agent_calls_rows = (await db.execute(
+            select(
+                AuditEvent.agent_name,
+                func.count().label("calls"),
+                func.sum(case((AuditEvent.decision == "deny", 1), else_=0)).label("denied"),
+            )
+            .where(AuditEvent.created_at >= since)
+            .where(AuditEvent.agent_name.isnot(None))
+            .group_by(AuditEvent.agent_name)
+            .order_by(text("calls DESC"))
+        )).all()
+
+        # Query 2: pending reviews per agent
+        agent_held_rows = (await db.execute(
+            select(AuditEvent.agent_name, func.count().label("held"))
+            .join(HITLReview, HITLReview.audit_event_id == AuditEvent.id)
+            .where(HITLReview.status == "pending")
+            .where(AuditEvent.created_at >= since)
+            .where(AuditEvent.agent_name.isnot(None))
+            .group_by(AuditEvent.agent_name)
+        )).all()
+
+    # Merge into dict for easy lookup
+    held_by_agent = {r.agent_name: r.held for r in agent_held_rows}
+    agents = [
+        {
+            "agent_name": r.agent_name,
+            "calls": r.calls,
+            "held_for_approval": held_by_agent.get(r.agent_name, 0),
+            "denied": r.denied,
+        }
+        for r in agent_calls_rows
+    ]
+
+    return {"window": window, "workflows": workflows, "agents": agents}
 
 
 @router.get("/summary")
