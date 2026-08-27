@@ -11,6 +11,8 @@ from unittest.mock import patch
 import httpx
 from sqlalchemy import text
 
+from scripts import db_hygiene
+
 # When tests run on the host machine, Docker internal hostnames won't resolve.
 # Load .env (if present) and replace Docker internal hostnames with localhost.
 try:
@@ -103,26 +105,23 @@ async def _seed_demo_policies():
     yield
 
 
+# The agents/policies/discovery sweeps below all delegate to scripts/db_hygiene.py
+# -- the single source of truth for what a leaked test row looks like and how to
+# clean it, shared with the standalone db_hygiene_check.py CLI. Each wrapper here
+# exists only to keep the pre-existing import paths that test_conftest_*_cleanup.py
+# regression tests rely on; the logic itself lives in db_hygiene.py.
+
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _cleanup_test_policies():
     """Session setup + teardown: remove test_ and not_lib_ policies so they don't
     accumulate across pytest runs. Runs cleanup both before and after."""
     from app.models.database import async_session_factory
     async with async_session_factory() as session:
-        await session.execute(text(
-            "UPDATE audit_events SET policy_id = NULL, policy_name = NULL "
-            "WHERE policy_id IN (SELECT id FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%')"
-        ))
-        await session.execute(text("DELETE FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%'"))
+        await db_hygiene._clean_policies(session)
         await session.commit()
     yield
-    from app.models.database import async_session_factory
     async with async_session_factory() as session:
-        await session.execute(text(
-            "UPDATE audit_events SET policy_id = NULL, policy_name = NULL "
-            "WHERE policy_id IN (SELECT id FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%')"
-        ))
-        await session.execute(text("DELETE FROM policies WHERE name LIKE 'test_%' OR name LIKE 'not_lib_%'"))
+        await db_hygiene._clean_policies(session)
         await session.commit()
 
 
@@ -131,49 +130,14 @@ async def _cleanup_test_agent_rows(session):
     # all NO ACTION FKs, so a bare DELETE FROM agents raises
     # ForeignKeyViolationError the moment a test drives a real intercept for a
     # test agent -- which aborts this session-scoped fixture and turns every
-    # later test into an "ERROR at setup". audit_events is append-only, so the
-    # event rows are never deleted: their nullable FK columns are cleared
-    # instead, exactly as _cleanup_test_policies already does for
-    # policy_id/policy_name. hitl_reviews.session_id is the same case.
-    await session.execute(text(
-        "UPDATE audit_events SET agent_id = NULL "
-        "WHERE agent_id IN (SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
-    ))
-    await session.execute(text(
-        "UPDATE audit_events SET session_id = NULL WHERE session_id IN "
-        "(SELECT id FROM sessions WHERE agent_id IN "
-        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%'))"
-    ))
-    await session.execute(text(
-        "UPDATE hitl_reviews SET session_id = NULL WHERE session_id IN "
-        "(SELECT id FROM sessions WHERE agent_id IN "
-        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%'))"
-    ))
-    await session.execute(text(
-        "DELETE FROM sessions WHERE agent_id IN "
-        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
-    ))
-    await session.execute(text(
-        "DELETE FROM admission_scans WHERE agent_id IN "
-        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
-    ))
-    await session.execute(text(
-        "UPDATE discovered_agents SET promoted_agent_id = NULL "
-        "WHERE promoted_agent_id IN (SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
-    ))
-    # api_tokens.agent_id is another NO ACTION FK: an agent-scoped token issued
-    # by a test pins its agent row and turns the delete below into a
-    # ForeignKeyViolationError.
-    await session.execute(text(
-        "DELETE FROM api_tokens WHERE agent_id IN "
-        "(SELECT id FROM agents WHERE name LIKE 'test-agent-%')"
-    ))
-    await session.execute(text("DELETE FROM agents WHERE name LIKE 'test-agent-%'"))
+    # later test into an "ERROR at setup". See db_hygiene._clean_agents for
+    # the full FK-safe ordering.
+    await db_hygiene._clean_agents(session)
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _cleanup_test_agents():
-    """Session setup + teardown: remove test-agent-* rows so they don't accumulate
+    """Session setup + teardown: remove test-* agent rows so they don't accumulate
     across pytest runs. Runs cleanup both before (removes prior-run leaks) and
     after (removes this-run creations)."""
     from app.models.database import async_session_factory
@@ -187,18 +151,14 @@ async def _cleanup_test_agents():
 
 
 async def _cleanup_test_discovery_rows(session):
-    # discovered_agents.promoted_agent_id FKs to agents.id -- delete the
-    # child rows first or the agents delete violates the FK constraint.
-    await session.execute(text("DELETE FROM discovered_agents WHERE external_id LIKE 'DISCOVERY-API-TEST-%'"))
-    await session.execute(text(
-        "DELETE FROM agents WHERE name IN "
-        "('test-discovered-via-api', 'test-promote-candidate', 'test-promote-no-owner', 'test-dismiss-candidate')"
-    ))
+    # Agents promoted from a discovery row are covered by the 'test-%' agents
+    # sweep above; this only needs to clear discovered_agents itself.
+    await db_hygiene._clean_discovery(session)
 
 
 @pytest_asyncio.fixture(scope="session", autouse=True)
 async def _cleanup_test_discovery():
-    """Session setup + teardown: remove discovered_agents/agents rows
+    """Session setup + teardown: remove discovered_agents rows
     created by tests/enterprise/test_discovery_api.py so they don't
     accumulate across pytest runs. Same class of bug fixed in fc54acd
     (test_promote_creates_a_real_agent had no cleanup fixture, so an
