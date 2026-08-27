@@ -56,7 +56,7 @@ SCENARIOS = {
             },
         ],
     },
-    "revops": {
+    "gtm": {
         "kind": "intercept",
         "name": "GTM — Sales Outreach",
         "agent_name": "sdr-agent",
