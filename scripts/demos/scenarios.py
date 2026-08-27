@@ -14,15 +14,15 @@ _FIXTURES = os.path.join(_repo_root, "scripts", "demos", "fixtures")
 SCENARIOS = {
     "healthcare": {
         "kind": "intercept",
-        "name": "Healthcare — Clinical Documentation Agent",
-        "agent_name": "clinical-documentation-agent",
-        "agent_id": "00000000-0000-0000-0000-000000000020",
-        "description": "Reads patient records, pulls lab results, drafts clinical notes. Touches PHI on every interaction.",
+        "name": "Healthcare — Care Coordination",
+        "agent_name": "care-coordinator",
+        "agent_id": "10000000-0000-0000-0000-000000000002",
+        "description": "A care-coordination agent summarises a patient's care history. A shared care-plan record references other patients' encounters; following that reference is the realistic misstep the demo shows getting caught.",
         "incident_ref": "2025 indirect prompt injection via patient intake form — agent queried records outside active encounter",
-        "framework": "langchain",
+        "framework": "openai-agents-sdk",
         "hook": "aicontrol-sdk",
         "sdk_version": "1.0.0",
-        "workflow": "clinical_documentation",
+        "workflow": "care_coordination",
         "tool_calls": [
             {
                 "tool_name": "read_patient_record",
@@ -58,15 +58,15 @@ SCENARIOS = {
     },
     "revops": {
         "kind": "intercept",
-        "name": "RevOps — CRM Automation Agent",
-        "agent_name": "crm-automation-agent",
-        "agent_id": "00000000-0000-0000-0000-000000000060",
-        "description": "Updates deal stages, logs activities, enriches contacts. OAuth access to full CRM. Saves AEs 2hrs/day.",
+        "name": "GTM — Sales Outreach",
+        "agent_name": "sdr-agent",
+        "agent_id": "10000000-0000-0000-0000-000000000003",
+        "description": "An SDR agent personalises outreach for a named campaign segment. Misreading the personalisation instruction as a request for the whole account table is the realistic misstep the demo shows getting caught.",
         "incident_ref": "UNC6395 Salesforce/Drift OAuth attack, August 2025 — legitimate tokens used to silently query 700+ customer environments",
-        "framework": "crewai",
+        "framework": "openai-agents-sdk",
         "hook": "aicontrol-sdk",
         "sdk_version": "1.0.0",
-        "workflow": "sales_automation",
+        "workflow": "sales_outreach",
         "tool_calls": [
             {
                 "tool_name": "update_deal_stage",
@@ -101,20 +101,20 @@ SCENARIOS = {
     },
     "insurance": {
         "kind": "intercept",
-        "name": "Insurance — Claims Processing Agent",
-        "agent_id": "00000000-0000-0000-0000-000000000070",
-        "agent_name": "insurance-claims-agent",
+        "name": "Insurance — Claims Settlement",
+        "agent_id": "10000000-0000-0000-0000-000000000001",
+        "agent_name": "claims-adjuster",
         "description": (
-            "Processes commercial property claims end to end — policy lookup, damage "
-            "assessment, payment approval. Handles 200 claims/day."
+            "A claims-adjuster agent settles a commercial-property claim end to end: reads the claim document, "
+            "then either releases payment or answers a follow-up query on the claims database."
         ),
         "deny_detail_field": "policy_name",
         "deny_detail_color": "dim",
         "deny_detail_indent": "    ",
-        "framework": "langgraph",
+        "framework": "openai-agents-sdk",
         "hook": "aicontrol-sdk",
         "sdk_version": "1.0.0",
-        "workflow": "claims_processing",
+        "workflow": "claims_settlement",
         "tool_calls": [
             {
                 "tool_name": "validate_policy_coverage",
