@@ -62,9 +62,6 @@ POSTGRES_PORT=5432
 # SQLAlchemy
 DATABASE_URL=postgresql+asyncpg://aicontrol:${DB_PASS}@postgres:5432/aicontrol
 
-# OPA
-OPA_URL=http://opa:8181
-
 # App
 APP_ENV=production
 SECRET_KEY=${SECRET_KEY}
@@ -100,7 +97,7 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml pull --quiet --ig
 echo -e "${GREEN}[done]${NC} Images pulled (or using cached versions)."
 
 # Start infra first
-echo "[2/4] Starting infrastructure (postgres + opa)..."
+echo "[2/4] Starting infrastructure (postgres)..."
 docker compose -f docker-compose.yml up -d
 echo -e "      Waiting for postgres..."
 for i in $(seq 1 30); do

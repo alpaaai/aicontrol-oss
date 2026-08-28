@@ -31,7 +31,7 @@ echo ""
 echo -e "${YELLOW}  Admin token: ${ADMIN_TOKEN:-[not set — run install.sh]}${NC}"
 echo ""
 echo -e "  Use the admin token directly with the API (curl, httpx, etc.)"
-echo -e "  Dashboard login uses email OTP — see aictl.io/docs/operations for email setup."
+echo -e "  Dashboard login is email + password — first login runs the setup wizard at http://localhost:3000."
 echo ""
 
 # Seed V2 demo data (idempotent)
