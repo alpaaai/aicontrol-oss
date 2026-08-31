@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Card } from "@/components/primitives/Card";
 import { Button } from "@/components/primitives/Button";
 import {
   createPolicy,
   draftPolicy,
+  draftToPolicyScope,
   simulatePolicy,
   type NLDraftResponse,
+  type PolicyScope,
   type SimulationResult as SimulationResultData,
 } from "@/api/policies";
 import { DraftReview } from "./DraftReview";
@@ -14,8 +15,15 @@ import { SimulationResult } from "./SimulationResult";
 // The primary input on Policies (spec §5 point 1), and the describe -> draft
 // -> simulate -> activate loop (spec §6.1) end to end. Nothing reaches the
 // policies table before a human clicks Activate -- draft and simulate are
-// both read-only round trips.
-export function NLComposer(props: { onCreated?: () => void }) {
+// both read-only round trips. Renders as the left column of the New Policy
+// modal; the drafted policy's preview lives in the modal's own side card,
+// fed via onDraftChange.
+export function NLComposer(props: {
+  onCreated?: () => void;
+  onDraftChange?: (scope: PolicyScope | null) => void;
+  onWriteManually?: () => void;
+  showManualLink?: boolean;
+}) {
   const [value, setValue] = useState("");
   const [draft, setDraft] = useState<NLDraftResponse | null>(null);
   const [simulation, setSimulation] = useState<SimulationResultData | null>(null);
@@ -25,6 +33,7 @@ export function NLComposer(props: { onCreated?: () => void }) {
     setSimulation(null);
     const result = await draftPolicy(value.trim());
     setDraft(result);
+    props.onDraftChange?.(result.draft ? draftToPolicyScope(result.draft) : null);
   };
 
   const handleSimulate = async () => {
@@ -52,7 +61,7 @@ export function NLComposer(props: { onCreated?: () => void }) {
   };
 
   return (
-    <Card data-testid="nl-composer">
+    <div data-testid="nl-composer">
       <label htmlFor="nl-input" className="text-title-sm text-ac-ink block mb-2">
         What should this agent never be allowed to do?
       </label>
@@ -64,8 +73,17 @@ export function NLComposer(props: { onCreated?: () => void }) {
         placeholder="e.g. claims-adjuster may not release a payment over $50,000 without approval"
         className="w-full h-28 rounded-md border border-ac-hairline-strong bg-ac-canvas-soft p-3 text-body-sm text-ac-ink placeholder:text-ac-muted focus:outline focus:outline-2 focus:outline-ac-primary focus:outline-offset-2"
       />
-      <div className="mt-3">
+      <div className="mt-3 flex items-center gap-4">
         <Button label="Draft policy" onClick={handleDraft} disabled={!value.trim()} />
+        {props.showManualLink && (
+          <button
+            type="button"
+            onClick={props.onWriteManually}
+            className="text-body-sm text-ac-primary hover:underline"
+          >
+            Write policy manually
+          </button>
+        )}
       </div>
 
       {draft && (
@@ -79,6 +97,6 @@ export function NLComposer(props: { onCreated?: () => void }) {
           <SimulationResult result={simulation} />
         </div>
       )}
-    </Card>
+    </div>
   );
 }

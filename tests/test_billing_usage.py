@@ -76,6 +76,59 @@ async def test_billing_usage_enterprise_plan(human_admin_token):
 
 
 @pytest.mark.asyncio
+async def test_billing_usage_community_features_are_community_only(human_admin_token):
+    from app.routers.billing import PLAN_CONFIG
+
+    with patch.object(license_gate, "get_license_info", return_value=_community()):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r = await client.get(
+                "/billing/usage",
+                headers={"Authorization": f"Bearer {human_admin_token}"},
+            )
+    assert r.json()["features"] == PLAN_CONFIG["community"]["features"]
+
+
+@pytest.mark.asyncio
+async def test_billing_usage_business_features_include_community(human_admin_token):
+    from app.routers.billing import PLAN_CONFIG
+
+    with patch.object(license_gate, "get_license_info", return_value=_business()):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r = await client.get(
+                "/billing/usage",
+                headers={"Authorization": f"Bearer {human_admin_token}"},
+            )
+    features = r.json()["features"]
+    assert features == PLAN_CONFIG["community"]["features"] + PLAN_CONFIG["business"]["features"]
+    assert not any("Everything in" in f for f in features)
+
+
+@pytest.mark.asyncio
+async def test_billing_usage_enterprise_features_include_community_and_business(human_admin_token):
+    from app.routers.billing import PLAN_CONFIG
+
+    with patch.object(license_gate, "get_license_info", return_value=_enterprise()):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r = await client.get(
+                "/billing/usage",
+                headers={"Authorization": f"Bearer {human_admin_token}"},
+            )
+    features = r.json()["features"]
+    assert features == (
+        PLAN_CONFIG["community"]["features"]
+        + PLAN_CONFIG["business"]["features"]
+        + PLAN_CONFIG["enterprise"]["features"]
+    )
+    assert not any("Everything in" in f for f in features)
+
+
+@pytest.mark.asyncio
 async def test_billing_usage_requires_auth():
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"

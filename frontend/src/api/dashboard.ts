@@ -12,6 +12,8 @@ export interface DecisionHour {
 }
 
 export interface DashboardSummary {
+  window: string;
+  granularity: "hour" | "day";
   intercepts_today: number;
   intercepts_7d: number;
   intercepts_30d: number;
@@ -31,8 +33,8 @@ export interface DashboardSummary {
   high_risk_sessions: number;
 }
 
-export const getSummary = () =>
-  apiClient.get<DashboardSummary>("/dashboard/summary").then((r) => r.data);
+export const getSummary = (window: string = "7d") =>
+  apiClient.get<DashboardSummary>("/dashboard/summary", { params: { window } }).then((r) => r.data);
 
 export interface WorkflowOutcome {
   kind: string;

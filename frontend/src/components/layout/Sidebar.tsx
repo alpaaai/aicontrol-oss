@@ -16,7 +16,6 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Metrics",   path: "/metrics" },
   { label: "Reports",   path: "/reports", requires: "compliance_reports" },
   { label: "Billing",   path: "/billing", requires: "compliance_reports" },
-  { label: "Demo",      path: "/demo" },
 ];
 
 export function Sidebar() {

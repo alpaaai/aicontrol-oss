@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
+import { Plus } from "lucide-react";
 import { listPolicies, type Policy } from "@/api/policies";
 import { getLicenseFeatures, type FeatureFlags } from "@/api/license";
-import { NLComposer } from "./NLComposer";
-import { StructuredEditor } from "./StructuredEditor";
+import { NewPolicyModal } from "./NewPolicyModal";
 import { PolicyRow } from "./PolicyRow";
 import { EmptyState } from "@/components/primitives/EmptyState";
 
@@ -10,6 +10,7 @@ export function PoliciesPage() {
   const [policies, setPolicies] = useState<Policy[] | null>(null);
   const [features, setFeatures] = useState<FeatureFlags | null>(null);
   const [tab, setTab] = useState<"active" | "library">("active");
+  const [modalOpen, setModalOpen] = useState(false);
 
   const reload = () => listPolicies().then(setPolicies).catch(() => setPolicies([]));
 
@@ -30,19 +31,31 @@ export function PoliciesPage() {
 
   return (
     <div className="p-6 space-y-8">
-      <div>
-        <h1 className="text-title-lg text-ac-ink">Policies</h1>
-        <p className="text-body-sm text-ac-muted mt-0.5">
-          {activePolicies === null
-            ? "—"
-            : `${activePolicies.length} active polic${activePolicies.length === 1 ? "y" : "ies"}`}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-title-lg text-ac-ink">Policies</h1>
+          <p className="text-body-sm text-ac-muted mt-0.5">
+            {activePolicies === null
+              ? "—"
+              : `${activePolicies.length} active polic${activePolicies.length === 1 ? "y" : "ies"}`}
+          </p>
+        </div>
+        <button
+          type="button"
+          data-testid="new-policy-button"
+          onClick={() => setModalOpen(true)}
+          className="flex items-center gap-1.5 bg-ac-primary text-ac-on-primary rounded-lg px-4 py-2 text-button hover:bg-ac-primary-active"
+        >
+          <Plus size={14} /> New policy
+        </button>
       </div>
 
-      <div className={features?.nl_authoring ? "grid grid-cols-1 md:grid-cols-2 gap-6" : ""}>
-        {features?.nl_authoring && <NLComposer onCreated={reload} />}
-        <StructuredEditor onCreated={reload} />
-      </div>
+      <NewPolicyModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onCreated={reload}
+        nlAuthoringEnabled={!!features?.nl_authoring}
+      />
 
       <div>
         <div role="tablist" className="flex gap-6 border-b border-ac-hairline mb-3">

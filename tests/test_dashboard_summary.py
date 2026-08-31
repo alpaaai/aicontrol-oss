@@ -65,16 +65,75 @@ async def seed_single_old_audit_event():
 
 
 @pytest.mark.asyncio
-async def test_decisions_by_hour_zero_fills_sparse_days(human_admin_token, seed_single_old_audit_event):
+async def test_decisions_by_hour_zero_fills_sparse_days_at_30d(human_admin_token, seed_single_old_audit_event):
     """The 30-day chart must have a bucket for every day in the window, not just days with events."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(
+            "/dashboard/summary",
+            params={"window": "30d"},
+            headers={"Authorization": f"Bearer {human_admin_token}"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["granularity"] == "day"
+    decisions_by_hour = body["decisions_by_hour"]
+    distinct_days = {row["hour"][:10] for row in decisions_by_hour}
+    assert len(distinct_days) >= 30, (
+        f"Expected 30 zero-filled days in the window, got {len(distinct_days)}"
+    )
+
+
+@pytest.mark.asyncio
+async def test_window_defaults_to_7d(human_admin_token):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         resp = await client.get(
             "/dashboard/summary",
             headers={"Authorization": f"Bearer {human_admin_token}"},
         )
     assert resp.status_code == 200
-    decisions_by_hour = resp.json()["decisions_by_hour"]
-    distinct_days = {row["hour"][:10] for row in decisions_by_hour}
-    assert len(distinct_days) >= 30, (
-        f"Expected 30 zero-filled days in the window, got {len(distinct_days)}"
-    )
+    body = resp.json()
+    assert body["window"] == "7d"
+    assert body["granularity"] == "hour"
+
+
+@pytest.mark.asyncio
+async def test_window_24h_zero_fills_24_hourly_buckets(human_admin_token):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(
+            "/dashboard/summary",
+            params={"window": "24h"},
+            headers={"Authorization": f"Bearer {human_admin_token}"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["granularity"] == "hour"
+    distinct_hours = {row["hour"] for row in body["decisions_by_hour"]}
+    assert len(distinct_hours) == 24
+
+
+@pytest.mark.asyncio
+async def test_window_7d_zero_fills_168_hourly_buckets(human_admin_token):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(
+            "/dashboard/summary",
+            params={"window": "7d"},
+            headers={"Authorization": f"Bearer {human_admin_token}"},
+        )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["granularity"] == "hour"
+    distinct_hours = {row["hour"] for row in body["decisions_by_hour"]}
+    assert len(distinct_hours) == 24 * 7
+
+
+@pytest.mark.asyncio
+async def test_top_tools_respects_window(human_admin_token, seed_single_old_audit_event):
+    """An event 10 days old must not appear in a 7d top_tools window."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp_7d = await client.get(
+            "/dashboard/summary",
+            params={"window": "7d"},
+            headers={"Authorization": f"Bearer {human_admin_token}"},
+        )
+    tools_7d = {t["tool"] for t in resp_7d.json()["top_tools"]}
+    assert "test_old_tool" not in tools_7d

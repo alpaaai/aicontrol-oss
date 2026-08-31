@@ -36,7 +36,6 @@ PLAN_CONFIG = {
         "rate_per_million": 15.0,
         "retention_days": None,
         "features": [
-            "Everything in Community",
             "1-year audit log retention",
             "Slack HITL notifications",
             "HITL review queue dashboard view",
@@ -48,7 +47,6 @@ PLAN_CONFIG = {
         "rate_per_million": 25.25,
         "retention_days": None,
         "features": [
-            "Everything in Business",
             "Policy engine observability",
             "Policy drift detection + warning feed",
             "Compliance report export (SOC 2, PCI, HIPAA, GLBA)",
@@ -56,6 +54,18 @@ PLAN_CONFIG = {
         ],
     },
 }
+
+# Each tier's PLAN_CONFIG["features"] list is additive-only (no "Everything in
+# X" placeholder) -- the billing card itemizes every feature the caller's plan
+# includes by concatenating every tier up to and including their own.
+TIER_ORDER = ["community", "business", "enterprise"]
+
+
+def _cascaded_features(plan: str) -> list[str]:
+    features: list[str] = []
+    for tier in TIER_ORDER[: TIER_ORDER.index(plan) + 1]:
+        features.extend(PLAN_CONFIG[tier]["features"])
+    return features
 
 
 async def count_intercepts_in_period(
@@ -119,7 +129,7 @@ async def billing_usage(
         "monthly_base_usd": config["monthly_base_usd"],
         "rate_per_million": rate,
         "retention_days": config["retention_days"],
-        "features": config["features"],
+        "features": _cascaded_features(info.plan),
         "this_month": {
             "period": f"{this_year}-{this_month:02d}",
             "intercepts": this_count,

@@ -52,25 +52,64 @@ test("view rule discloses the rule text", async ({ page }) => {
   await expect(page.getByTestId("raw-rule")).toBeVisible();
 });
 
-test("the composer is the primary input and the editor is its peer", async ({ page }) => {
+test("the policy creation forms are not inline on the page", async ({ page }) => {
   await page.route("**/license/features", (route) =>
     route.fulfill({ json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } } }),
   );
   await page.goto("/policies");
-  await expect(page.getByTestId("nl-composer")).toBeVisible();
-  await expect(page.getByTestId("structured-editor")).toBeVisible();
-  const composerBox = await page.getByTestId("nl-composer").boundingBox();
-  const editorBox = await page.getByTestId("structured-editor").boundingBox();
-  expect(Math.abs(composerBox!.y - editorBox!.y)).toBeLessThan(200);
+  await expect(page.getByTestId("nl-composer")).toHaveCount(0);
+  await expect(page.getByTestId("structured-editor")).toHaveCount(0);
+  await expect(page.getByTestId("new-policy-button")).toBeVisible();
 });
 
-test("a free install shows the structured editor alone", async ({ page }) => {
+test("New policy opens a modal with the composer as the default input, with a live preview", async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({ json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } } }),
+  );
+  await page.goto("/policies");
+  await page.getByTestId("new-policy-button").click();
+  await expect(page.getByTestId("new-policy-modal")).toBeVisible();
+  await expect(page.getByTestId("nl-composer")).toBeVisible();
+  await expect(page.getByTestId("structured-editor")).toHaveCount(0);
+  await expect(page.getByTestId("policy-preview-card")).toBeVisible();
+});
+
+test("Write policy manually switches the modal to the structured editor with a live preview", async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({ json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } } }),
+  );
+  await page.goto("/policies");
+  await page.getByTestId("new-policy-button").click();
+  await page.getByRole("button", { name: "Write policy manually" }).click();
+  await expect(page.getByTestId("nl-composer")).toHaveCount(0);
+  await expect(page.getByTestId("structured-editor")).toBeVisible();
+  await expect(page.getByTestId("policy-preview-card")).toBeVisible();
+});
+
+test("the preview card defaults to human-readable and toggles to code", async ({ page }) => {
+  await page.route("**/license/features", (route) =>
+    route.fulfill({ json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true } } }),
+  );
+  await page.goto("/policies");
+  await page.getByTestId("new-policy-button").click();
+  await page.getByRole("button", { name: "Write policy manually" }).click();
+  await page.getByPlaceholder("Tool (blank = any tool)").fill("release_payment");
+  await expect(page.getByTestId("policy-preview-human")).toBeVisible();
+  await expect(page.getByTestId("policy-preview-code")).toHaveCount(0);
+  await page.getByRole("button", { name: "Code view" }).click();
+  await expect(page.getByTestId("policy-preview-code")).toBeVisible();
+  await expect(page.getByTestId("policy-preview-code")).toContainText("release_payment");
+});
+
+test("a free install's New policy modal opens directly to the structured editor, with no manual-switch link", async ({ page }) => {
   await page.route("**/license/features", (route) =>
     route.fulfill({ json: { tier: "free", features: { nl_authoring: false, simulation: false, hitl: false, compliance_reports: false } } }),
   );
   await page.goto("/policies");
-  await expect(page.getByTestId("nl-composer")).toHaveCount(0);
+  await page.getByTestId("new-policy-button").click();
   await expect(page.getByTestId("structured-editor")).toBeVisible();
+  await expect(page.getByTestId("nl-composer")).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Write policy manually" })).toHaveCount(0);
 });
 
 test("an already-active policy shows Deactivate, not Activate", async ({ page }) => {

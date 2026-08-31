@@ -1,4 +1,9 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
+
+async function openComposer(page: Page) {
+  await page.goto("/policies");
+  await page.getByTestId("new-policy-button").click();
+}
 
 const DRAFT_RESPONSE = {
   draft: { principal_type: "agent", principal_id: "claims-adjuster",
@@ -23,13 +28,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("the composer asks the product's question", async ({ page }) => {
-  await page.goto("/policies");
+  await openComposer(page);
   await expect(page.getByTestId("nl-composer"))
     .toContainText("What should this agent never be allowed to do?");
 });
 
 test("a description produces a sentence, never JSON or Cedar", async ({ page }) => {
-  await page.goto("/policies");
+  await openComposer(page);
   await page.getByTestId("nl-input").fill("no payments over 50000 on guidewire");
   await page.getByRole("button", { name: "Draft policy" }).click();
   const review = page.getByTestId("draft-review");
@@ -39,7 +44,7 @@ test("a description produces a sentence, never JSON or Cedar", async ({ page }) 
 });
 
 test("the draft's chips are editable", async ({ page }) => {
-  await page.goto("/policies");
+  await openComposer(page);
   await page.getByTestId("nl-input").fill("no payments over 50000 on guidewire");
   await page.getByRole("button", { name: "Draft policy" }).click();
   await expect(page.getByTestId("draft-review").getByRole("button").first()).toBeEnabled();
@@ -51,7 +56,7 @@ test("simulation reports an outcome, not a diff", async ({ page }) => {
                             corpus_start: "2026-08-15T00:00:00Z", corpus_note: null,
                             matches: [] } }),
   );
-  await page.goto("/policies");
+  await openComposer(page);
   await page.getByTestId("nl-input").fill("no payments over 50000 on guidewire");
   await page.getByRole("button", { name: "Draft policy" }).click();
   await page.getByRole("button", { name: "Simulate" }).click();
@@ -66,7 +71,7 @@ test("an empty corpus says so instead of showing a confident zero", async ({ pag
                             corpus_note: "No traffic recorded since governance began capturing workflow and system.",
                             matches: [] } }),
   );
-  await page.goto("/policies");
+  await openComposer(page);
   await page.getByTestId("nl-input").fill("no payments over 50000 on guidewire");
   await page.getByRole("button", { name: "Draft policy" }).click();
   await page.getByRole("button", { name: "Simulate" }).click();
@@ -82,7 +87,7 @@ test("nothing is saved until a human activates", async ({ page }) => {
     if (route.request().method() === "POST") { activated = true; }
     return route.fulfill({ json: [] });
   });
-  await page.goto("/policies");
+  await openComposer(page);
   await page.getByTestId("nl-input").fill("no payments over 50000 on guidewire");
   await page.getByRole("button", { name: "Draft policy" }).click();
   expect(activated).toBe(false);
@@ -96,7 +101,7 @@ test("activate keeps its word through the flow", async ({ page }) => {
       ? route.continue()
       : route.fulfill({ json: [] }),
   );
-  await page.goto("/policies");
+  await openComposer(page);
   await page.getByTestId("nl-input").fill("no payments over 50000 on guidewire");
   await page.getByRole("button", { name: "Draft policy" }).click();
   await page.getByRole("button", { name: "Activate" }).click();
@@ -108,7 +113,7 @@ test("a manual-authoring fallback explains itself", async ({ page }) => {
     route.fulfill({ json: { draft: null, sentence: null, status: "requires_manual_authoring",
                             warnings: ["geofencing is not a supported condition"] } }),
   );
-  await page.goto("/policies");
+  await openComposer(page);
   await page.getByTestId("nl-input").fill("only allow calls from the US");
   await page.getByRole("button", { name: "Draft policy" }).click();
   await expect(page.getByTestId("draft-review")).toContainText("geofencing is not a supported condition");

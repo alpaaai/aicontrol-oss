@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const FREE_ITEMS = ["Overview", "Agents", "Policies", "Audit log", "Metrics", "Demo"];
+const FREE_ITEMS = ["Overview", "Agents", "Policies", "Audit log", "Metrics"];
 const PAID_ONLY = ["Reviews", "Reports", "Billing"];
 
 test.beforeEach(async ({ page }) => {
@@ -32,6 +32,14 @@ test("free install shows only free destinations", async ({ page }) => {
   for (const item of PAID_ONLY) {
     await expect(nav.getByRole("link", { name: item })).toHaveCount(0);
   }
+});
+
+test("Demo is not listed in the nav, but the route still works directly", async ({ page }) => {
+  await page.goto("/");
+  const nav = page.getByRole("navigation");
+  await expect(nav.getByRole("link", { name: "Demo" })).toHaveCount(0);
+  await page.goto("/demo");
+  await expect(page).toHaveURL(/\/demo$/);
 });
 
 test("nav has no section headers or accordions", async ({ page }) => {

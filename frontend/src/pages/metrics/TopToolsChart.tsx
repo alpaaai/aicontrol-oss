@@ -11,12 +11,13 @@ import type { TopTool } from "@/api/dashboard";
 
 interface Props {
   data: TopTool[];
+  window: string;
 }
 
-export function TopToolsChart({ data }: Props) {
+export function TopToolsChart({ data, window }: Props) {
   return (
     <div className="bg-ac-surface-card border border-ac-hairline rounded-lg p-4">
-      <p className="text-title-sm text-ac-ink mb-4">Top tools — last 24h</p>
+      <p className="text-title-sm text-ac-ink mb-4">Top tools — last {window}</p>
       <ResponsiveContainer width="100%" height={Math.max(220, data.length * 28)}>
         <BarChart
           data={data}

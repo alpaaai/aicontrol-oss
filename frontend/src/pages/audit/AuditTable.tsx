@@ -34,11 +34,17 @@ export function AuditTable(props: { events: AuditEvent[]; loading: boolean; grou
 
   const groups = groupEvents(events, groupBy);
 
+  // "unassigned" is a deliberate fallback (SDK spec 3.2, sdk/.../adapters/base.py)
+  // for a call whose integrator never declared a workflow -- there's no way to
+  // recover a real workflow for it, so the group stays, just relabeled.
+  const groupLabel = (key: string) =>
+    groupBy === "workflow" && key === "unassigned" ? "No workflow specified" : key;
+
   return (
     <div data-testid="audit-table" className="max-h-[640px] overflow-y-auto space-y-6">
       {groups.map(([key, groupEvents]) => (
         <div key={key || "flat"} data-testid={key ? `${groupBy}-group-${key}` : undefined}>
-          {key && <h3 className="text-title-sm text-ac-ink mb-2">{key}</h3>}
+          {key && <h3 className="text-title-sm text-ac-ink mb-2">{groupLabel(key)}</h3>}
           <div className="space-y-2">
             {groupEvents.map((event) => (
               <AuditRow key={event.id} event={event} />

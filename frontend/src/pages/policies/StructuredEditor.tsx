@@ -1,6 +1,5 @@
-import { useState } from "react";
-import { createPolicy } from "@/api/policies";
-import { Card } from "@/components/primitives/Card";
+import { useEffect, useState } from "react";
+import { createPolicy, type PolicyScope } from "@/api/policies";
 import { Button } from "@/components/primitives/Button";
 
 const NUMERIC_OPS: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤", eq: "=" };
@@ -8,9 +7,11 @@ const NUMERIC_OPS: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte:
 // The structured editor edits the four scope columns plus a simple numeric
 // condition -- not the old twelve-field rule_type form, which no longer maps
 // to anything Cedar understands. On a free install this is the only input
-// (D11), so it stands on its own; on a paid install it sits beside the NL
-// composer as a peer, never a fallback.
-export function StructuredEditor(props: { onCreated?: () => void }) {
+// (D11), opened directly in the New Policy modal; on a paid install it's one
+// tap away from the NL composer via "Write policy manually." Every keystroke
+// is mirrored out via onScopeChange so the modal's side card can preview it
+// live, before anything is created.
+export function StructuredEditor(props: { onCreated?: () => void; onScopeChange?: (scope: PolicyScope | null) => void }) {
   const [name, setName] = useState("");
   const [principalId, setPrincipalId] = useState("");
   const [actionTool, setActionTool] = useState("");
@@ -30,16 +31,35 @@ export function StructuredEditor(props: { onCreated?: () => void }) {
     setConditionValue("");
   };
 
+  const buildCondition = () =>
+    conditionField.trim() && conditionValue.trim()
+      ? { numeric_conditions: { [conditionField.trim()]: { [conditionOp]: Number(conditionValue) } } }
+      : {};
+
+  useEffect(() => {
+    const isEmpty = !name.trim() && !principalId.trim() && !actionTool.trim() && !resourceSystem.trim() && !conditionField.trim();
+    props.onScopeChange?.(
+      isEmpty
+        ? null
+        : {
+            id: "draft",
+            principalType: principalId.trim() ? "agent" : null,
+            principalId: principalId.trim() || null,
+            actionTool: actionTool.trim() || null,
+            resourceSystem: resourceSystem.trim() || null,
+            effect,
+            condition: buildCondition(),
+          },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [name, principalId, actionTool, resourceSystem, effect, conditionField, conditionOp, conditionValue]);
+
   const handleCreate = async () => {
     if (!name.trim()) return;
-    const condition =
-      conditionField.trim() && conditionValue.trim()
-        ? { numeric_conditions: { [conditionField.trim()]: { [conditionOp]: Number(conditionValue) } } }
-        : {};
     try {
       await createPolicy({
         name: name.trim(),
-        condition,
+        condition: buildCondition(),
         principal_type: principalId.trim() ? "agent" : null,
         principal_id: principalId.trim() || null,
         action_tool: actionTool.trim() || null,
@@ -59,7 +79,7 @@ export function StructuredEditor(props: { onCreated?: () => void }) {
     "placeholder:text-ac-muted focus:outline focus:outline-2 focus:outline-ac-primary focus:outline-offset-2";
 
   return (
-    <Card data-testid="structured-editor">
+    <div data-testid="structured-editor">
       <h2 className="text-title-sm text-ac-ink mb-4">Build a policy</h2>
       <div className="space-y-3">
         <input className={inputClass} placeholder="Policy name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -81,6 +101,6 @@ export function StructuredEditor(props: { onCreated?: () => void }) {
         </div>
         <Button label="Create policy" pendingLabel="Creating…" doneLabel="Created" onClick={handleCreate} />
       </div>
-    </Card>
+    </div>
   );
 }

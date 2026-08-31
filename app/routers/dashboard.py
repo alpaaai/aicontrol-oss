@@ -134,11 +134,15 @@ async def get_outcomes(window: str = Query("7d"), _=Depends(require_human)):
 
 
 @router.get("/summary")
-async def get_summary(_=Depends(require_human)):
+async def get_summary(window: str = Query("7d", pattern="^(24h|7d|30d)$"), _=Depends(require_human)):
     now = datetime.utcnow()
     today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     week_start = now - timedelta(days=7)
     month_start = now - timedelta(days=30)
+    window_start = _parse_window(window)
+    # 30d of hourly buckets is 720 bars -- impractical for a bar chart, so that
+    # window falls back to daily granularity; 24h/7d stay truly hourly.
+    granularity = "day" if window == "30d" else "hour"
 
     async with async_session_factory() as db:
         def _count(since):
@@ -179,35 +183,45 @@ async def get_summary(_=Depends(require_human)):
 
         top_tools_rows = (await db.execute(
             select(AuditEvent.tool_name, func.count().label("count"))
-            .where(AuditEvent.created_at >= now - timedelta(hours=24))
+            .where(AuditEvent.created_at >= window_start)
             .group_by(AuditEvent.tool_name)
             .order_by(text("count DESC"))
             .limit(10)
         )).all()
         top_tools = [{"tool": t, "count": c} for t, c in top_tools_rows]
 
-        hours_rows = (await db.execute(
+        bucket_rows = (await db.execute(
             select(
-                func.date_trunc("day", AuditEvent.created_at).label("hour"),
+                func.date_trunc(granularity, AuditEvent.created_at).label("bucket"),
                 AuditEvent.decision,
                 func.count().label("count"),
             )
-            .where(AuditEvent.created_at >= now - timedelta(days=30))
-            .group_by("hour", AuditEvent.decision)
-            .order_by("hour")
+            .where(AuditEvent.created_at >= window_start)
+            .group_by("bucket", AuditEvent.decision)
+            .order_by("bucket")
         )).all()
-        rows_by_day: dict = {}
-        for h, d, c in hours_rows:
-            rows_by_day.setdefault(h.date(), []).append({"hour": h.isoformat(), "decision": d, "count": c})
+        rows_by_bucket: dict = {}
+        for b, d, c in bucket_rows:
+            rows_by_bucket.setdefault(b, []).append({"hour": b.isoformat(), "decision": d, "count": c})
 
         decisions_by_hour = []
-        for day_offset in range(29, -1, -1):
-            day = (now - timedelta(days=day_offset)).replace(hour=0, minute=0, second=0, microsecond=0)
-            rows_for_day = rows_by_day.get(day.date())
-            if rows_for_day:
-                decisions_by_hour.extend(rows_for_day)
-            else:
-                decisions_by_hour.append({"hour": day.isoformat(), "decision": None, "count": 0})
+        if granularity == "day":
+            for day_offset in range(29, -1, -1):
+                bucket = (now - timedelta(days=day_offset)).replace(hour=0, minute=0, second=0, microsecond=0)
+                rows_for_bucket = rows_by_bucket.get(bucket)
+                if rows_for_bucket:
+                    decisions_by_hour.extend(rows_for_bucket)
+                else:
+                    decisions_by_hour.append({"hour": bucket.isoformat(), "decision": None, "count": 0})
+        else:
+            total_hours = 24 if window == "24h" else 24 * 7
+            for hour_offset in range(total_hours - 1, -1, -1):
+                bucket = (now - timedelta(hours=hour_offset)).replace(minute=0, second=0, microsecond=0)
+                rows_for_bucket = rows_by_bucket.get(bucket)
+                if rows_for_bucket:
+                    decisions_by_hour.extend(rows_for_bucket)
+                else:
+                    decisions_by_hour.append({"hour": bucket.isoformat(), "decision": None, "count": 0})
 
         active_warnings = (await db.execute(
             select(func.count()).select_from(PolicyWarning)
@@ -240,6 +254,8 @@ async def get_summary(_=Depends(require_human)):
         )).scalar()
 
     return {
+        "window": window,
+        "granularity": granularity,
         "intercepts_today": intercepts_today,
         "intercepts_7d": intercepts_7d,
         "intercepts_30d": intercepts_30d,

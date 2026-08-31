@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { usePoll } from "@/hooks/usePoll";
 import { getSummary } from "@/api/dashboard";
 import { getMetrics } from "@/api/metrics";
@@ -7,7 +7,8 @@ import { TopToolsChart } from "./TopToolsChart";
 import { StatCard } from "@/pages/overview/StatCard";
 
 export function MetricsPage() {
-  const fetcher = useCallback(() => getSummary(), []);
+  const [window, setWindow] = useState<"24h" | "7d" | "30d">("7d");
+  const fetcher = useCallback(() => getSummary(window), [window]);
   const { data, loading } = usePoll(fetcher, 30000);
 
   const metricsFetcher = useCallback(() => getMetrics(), []);
@@ -15,8 +16,18 @@ export function MetricsPage() {
 
   return (
     <div className="p-6 space-y-5">
-      <div>
+      <div className="flex items-center justify-between">
         <h1 className="text-title-lg text-ac-ink">Decision metrics</h1>
+        <select
+          data-testid="metrics-window-select"
+          value={window}
+          onChange={(e) => setWindow(e.target.value as "24h" | "7d" | "30d")}
+          className="h-9 rounded-md border border-ac-hairline-strong bg-ac-canvas-soft px-3 text-body-sm text-ac-ink"
+        >
+          <option value="24h">Last 24 hours</option>
+          <option value="7d">Last 7 days</option>
+          <option value="30d">Last 30 days</option>
+        </select>
       </div>
 
       <div className="flex gap-4 flex-wrap">
@@ -61,8 +72,8 @@ export function MetricsPage() {
 
       {data && (
         <div className="grid grid-cols-2 gap-4">
-          <DecisionTrendChart data={data.decisions_by_hour} />
-          <TopToolsChart data={data.top_tools} />
+          <DecisionTrendChart data={data.decisions_by_hour} window={data.window} granularity={data.granularity} />
+          <TopToolsChart data={data.top_tools} window={data.window} />
         </div>
       )}
 
