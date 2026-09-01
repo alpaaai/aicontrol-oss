@@ -23,7 +23,6 @@ from app.routers.billing import router as billing_router
 from app.routers.users import router as users_router
 from app.routers.setup import router as setup_router
 from app.routers.org_settings import router as org_settings_router
-from app.routers.demo import router as demo_router
 from app.services.cedar_client import invalidate_policy_set_cache
 from app.services.policy_loader import load_all
 from app.services.wal import default_wal_writer
@@ -116,7 +115,6 @@ app.include_router(tokens_router)
 app.include_router(billing_router)
 app.include_router(users_router)
 app.include_router(org_settings_router)
-app.include_router(demo_router)
 if compliance_router is not None:
     app.include_router(compliance_router)
 if policy_authoring_router is not None:

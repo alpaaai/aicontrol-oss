@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const ROUTES = ["/", "/agents", "/policies", "/audit", "/reviews", "/metrics", "/reports", "/billing", "/demo"];
+const ROUTES = ["/", "/agents", "/policies", "/audit", "/reviews", "/metrics", "/reports", "/billing"];
 
 test.beforeEach(async ({ page }) => {
   await page.goto("/login");

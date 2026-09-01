@@ -34,14 +34,6 @@ test("free install shows only free destinations", async ({ page }) => {
   }
 });
 
-test("Demo is not listed in the nav, but the route still works directly", async ({ page }) => {
-  await page.goto("/");
-  const nav = page.getByRole("navigation");
-  await expect(nav.getByRole("link", { name: "Demo" })).toHaveCount(0);
-  await page.goto("/demo");
-  await expect(page).toHaveURL(/\/demo$/);
-});
-
 test("nav has no section headers or accordions", async ({ page }) => {
   await page.goto("/");
   const nav = page.getByRole("navigation");

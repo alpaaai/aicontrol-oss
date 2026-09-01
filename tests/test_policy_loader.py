@@ -101,26 +101,3 @@ def test_policies_yaml_excludes_demo_scenario_policies():
     assert names.isdisjoint(demo_only_names), (
         f"demo-scenario policies leaked into default seed: {names & demo_only_names}"
     )
-
-
-def test_load_yaml_accepts_explicit_path_for_demo_seeds():
-    """load_yaml(path) must read an arbitrary policies-shaped YAML file, so
-    demo seed files under policies/demo_seeds/ can reuse the same loader."""
-    from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
-    policies = load_yaml(DEMO_SEEDS_DIR / "lending.yaml")
-    names = {p["name"] for p in policies}
-    assert names == {"deny_bulk_credit_query", "deny_bulk_credit_query_rate"}
-
-
-def test_all_demo_seed_files_load_and_have_valid_effects():
-    """Every YAML file under policies/demo_seeds/ must parse and contain only
-    valid policy effects -- same contract as the default policies.yaml."""
-    from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
-    valid_effects = {"deny", "review"}
-    seed_files = sorted(DEMO_SEEDS_DIR.glob("*.yaml"))
-    # 6 pre-phase-6 scenario files plus gtm.yaml (task 6.4 -- GTM sales
-    # outreach, the demo-harness successor to the revops.yaml scenario).
-    assert len(seed_files) == 7, f"expected 7 demo seed files, found {len(seed_files)}"
-    for path in seed_files:
-        for p in load_yaml(path):
-            assert p["effect"] in valid_effects, f"{path.name}: invalid effect {p['effect']}"
