@@ -64,6 +64,20 @@ AGENTS = [
         "status": "active",
         "tools": '[]',
     },
+    {
+        "id": "00000000-0000-0000-0000-000000000080",
+        "name": "finance-forecast-agent",
+        "owner": "finance-systems@automaker.com",
+        "status": "active",
+        "tools": '[]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000090",
+        "name": "product-planning-agent",
+        "owner": "enterprise-data@oem-europe.com",
+        "status": "active",
+        "tools": '[]',
+    },
 ]
 
 
@@ -117,6 +131,17 @@ AGENT_APPROVED_TOOLS = {
         "process_claim_payment",
         "request_additional_info",
         "flag_for_review",
+    ],
+    "00000000-0000-0000-0000-000000000080": [  # finance-forecast-agent
+        "query_redshift_sales",
+        "query_salesforce_demand_signals",
+        "push_sap_forecast",
+        "db_query",
+    ],
+    "00000000-0000-0000-0000-000000000090": [  # product-planning-agent
+        "query_snowflake_specs",
+        "submit_spec_recommendation",
+        "db_query",
     ],
 }
 
