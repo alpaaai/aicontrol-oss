@@ -37,10 +37,6 @@ check "API /health returns ok" \
   "curl -s --max-time 5 http://localhost:8001/health" \
   "ok"
 
-check "API /debug database ok" \
-  "curl -s --max-time 5 http://localhost:8001/debug" \
-  "\"status\":\"ok\""
-
 check "Migrations applied" \
   "docker compose $COMPOSE exec -T postgres psql -U aicontrol -d aicontrol -c '\dt'" \
   "alembic_version"

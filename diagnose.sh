@@ -39,11 +39,6 @@ curl -s --max-time 5 http://localhost:8001/health 2>&1 \
   || echo "ERROR: API not reachable"
 
 echo ""
-echo "--- API /debug ---"
-curl -s --max-time 5 http://localhost:8001/debug 2>&1 | python3 -m json.tool \
-  || echo "ERROR: /debug failed"
-
-echo ""
 echo "--- API Logs (last 50 lines) ---"
 docker compose $COMPOSE logs --tail=50 api 2>&1 \
   || echo "ERROR: could not fetch api logs"
