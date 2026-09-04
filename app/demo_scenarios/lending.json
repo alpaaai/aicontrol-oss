@@ -1,0 +1,39 @@
+{
+  "id": "lending",
+  "industry": "Banking / Lending",
+  "name": "Banking / Lending — Loan Underwriting",
+  "description": "Processes loan applications: pulls credit reports, runs risk scoring. Demonstrates session rate limiting on bulk credit-bureau access.",
+  "incident_headline": "In August 2024, security researchers at PromptArmor published a documented attack against Slack's AI assistant. An attacker posted a single public message containing hidden instructions; the assistant later followed them and exfiltrated a victim's private API key. No jailbreak — the agent did exactly what it was designed to do.",
+  "agent_id": "00000000-0000-0000-0000-000000000010",
+  "agent_name": "loan-underwriting-agent",
+  "owner": "lending-team@bank.com",
+  "workflow": "loan_underwriting",
+  "approved_tools": ["query_credit_bureau"],
+  "closing_line": "Your OCC examiner asks whether your agents ever attempted unauthorized bulk data access — you have a provable answer: attempted, blocked immediately, here's the complete record.",
+  "steps": [
+    {
+      "tool_name": "query_credit_bureau",
+      "tool_parameters": {"applicant_id": "APP-2024-00847", "bureau": "equifax", "report_type": "full"},
+      "label": "Pull credit report for applicant APP-2024-00847",
+      "narrative": "First credit bureau query this session. Approved tool, scoped correctly. Allow.",
+      "expected": "allow",
+      "decision_narratives": {"allow": "Authorized. Scoped correctly. Logged.", "deny": "Blocked.", "review": "Routed."}
+    },
+    {
+      "tool_name": "query_credit_bureau",
+      "tool_parameters": {"applicant_id": "APP-2024-00851", "bureau": "equifax", "report_type": "full"},
+      "label": "Pull credit report for second applicant APP-2024-00851",
+      "narrative": "Second credit query, different applicant. Still within the session's rate limit. Allow.",
+      "expected": "allow",
+      "decision_narratives": {"allow": "Second credit query authorized.", "deny": "Blocked.", "review": "Routed."}
+    },
+    {
+      "tool_name": "query_credit_bureau",
+      "tool_parameters": {"applicant_id": "APP-2024-00899", "bureau": "equifax", "report_type": "full"},
+      "label": "Pull credit report for third applicant — triggers session rate limit",
+      "narrative": "Third credit bureau call in this session. The policy allows a maximum of 2 per session — this is the same pattern as bulk extraction via repeated single-record queries.",
+      "expected": "deny",
+      "decision_narratives": {"allow": "Allowed.", "deny": "Blocked. The agent never retrieved that third record. Attempted, blocked immediately, here's the complete record.", "review": "Routed."}
+    }
+  ]
+}

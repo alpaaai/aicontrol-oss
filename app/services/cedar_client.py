@@ -60,6 +60,15 @@ def _coerce_context(context: dict[str, Any]) -> dict[str, Any]:
     """
     coerced: dict[str, Any] = {}
     for key, value in context.items():
+        # Cedar has no null type -- a Python/JSON None left in the context
+        # makes the whole request unparseable, surfacing as a deny via
+        # evaluation_error:cedar_diagnostics instead of a real policy match.
+        # "caller omitted this parameter" conditions (demo_seeds/revops.yaml,
+        # policies.yaml's example_bulk_revenue_export_deny) compare against
+        # the string "null" for exactly this case, so coerce to match.
+        if value is None:
+            coerced[key] = "null"
+            continue
         # cost_usd columns are Numeric(10,6), so SQLAlchemy hands back Decimal,
         # which Cedar cannot serialise -- the whole request is then rejected with
         # "failed to parse schema from request" and every call fails closed.

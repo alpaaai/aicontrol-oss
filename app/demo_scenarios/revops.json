@@ -1,0 +1,39 @@
+{
+  "id": "revops",
+  "industry": "RevOps",
+  "name": "RevOps — CRM Automation",
+  "description": "Updates deal stages, logs activities, enriches contacts. Demonstrates unscoped CRM query blocking.",
+  "incident_headline": "In August 2025, threat actor UNC6395 used stolen OAuth tokens from a Drift-Salesforce integration to access customer environments across more than 700 organizations. Normal API calls, normal activity patterns — invisible to user-focused monitoring because it came from a trusted integration.",
+  "agent_id": "00000000-0000-0000-0000-000000000060",
+  "agent_name": "crm-automation-agent",
+  "owner": "revops@company.com",
+  "workflow": "crm_automation",
+  "approved_tools": ["update_deal_stage", "log_sales_activity", "query_all_accounts"],
+  "closing_line": "Your CRM agent has OAuth access to your most sensitive commercial data. The question is whether that access is governed by what you intended — or by whatever the agent happens to do.",
+  "steps": [
+    {
+      "tool_name": "update_deal_stage",
+      "tool_parameters": {"opportunity_name": "Acme Corp — Enterprise Q2", "stage": "proposal_sent", "owner": "sarah.chen@company.com", "notes": "Demo completed, proposal sent via email"},
+      "label": "Update opportunity 'Acme Corp — Enterprise Q2' to proposal_sent stage",
+      "narrative": "Approved operation. Allow. Logged — which opportunity, which stage change, which agent session.",
+      "expected": "allow",
+      "decision_narratives": {"allow": "Opportunity update authorized. Logged.", "deny": "Blocked.", "review": "Routed."}
+    },
+    {
+      "tool_name": "log_sales_activity",
+      "tool_parameters": {"opportunity_name": "Acme Corp — Enterprise Q2", "activity_type": "demo", "duration_minutes": 32, "outcome": "positive", "next_step": "follow_up_proposal_review"},
+      "label": "Log 32-minute demo activity against opportunity",
+      "narrative": "Activity log — 32-minute demo, positive outcome. Allow.",
+      "expected": "allow",
+      "decision_narratives": {"allow": "Activity logged. Two rows in audit trail.", "deny": "Blocked.", "review": "Routed."}
+    },
+    {
+      "tool_name": "query_all_accounts",
+      "tool_parameters": {"filter": null, "fields": ["company", "revenue", "contacts", "opportunity_value"], "limit": 10000},
+      "label": "Query all accounts with no territory filter (unscoped access attempt)",
+      "narrative": "The agent is querying all accounts with no filter — the UNC6395 access pattern: a legitimate integration using its real OAuth credentials to pull data it was never intended to retrieve.",
+      "expected": "deny",
+      "decision_narratives": {"allow": "Allowed.", "deny": "Blocked. Your full account database was never touched. Filter: null. Limit: 10,000 records. This audit row is proof that access is scoped, enforced, and logged — not asserted.", "review": "Routed."}
+    }
+  ]
+}

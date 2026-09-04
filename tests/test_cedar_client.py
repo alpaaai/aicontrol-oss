@@ -173,3 +173,34 @@ async def test_editing_a_policy_yields_a_new_cache_entry():
 
     cedar_client.invalidate_policy_set_cache()
     assert cedar_client._policy_set_cache == {}
+
+
+NULL_FILTER_DENY_POLICY = {
+    "id": "33333333-3333-3333-3333-333333333333",
+    "name": "deny_unscoped_crm_query",
+    "effect": "deny",
+    "cedar_text": (
+        '@id("33333333-3333-3333-3333-333333333333") @effect("deny")\n'
+        'forbid (principal == Agent::"crm-automation-agent", action == Action::"query_all_accounts", '
+        'resource == System::"crm")\n'
+        'when { context.filter == "null" };'
+    ),
+}
+
+
+@pytest.mark.asyncio
+async def test_none_valued_context_param_matches_a_null_literal_condition():
+    """Regression: a real caller sends tool_parameters={"filter": None} for an
+    unscoped query (JSON null). Cedar has no null type, so passing a Python
+    None straight through used to make the whole request error out --
+    surfacing as a deny via evaluation_error:cedar_diagnostics, not a real
+    policy match, defeating the point of the policy. None must coerce to the
+    string "null" so a `context.field == "null"` condition -- the existing
+    pattern demo_seeds/revops.yaml and policies.yaml both use for "caller
+    omitted this filter" -- matches for real."""
+    result = await evaluate(
+        agent_name="crm-automation-agent", agent_groups=[], tool_name="query_all_accounts",
+        system="crm", context={"filter": None}, policies=[NULL_FILTER_DENY_POLICY],
+    )
+    assert result["decision"] == "deny"
+    assert result["fired_policy_name"] == "deny_unscoped_crm_query"

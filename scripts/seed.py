@@ -7,6 +7,10 @@ from app.services.policy_loader import DEMO_SEEDS_DIR, load_yaml, upsert_policie
 
 # approved_tools: lending + healthcare agents are allowlisted (P1-1 enforcement).
 # All other agents use [] (unrestricted) — intentional contrast for future demo scenarios.
+# finance-forecast-agent (...080) and product-planning-agent (...090) moved to
+# app.services.demo_provisioning, which owns those identities under new ids
+# (10000000-...004/005) — kept here they'd collide on the agents.name unique
+# constraint with the demo provisioning's ON CONFLICT (id) upsert.
 AGENTS = [
     {
         "id": "00000000-0000-0000-0000-000000000001",
@@ -64,20 +68,6 @@ AGENTS = [
         "status": "active",
         "tools": '[]',
     },
-    {
-        "id": "00000000-0000-0000-0000-000000000080",
-        "name": "finance-forecast-agent",
-        "owner": "finance-systems@automaker.com",
-        "status": "active",
-        "tools": '[]',
-    },
-    {
-        "id": "00000000-0000-0000-0000-000000000090",
-        "name": "product-planning-agent",
-        "owner": "enterprise-data@oem-europe.com",
-        "status": "active",
-        "tools": '[]',
-    },
 ]
 
 
@@ -131,17 +121,6 @@ AGENT_APPROVED_TOOLS = {
         "process_claim_payment",
         "request_additional_info",
         "flag_for_review",
-    ],
-    "00000000-0000-0000-0000-000000000080": [  # finance-forecast-agent
-        "query_redshift_sales",
-        "query_salesforce_demand_signals",
-        "push_sap_forecast",
-        "db_query",
-    ],
-    "00000000-0000-0000-0000-000000000090": [  # product-planning-agent
-        "query_snowflake_specs",
-        "submit_spec_recommendation",
-        "db_query",
     ],
 }
 
