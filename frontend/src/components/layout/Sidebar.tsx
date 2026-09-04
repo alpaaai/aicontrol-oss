@@ -13,6 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Policies",  path: "/policies" },
   { label: "Audit log", path: "/audit" },
   { label: "Reviews",   path: "/reviews", requires: "hitl" },
+  { label: "Policy Drift", path: "/drift" },
   { label: "Metrics",   path: "/metrics" },
   { label: "Reports",   path: "/reports", requires: "compliance_reports" },
   { label: "Billing",   path: "/billing", requires: "compliance_reports" },

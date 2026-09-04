@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const FREE_ITEMS = ["Overview", "Agents", "Policies", "Audit log", "Metrics"];
+const FREE_ITEMS = ["Overview", "Agents", "Policies", "Audit log", "Metrics", "Policy Drift"];
 const PAID_ONLY = ["Reviews", "Reports", "Billing"];
 
 test.beforeEach(async ({ page }) => {

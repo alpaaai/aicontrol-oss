@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { getSummary } from '../../api/dashboard'
 import { listWarnings } from '../../api/warnings'
 import { AlertTriangle, Clock, CheckCircle, X } from 'lucide-react'
@@ -8,6 +9,7 @@ interface Notification {
   id: string
   type: 'warning' | 'review' | 'info'
   message: string
+  to?: string
 }
 
 export function NotificationBar() {
@@ -49,6 +51,7 @@ export function NotificationBar() {
               id: 'drift_warnings',
               type: 'warning',
               message: `${warnings.length} active policy drift warning${warnings.length > 1 ? 's' : ''}`,
+              to: '/drift',
             }]
           })
         }
@@ -77,7 +80,11 @@ export function NotificationBar() {
         <div key={n.id}
           className={`flex items-center gap-2 px-6 py-2 text-[12px] border-b ${colors[n.type]}`}>
           {icons[n.type]}
-          <span>{n.message}</span>
+          {n.to ? (
+            <Link to={n.to} className="hover:underline">{n.message}</Link>
+          ) : (
+            <span>{n.message}</span>
+          )}
           <button
             onClick={() => setDismissed(prev => new Set([...prev, n.id]))}
             className="ml-auto opacity-50 hover:opacity-100">
