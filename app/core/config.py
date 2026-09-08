@@ -29,6 +29,7 @@ class Settings(BaseSettings):
     REPORTS_DIR: str = "./data/reports"
     MCP_RESPONSE_SCAN_POLICY: Literal["block", "log"] = "block"
     drift_scan_interval_hours: int = 6
+    drift_unseen_tool_lookback_days: int = 30
     REVIEW_TIMEOUT_MINUTES: int = 60
     app_env: str = "development"
     secret_key: str = "changeme"

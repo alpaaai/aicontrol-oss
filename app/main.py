@@ -67,6 +67,7 @@ async def lifespan(app: FastAPI):
         drift_detector = DriftDetector(
             session_factory=async_session_factory,
             interval_hours=_settings.drift_scan_interval_hours,
+            unseen_tool_lookback_days=_settings.drift_unseen_tool_lookback_days,
         )
         drift_detector.start()
         app.state.drift_detector = drift_detector

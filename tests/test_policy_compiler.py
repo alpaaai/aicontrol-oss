@@ -191,3 +191,50 @@ def test_deny_days_and_deny_hours_are_anded():
 def test_extended_conditions_parse_as_cedar(condition):
     src = compile_policy(_policy(condition=condition))
     PolicySet.from_str(src + "\npermit (principal, action, resource);")
+
+
+from app.services.policy_compiler import extract_condition_tool_names
+
+
+def test_extract_condition_tool_names_empty_condition():
+    assert extract_condition_tool_names({}) == ([], [])
+
+
+def test_extract_condition_tool_names_blocked_tools():
+    primary, aliases = extract_condition_tool_names({"blocked_tools": ["a", "b"]})
+    assert primary == ["a", "b"]
+    assert aliases == []
+
+
+def test_extract_condition_tool_names_tool_aliases_kept_separate():
+    primary, aliases = extract_condition_tool_names(
+        {"blocked_tools": ["query_credit_bureau"], "tool_aliases": ["fetch_credit_data"]}
+    )
+    assert primary == ["query_credit_bureau"]
+    assert aliases == ["fetch_credit_data"]
+
+
+def test_extract_condition_tool_names_tool_name_in_and_tools_spellings():
+    primary, _ = extract_condition_tool_names({"tool_name_in": ["x"]})
+    assert primary == ["x"]
+    primary, _ = extract_condition_tool_names({"tools": ["y"]})
+    assert primary == ["y"]
+
+
+def test_extract_condition_tool_names_recurses_all_of():
+    condition = {"all_of": [{"blocked_tools": ["a"]}, {"tool_aliases": ["b"]}]}
+    primary, aliases = extract_condition_tool_names(condition)
+    assert primary == ["a"]
+    assert aliases == ["b"]
+
+
+def test_extract_condition_tool_names_recurses_any_of():
+    condition = {"any_of": [{"tool_name_in": ["a"]}, {"tools": ["b"]}]}
+    primary, _ = extract_condition_tool_names(condition)
+    assert set(primary) == {"a", "b"}
+
+
+def test_extract_condition_tool_names_ignores_tool_name_contains():
+    primary, aliases = extract_condition_tool_names({"tool_name_contains": ["http_"]})
+    assert primary == []
+    assert aliases == []

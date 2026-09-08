@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { resolveWarning } from '../../api/warnings'
 import type { PolicyWarning } from '../../api/warnings'
-import { AlertTriangle, Ban, CheckCircle } from 'lucide-react'
+import { AlertTriangle, Ban, CheckCircle, HelpCircle } from 'lucide-react'
 
 interface Props {
   warning: PolicyWarning
@@ -27,6 +27,11 @@ const TYPE_META = {
     label: 'Orphaned policy',
     icon: Ban,
     className: 'bg-ac-surface-sunk text-ac-muted border border-ac-hairline',
+  },
+  UNSEEN_TOOL_NO_POLICY: {
+    label: 'Unseen tool',
+    icon: HelpCircle,
+    className: 'bg-ac-surface-sunk text-ac-warning border border-ac-warning',
   },
 } as const
 

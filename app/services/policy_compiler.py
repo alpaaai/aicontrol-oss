@@ -45,6 +45,42 @@ def supported_condition_keys() -> frozenset[str]:
     return SUPPORTED_CONDITION_KEYS
 
 
+def extract_condition_tool_names(condition: dict[str, Any]) -> tuple[list[str], list[str]]:
+    """Walk a condition dict for its exact tool-name references, recursing
+    into all_of/any_of. Returns (primary_names, alias_names).
+
+    Primary names come from blocked_tools/tools/tool_name_in -- each is an
+    independent exact-match tool reference. Alias names come only from
+    tool_aliases: compile_condition's own comment already establishes that
+    aliases EXTEND a primary denylist rather than standing as their own
+    reference, so a caller (drift detection) should count an alias as
+    coverage but never raise an orphan warning for an alias with no primary
+    name behind it.
+
+    tool_name_contains (substring patterns) is deliberately not represented
+    here: a pattern has no single canonical name to diff against a
+    declared or observed tool list. Any caller of this function has no way
+    to reason about substring-matching policies -- that is a permanent gap,
+    not something to work around by inventing a fake name.
+    """
+    primary: list[str] = []
+    aliases: list[str] = []
+    if not condition:
+        return primary, aliases
+
+    for key in ("all_of", "any_of"):
+        for inner in condition.get(key, []):
+            inner_primary, inner_aliases = extract_condition_tool_names(inner)
+            primary.extend(inner_primary)
+            aliases.extend(inner_aliases)
+
+    for key in ("blocked_tools", "tools", "tool_name_in"):
+        primary.extend(condition.get(key, []))
+    aliases.extend(condition.get("tool_aliases", []))
+
+    return primary, aliases
+
+
 def _guard(expr: str) -> str:
     """Prefix every context attribute this expression reads with a `has` check.
 

@@ -20,3 +20,8 @@ def test_settings_loads_database_url():
         assert settings.database_url == "postgresql+asyncpg://u:p@localhost:5432/db"
 
 
+def test_drift_unseen_tool_lookback_days_default():
+    from app.core.config import Settings
+    s = Settings(database_url="postgresql+asyncpg://x/y")
+    assert s.drift_unseen_tool_lookback_days == 30
+

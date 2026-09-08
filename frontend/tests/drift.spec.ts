@@ -65,6 +65,36 @@ test("drift page lists active warnings and resolves one", async ({ page }) => {
   await expect(page.getByText("No active drift warnings")).toBeVisible();
 });
 
+test("drift page labels an unseen-tool warning distinctly from an orphaned policy", async ({ page }) => {
+  await page.route("**/license-info", (route) =>
+    route.fulfill({
+      json: { plan: "enterprise", company: "Acme", is_enterprise: true, is_business: true, expires_at: null },
+    }),
+  );
+  await page.route(/\/warnings\?/, (route) =>
+    route.fulfill({
+      json: [{
+        id: "w2",
+        warning_type: "UNSEEN_TOOL_NO_POLICY",
+        agent_id: "a2",
+        agent_name: "loan-underwriting-agent",
+        policy_id: null,
+        policy_name: null,
+        tool_name: "fetch_credit_data_v2",
+        message: "Agent 'loan-underwriting-agent' called tool 'fetch_credit_data_v2' in the last 30 days but no active policy matches it.",
+        is_active: true,
+        created_at: new Date().toISOString(),
+        resolved_at: null,
+      }],
+    }),
+  );
+
+  await page.goto("/drift");
+  await expect(page.getByText("fetch_credit_data_v2").first()).toBeVisible();
+  await expect(page.getByText("Unseen tool", { exact: true })).toBeVisible();
+  await expect(page.getByText("Orphaned policy", { exact: true })).not.toBeVisible();
+});
+
 test("drift page shows empty state with no warnings", async ({ page }) => {
   await page.route("**/license-info", (route) =>
     route.fulfill({

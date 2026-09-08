@@ -3,17 +3,17 @@ from app.services.demo_scenario_service import list_scenarios, get_scenario, all
 
 EXPECTED_IDS = {
     "insurance", "healthcare", "itsm", "lending",
-    "support", "revops", "lucid_motors", "toyota_europe",
+    "support", "revops", "lucid_motors", "toyota_europe", "toyota_it",
 }
 
 
-def test_all_scenario_ids_are_exactly_the_eight_approved():
+def test_all_scenario_ids_are_exactly_the_nine_approved():
     assert set(all_scenario_ids()) == EXPECTED_IDS
 
 
 def test_list_scenarios_returns_summaries_without_steps():
     summaries = list_scenarios()
-    assert len(summaries) == 8
+    assert len(summaries) == 9
     for s in summaries:
         assert not hasattr(s, "steps")
         assert s.id in EXPECTED_IDS

@@ -53,3 +53,24 @@ async def test_two_runs_of_the_same_scenario_produce_identical_decisions(real_ht
 async def test_unknown_scenario_raises(real_http_client, db_session):
     with pytest.raises(Exception):
         await DemoHarness(scenario="gtm").run()
+
+
+@pytest.mark.asyncio
+async def test_on_step_fires_before_each_call_and_on_result_after(real_http_client, db_session):
+    """The CLI needs to print a step's label/narrative before sending it and
+    the decision right after -- progressive walkthrough display, not
+    everything dumped at the end. Both hooks are optional so the harness
+    stays presentation-agnostic for every other caller."""
+    harness = DemoHarness(scenario="insurance")
+    seen_steps: list[tuple[int, str]] = []
+    seen_results: list[str] = []
+
+    results = await harness.run(
+        on_step=lambda i, step: seen_steps.append((i, step.tool_name)),
+        on_result=lambda r: seen_results.append(r["tool_name"]),
+    )
+
+    assert seen_steps == [
+        (1, "read_claim_document"), (2, "release_payment"), (3, "db_query"),
+    ]
+    assert seen_results == [r["tool_name"] for r in results]
