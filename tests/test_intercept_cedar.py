@@ -5,7 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from app.models.schemas import Policy
-from app.routers.intercept import get_scoped_policies
+from app.services.governance_engine import get_scoped_policies
 
 
 @pytest.mark.asyncio

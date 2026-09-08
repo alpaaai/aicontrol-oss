@@ -101,11 +101,11 @@ async def test_observe_mode_returns_allow_but_records_the_true_deny(observe_agen
     wal_mock = MagicMock()
     wal_mock.append.return_value = uuid.uuid4()
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "policy_matched:probe",
                       "fired_policy_id": None, "fired_policy_name": "probe"}
     )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
-        "app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])
+        "app.services.governance_engine.get_scoped_policies", new=AsyncMock(return_value=[])
     ), _mock_auth():
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -129,11 +129,11 @@ async def test_govern_mode_returns_the_true_deny(govern_agent):
     wal_mock = MagicMock()
     wal_mock.append.return_value = uuid.uuid4()
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "policy_matched:probe",
                       "fired_policy_id": None, "fired_policy_name": "probe"}
     )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
-        "app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])
+        "app.services.governance_engine.get_scoped_policies", new=AsyncMock(return_value=[])
     ), _mock_auth():
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -157,11 +157,11 @@ async def test_deny_events_accumulate_session_risk_score(govern_agent):
     wal_mock = MagicMock()
     wal_mock.append.return_value = uuid.uuid4()
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "policy_matched:probe",
                       "fired_policy_id": None, "fired_policy_name": "probe"}
     )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
-        "app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])
+        "app.services.governance_engine.get_scoped_policies", new=AsyncMock(return_value=[])
     ), _mock_auth():
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"

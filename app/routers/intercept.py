@@ -6,33 +6,23 @@ from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import and_, or_, select, update
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_agent
 from app.core.logging import get_logger
 from app.models.database import get_db
-from app.models.schemas import Agent, Policy, Session
+from app.models.schemas import Agent
 from app.services.audit_writer import write_event
 from app.services.budget_alert_service import maybe_alert_budget_threshold
+from app.services.governance_engine import evaluate_tool_call
 from app.services.hitl_service import create_hitl_review, post_slack_review
-from app.services.cedar_client import current_time_context, evaluate
-from app.services.policy_compiler import ALL_PARAMS_FIELD
-from app.services.rate_limit_service import build_call_counts
-from app.services.system_resolver import UNKNOWN_SYSTEM, merge_unresolved, resolve_system
 from app.services.response_scanner import scan_tool_response
-from app.services.token_budget_service import build_aggregate_budgets, build_token_budgets
+from app.services.session_tracking import RISK_SCORE_DELTA, accumulate_session_risk, ensure_session
 from app.services.wal import default_wal_writer as wal_writer
 
 router = APIRouter()
 logger = get_logger("intercept")
-
-RISK_SCORE_DELTA: dict[str, int] = {
-    "allow": 1,
-    "review": 10,
-    "deny": 25,
-}
 
 
 class InterceptRequest(BaseModel):
@@ -69,87 +59,6 @@ def enrich_parameters(tool_name: str, tool_parameters: dict[str, Any]) -> dict[s
             if parsed.netloc:
                 params["domain"] = parsed.netloc
     return params
-
-
-async def get_scoped_policies(
-    session: AsyncSession,
-    *,
-    agent_name: str,
-    agent_groups: list[str],
-    tool_name: str,
-    system: str,
-) -> list[dict]:
-    """Load only the active policies whose scope matches this call.
-
-    This is what the scope columns exist for: without the WHERE clause every
-    policy is evaluated against every call for every agent, which is the
-    defect the Cedar migration was undertaken to fix.
-
-    NULL action_tool means "any tool"; NULL resource_system means "any system".
-    """
-    principal_match = or_(
-        # NULL principal = applies to every agent. Task 2.8 chose this over a
-        # magic "all" group that every agent would have to be enrolled in.
-        Policy.principal_id.is_(None),
-        and_(Policy.principal_type == "agent", Policy.principal_id == agent_name),
-        and_(Policy.principal_type == "group", Policy.principal_id.in_(agent_groups or [""])),
-    )
-    result = await session.execute(
-        select(Policy).where(
-            Policy.active == True,  # noqa: E712 -- SQLAlchemy needs ==, not `is`
-            principal_match,
-            or_(Policy.action_tool.is_(None), Policy.action_tool == tool_name),
-            or_(Policy.resource_system.is_(None), Policy.resource_system == system),
-        )
-    )
-    return [
-        {
-            "id": str(p.id),
-            "name": p.name,
-            "effect": p.effect or "deny",
-            "cedar_text": p.cedar_text,
-            "condition": p.condition,
-            "severity": p.severity,
-            # The tool binding moved from condition["tools"]/["blocked_tools"]
-            # into the scope column, so the counting services need it here.
-            "action_tool": p.action_tool,
-        }
-        for p in result.scalars().all()
-    ]
-
-
-async def ensure_session(
-    db: AsyncSession, session_id: uuid.UUID, agent_id: uuid.UUID
-) -> None:
-    """Create a session row if one does not already exist for this session_id.
-
-    Guards against the race where two concurrent calls for a brand-new
-    session_id both see no existing row: if the INSERT loses a race to
-    another concurrent request, roll back just this savepoint and treat the
-    now-existing row as success rather than propagating the IntegrityError.
-    """
-    result = await db.execute(select(Session).where(Session.id == session_id))
-    if result.scalar_one_or_none() is not None:
-        return
-    try:
-        async with db.begin_nested():
-            db.add(Session(id=session_id, agent_id=agent_id, status="active"))
-            await db.flush()
-    except IntegrityError:
-        pass
-
-
-async def accumulate_session_risk(
-    db: AsyncSession, session_id: uuid.UUID, delta: int
-) -> None:
-    """Add delta to sessions.risk_score for this session. No-op if delta is 0."""
-    if delta == 0:
-        return
-    await db.execute(
-        update(Session)
-        .where(Session.id == session_id)
-        .values(risk_score=Session.risk_score + delta)
-    )
 
 
 @router.post("/intercept", response_model=InterceptResponse)
@@ -209,82 +118,22 @@ async def intercept(
                 review_id=None,
             )
 
-    # Resolve the business system this call touches, then load only the
-    # policies scoped to (this agent, this tool, this system).
-    system = resolve_system(body.tool_name, body.tool_parameters)
-    if system == UNKNOWN_SYSTEM and agent is not None:
-        # Record it so an admin can correct the mapping. Guarded: writing on
-        # every call would put a row update on the hot path for no gain.
-        merged = merge_unresolved(agent.unresolved_systems, body.tool_name)
-        if merged != (agent.unresolved_systems or []):
-            agent.unresolved_systems = merged
-    agent_groups: list[str] = list(getattr(agent, "groups", None) or []) if agent else []
-    policies = await get_scoped_policies(
+    gov_result = await evaluate_tool_call(
         db,
+        agent=agent,
         agent_name=body.agent_name,
-        agent_groups=agent_groups,
         tool_name=body.tool_name,
-        system=system,
-    )
-
-    # Step 3b: build call_counts for rate-limit policy evaluation
-    call_counts = await build_call_counts(
-        db=db,
-        agent_id=str(body.agent_id),
-        session_id=str(body.session_id),
-        tool_name=body.tool_name,
-        active_policies=policies,
-    )
-
-    cumulative_tokens, cumulative_cost_usd = await build_token_budgets(
-        db=db,
-        agent_id=str(body.agent_id),
-        session_id=str(body.session_id),
-        tool_name=body.tool_name,
-        active_policies=policies,
-    )
-    agent_cumulative, org_cumulative = await build_aggregate_budgets(
-        db=db, agent_id=str(body.agent_id), active_policies=policies,
+        tool_parameters=body.tool_parameters,
+        workflow=body.workflow,
+        session_id=body.session_id,
     )
     import asyncio
     asyncio.create_task(maybe_alert_budget_threshold(
-        cumulative_tokens=cumulative_tokens, cumulative_cost_usd=cumulative_cost_usd,
-        active_policies=policies, tool_name=body.tool_name,
-    ))
-
-    # Evaluate in-process via Cedar. The result shape is identical to the one
-    # the OPA client returned, so everything downstream of here is untouched.
-    decision_result = await evaluate(
-        agent_name=body.agent_name,
-        agent_groups=agent_groups,
+        cumulative_tokens=gov_result.cumulative_tokens,
+        cumulative_cost_usd=gov_result.cumulative_cost_usd,
+        active_policies=gov_result.policies,
         tool_name=body.tool_name,
-        system=system,
-        context={
-            "tool_name": body.tool_name,
-            **body.tool_parameters,
-            # Context, not a binding axis: a policy can condition on
-            # context.workflow with no migration. Set after the spread so a
-            # tool parameter named "workflow" cannot shadow the real one.
-            "workflow": body.workflow,
-            # Flattened parameter text, so a policy can match "any parameter
-            # contains X" -- Cedar cannot iterate the context's own keys.
-            ALL_PARAMS_FIELD: " ".join(
-                str(v) for v in body.tool_parameters.values()
-            ),
-            **current_time_context(),
-            "call_count": call_counts.get(body.tool_name, 0),
-            # build_token_budgets returns {tool_name: sum}, keyed per tool --
-            # not {"tokens": ...}. Keying it wrong made every per-tool token
-            # budget read 0 and never fire.
-            "cumulative_tokens": cumulative_tokens.get(body.tool_name, 0),
-            "cumulative_cost_usd": cumulative_cost_usd.get(body.tool_name, 0),
-            "agent_cumulative_tokens": agent_cumulative.get("tokens", 0),
-            "agent_cumulative_cost_usd": agent_cumulative.get("cost_usd", 0),
-            "org_cumulative_tokens": org_cumulative.get("tokens", 0),
-            "org_cumulative_cost_usd": org_cumulative.get("cost_usd", 0),
-        },
-        policies=policies,
-    )
+    ))
 
     duration_ms = int((time.monotonic() - start) * 1000)
 
@@ -292,17 +141,17 @@ async def intercept(
     enriched_parameters = enrich_parameters(body.tool_name, body.tool_parameters)
 
     # Cedar names the policy that fired directly — no reverse-engineering needed
-    fired_policy_id: Optional[str] = decision_result.get("fired_policy_id") or None
-    fired_policy_name: Optional[str] = decision_result.get("fired_policy_name") or None
+    fired_policy_id: Optional[str] = gov_result.fired_policy_id
+    fired_policy_name: Optional[str] = gov_result.fired_policy_name
 
     # Ensure session row exists (auto-create if agent didn't pre-register)
     await ensure_session(db, body.session_id, body.agent_id)
 
-    true_decision = decision_result["decision"]
-    true_reason = decision_result["reason"]
+    true_decision = gov_result.decision
+    true_reason = gov_result.reason
     enforced_decision = "allow" if is_observe_mode else true_decision
 
-    if decision_result.get("bypass"):
+    if gov_result.bypass:
         logger.critical(
             "engine_bypass_event",
             tool_name=body.tool_name,
@@ -372,7 +221,7 @@ async def intercept(
             "input_tokens": body.input_tokens,
             "output_tokens": body.output_tokens,
             "cost_usd": body.cost_usd,
-            "bypass": decision_result.get("bypass", False),
+            "bypass": gov_result.bypass,
             "enforced": not is_observe_mode,
         })
         await accumulate_session_risk(db, body.session_id, RISK_SCORE_DELTA.get(true_decision, 0))

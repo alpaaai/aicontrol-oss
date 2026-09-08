@@ -34,11 +34,11 @@ async def test_intercept_returns_200():
     """POST /intercept must return HTTP 200."""
     from app.main import app
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch("app.routers.intercept.write_event", new=AsyncMock(
         return_value=uuid.uuid4()
-    )), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    )), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
     )), _mock_auth():
@@ -55,11 +55,11 @@ async def test_intercept_returns_decision():
     """POST /intercept response must include decision field."""
     from app.main import app
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "tool_denylisted"}
     )), patch("app.routers.intercept.write_event", new=AsyncMock(
         return_value=uuid.uuid4()
-    )), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    )), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
     )), _mock_auth():
@@ -83,10 +83,10 @@ async def test_intercept_returns_audit_event_id():
     wal_mock = MagicMock()
     wal_mock.append.return_value = event_id
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch("app.routers.intercept.wal_writer", new=wal_mock
-    ), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    ), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
     )), _mock_auth():
@@ -116,11 +116,11 @@ async def test_intercept_fires_hitl_on_review_decision():
     """POST /intercept must call create_hitl_review when decision is review."""
     from app.main import app
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "review", "reason": "requires_human_review"}
     )), patch("app.routers.intercept.write_event", new=AsyncMock(
         return_value=uuid.uuid4()
-    )), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    )), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch(
         "app.routers.intercept.create_hitl_review",
@@ -151,11 +151,11 @@ async def test_allow_decision_persists_parameters():
     wal_mock = MagicMock()
     wal_mock.append.side_effect = capture_append
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch(
         "app.routers.intercept.wal_writer", new=wal_mock
-    ), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    ), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
     )), _mock_auth():
@@ -190,11 +190,11 @@ async def test_http_tool_captures_domain():
     wal_mock = MagicMock()
     wal_mock.append.side_effect = capture_append
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "tool_denylisted"}
     )), patch(
         "app.routers.intercept.wal_writer", new=wal_mock
-    ), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    ), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
     )), _mock_auth():
@@ -243,11 +243,11 @@ async def test_deny_writes_policy_name():
         }
     ]
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "deny", "reason": "tool_denylisted", "fired_policy_id": str(policy_id), "fired_policy_name": "block_dangerous_tool"}
     )), patch(
         "app.routers.intercept.wal_writer", new=wal_mock
-    ), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    ), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=policies
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock(
     )), _mock_auth():
@@ -275,11 +275,11 @@ async def test_intercept_returns_review_id_on_review_decision():
     event_id = uuid.uuid4()
     review_id = uuid.uuid4()
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "review", "reason": "requires_human_review"}
     )), patch("app.routers.intercept.write_event", new=AsyncMock(
         return_value=event_id
-    )), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    )), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.create_hitl_review", new=AsyncMock(
         return_value=review_id
@@ -358,10 +358,10 @@ async def test_intercept_passes_token_fields_to_write_event():
     payload["output_tokens"] = 80
     payload["cost_usd"] = 0.0125
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
-        "app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])
+        "app.services.governance_engine.get_scoped_policies", new=AsyncMock(return_value=[])
     ), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
@@ -383,10 +383,10 @@ async def test_intercept_token_fields_optional():
     wal_mock = MagicMock()
     wal_mock.append.return_value = uuid.uuid4()
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
-        "app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])
+        "app.services.governance_engine.get_scoped_policies", new=AsyncMock(return_value=[])
     ), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"

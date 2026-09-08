@@ -70,9 +70,9 @@ async def test_workflow_reaches_cedar_as_context():
     wal_mock = MagicMock()
     wal_mock.append.return_value = uuid.uuid4()
 
-    with patch("app.routers.intercept.evaluate", new=fake_evaluate), patch(
+    with patch("app.services.governance_engine.evaluate", new=fake_evaluate), patch(
         "app.routers.intercept.wal_writer", new=wal_mock
-    ), patch("app.routers.intercept.get_scoped_policies", new=AsyncMock(
+    ), patch("app.services.governance_engine.get_scoped_policies", new=AsyncMock(
         return_value=[]
     )), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
         async with AsyncClient(
@@ -93,10 +93,10 @@ async def test_workflow_is_written_to_the_wal_on_the_allow_path():
     wal_mock = MagicMock()
     wal_mock.append.return_value = uuid.uuid4()
 
-    with patch("app.routers.intercept.evaluate", new=AsyncMock(
+    with patch("app.services.governance_engine.evaluate", new=AsyncMock(
         return_value={"decision": "allow", "reason": "default_allow"}
     )), patch("app.routers.intercept.wal_writer", new=wal_mock), patch(
-        "app.routers.intercept.get_scoped_policies", new=AsyncMock(return_value=[])
+        "app.services.governance_engine.get_scoped_policies", new=AsyncMock(return_value=[])
     ), patch("app.routers.intercept.ensure_session", new=AsyncMock()), _mock_auth():
         async with AsyncClient(
             transport=ASGITransport(app=app), base_url="http://test"
