@@ -13,6 +13,7 @@ named so it matches one of the SWEEPS patterns below --
     discovered_agents.external_id  LIKE 'DISCOVERY-API-TEST-%'
     agents.name (discovery) IN (exact names below)
     api_tokens.description LIKE 'pytest-%'
+    mcp_servers.name       LIKE 'test-mcp-server-%'
 
 Adding a new kind of test-created row means adding a sweep here, not
 inventing a new prefix and a bespoke fixture elsewhere.
@@ -113,6 +114,12 @@ async def _clean_tokens(session: AsyncSession) -> None:
     ))
 
 
+async def _clean_mcp_servers(session: AsyncSession) -> None:
+    await session.execute(text(
+        "DELETE FROM mcp_servers WHERE name LIKE 'test-mcp-server-%'"
+    ))
+
+
 SWEEPS = [
     Sweep(
         label="agents",
@@ -143,6 +150,11 @@ SWEEPS = [
         label="api_tokens",
         count_sql="SELECT count(*) FROM api_tokens WHERE description LIKE 'pytest-%'",
         clean=_clean_tokens,
+    ),
+    Sweep(
+        label="mcp_servers",
+        count_sql="SELECT count(*) FROM mcp_servers WHERE name LIKE 'test-mcp-server-%'",
+        clean=_clean_mcp_servers,
     ),
 ]
 

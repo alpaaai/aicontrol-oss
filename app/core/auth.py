@@ -93,6 +93,22 @@ async def require_admin(payload: dict = Depends(_get_verified_token)) -> dict:
     return payload
 
 
+async def require_gateway_agent(payload: dict = Depends(_get_verified_token)) -> dict:
+    """Dependency for MCP gateway endpoints. Unlike require_agent, this also
+    rejects admin tokens and any agent-role token with no agent_id scope --
+    a gateway call must be attributable to exactly one real registered agent,
+    since the gateway derives caller identity entirely from the token (no
+    client-supplied agent_id field exists to cross-check, unlike /intercept).
+    This is the fix for the deleted enterprise/mcp_gateway/'s zero-authentication
+    and unvalidated-agent_id gaps -- see plan 02 Task 2."""
+    if payload.get("role") != "agent" or not payload.get("agent_id"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Gateway calls require an agent-scoped token",
+        )
+    return payload
+
+
 async def require_human(
     credentials: HTTPAuthorizationCredentials = Security(bearer_scheme),
 ) -> dict:

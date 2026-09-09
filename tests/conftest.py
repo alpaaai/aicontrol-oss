@@ -250,6 +250,48 @@ def agent_token(_seed_and_token_setup):
     return {"Authorization": f"Bearer {_seed_and_token_setup['agent']}"}
 
 
+@pytest_asyncio.fixture(scope="session")
+async def _gateway_agent_setup():
+    """Session-scoped: register a real test agent and issue a token scoped to
+    it (api_tokens.agent_id set). require_gateway_agent (app/core/auth.py)
+    rejects _seed_and_token_setup's agent token because that one is
+    deliberately unscoped (agent_id NULL, so /intercept's require_agent
+    accepts any client-supplied agent_id) -- the gateway has no such
+    client-supplied field to scope from, so it needs a token whose agent_id
+    FK is real. Session-scoped and deliberately never combined with a
+    function-scoped async DB fixture in the same test (see test_mcp_gateway.py
+    -- combining a session-scoped async fixture with a function-scoped one,
+    e.g. db_session, crashes on asyncpg connection teardown with "attached to
+    a different loop" in this stack; every fixture that touches the DB for
+    gateway tests is session-scoped to avoid it). Cleanup rides on
+    _cleanup_test_agents's existing test-agent-% sweep, which removes this
+    row's api_tokens too (see scripts/db_hygiene._clean_agents's FK-safe
+    ordering)."""
+    from app.core.auth import create_token, hash_token
+    from app.models.database import async_session_factory
+
+    agent_id = uuid.uuid4()
+    async with async_session_factory() as session:
+        await session.execute(text("""
+            INSERT INTO agents (id, name, owner, status, approved_tools)
+            VALUES (:id, 'test-agent-mcp-gateway', 'pytest', 'active', '[]'::jsonb)
+        """), {"id": str(agent_id)})
+
+        token = create_token(role="agent", description="pytest-gateway-agent-fixture")
+        await session.execute(text("""
+            INSERT INTO api_tokens (id, token_hash, role, description, revoked, agent_id)
+            VALUES (gen_random_uuid(), :hash, 'agent', 'pytest-gateway-agent-fixture', false, :agent_id)
+        """), {"hash": hash_token(token), "agent_id": str(agent_id)})
+        await session.commit()
+
+    return {"agent_id": str(agent_id), "token": token}
+
+
+@pytest.fixture
+def gateway_agent_token(_gateway_agent_setup):
+    return {"Authorization": f"Bearer {_gateway_agent_setup['token']}"}
+
+
 # ── P1-8a: human JWT + dashboard fixtures ────────────────────────────────────
 
 @pytest.fixture
