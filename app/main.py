@@ -10,7 +10,6 @@ from app.models.database import async_session_factory
 from app.routers.auth import router as auth_router
 from app.routers.audit_events import router as audit_events_router
 from app.routers.dashboard import router as dashboard_router
-from app.routers.intercept import router as intercept_router
 from app.routers.policies import router as policies_router
 from app.routers.agents import router as agents_router
 from app.routers.coverage import router as coverage_router
@@ -109,7 +108,6 @@ app.include_router(setup_router)
 app.include_router(auth_router)
 app.include_router(audit_events_router)
 app.include_router(dashboard_router)
-app.include_router(intercept_router)
 app.include_router(policies_router)
 app.include_router(agents_router)
 app.include_router(coverage_router)

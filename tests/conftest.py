@@ -272,9 +272,14 @@ async def _gateway_agent_setup():
 
     agent_id = uuid.uuid4()
     async with async_session_factory() as session:
+        # governance_mode is explicit ('govern'), not left to the DB's
+        # observe_by_default server_default -- these gateway tests exercise
+        # real enforcement (deny/review), which observe mode would silently
+        # collapse to allow (app/services/governance_engine.py's
+        # evaluate_and_enforce).
         await session.execute(text("""
-            INSERT INTO agents (id, name, owner, status, approved_tools)
-            VALUES (:id, 'test-agent-mcp-gateway', 'pytest', 'active', '[]'::jsonb)
+            INSERT INTO agents (id, name, owner, status, approved_tools, governance_mode)
+            VALUES (:id, 'test-agent-mcp-gateway', 'pytest', 'active', '[]'::jsonb, 'govern')
         """), {"id": str(agent_id)})
 
         token = create_token(role="agent", description="pytest-gateway-agent-fixture")

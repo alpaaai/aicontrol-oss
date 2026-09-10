@@ -124,11 +124,11 @@ async def register_agent(
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_agent),
 ) -> AgentResponse:
-    """Zero-friction SDK self-registration: idempotent get-or-create by name.
+    """Zero-friction agent self-registration: idempotent get-or-create by name.
 
-    Open to agent-role tokens (not admin-only) so instrument() can register
-    an agent on first call with no separate onboarding step. Returns 201 for
-    a freshly created agent, 200 when one with this name already existed.
+    Open to agent-role tokens (not admin-only) so an agent can register on
+    first call with no separate onboarding step. Returns 201 for a freshly
+    created agent, 200 when one with this name already existed.
     """
     new_id = uuid.uuid4()
     result = await db.execute(

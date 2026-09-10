@@ -42,9 +42,10 @@ a human sign-off.
   useful for rolling out a new policy set risk-free before switching it to enforce.
 - **React dashboard** — first-run setup wizard, a live activity/audit feed, agent and
   token management, a policy library of pre-built templates, and a no-JSON policy editor.
-- **Official Python SDK** — auto-instruments the Anthropic Claude Agent SDK, OpenAI Agents
-  SDK, or Google ADK with no per-call code changes, or use a framework-agnostic decorator
-  on any callable (see [Integration](#integration) below).
+- **MCP gateway** — point any MCP-client-capable agent framework at AIControl's gateway
+  endpoint instead of the downstream MCP server directly; AIControl evaluates policy and
+  audits every `tools/list` and `tools/call` on the wire before forwarding (see
+  [Integration](#integration) below).
 - **Self-hosted, one command** — runs on your own infrastructure, no cloud dependency.
 
 ---
@@ -80,53 +81,48 @@ docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose
 ## How it works
 
 ```
-Your Agent ──► POST /intercept ──► Cedar Policy Engine ──► allow / deny / review
-                                           │
-                                  Immutable Audit Log
-                                     (PostgreSQL)
-                                           │
-                                  HITL Review Queue
+Your Agent ──► AIControl Gateway ──► Cedar Policy Engine ──► allow / deny / review
+             (MCP tools/list, call)          │
+                                     Immutable Audit Log
+                                        (PostgreSQL)
+                                              │
+                                     HITL Review Queue
 ```
 
 ---
 
 ## Integration
 
-**Python — the official SDK (recommended):**
+Point your agent's MCP client at AIControl's gateway endpoint instead of the
+downstream MCP server directly. Register the downstream server once
+(`POST /mcp-servers`, admin-only):
 
 ```bash
-pip install "./sdk[anthropic]"   # or [openai], [google-adk] — installs from source
+curl -X POST http://localhost:8001/mcp-servers \
+  -H "Authorization: Bearer <admin-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "invoicing-mcp", "base_url": "https://invoicing.internal/mcp", "approved_tools": ["get_invoice", "create_invoice"]}'
+# -> {"id": "<server_id>", "status": "pending_review", ...}
+
+curl -X PATCH http://localhost:8001/mcp-servers/<server_id> \
+  -H "Authorization: Bearer <admin-token>" \
+  -d '{"status": "active"}'
 ```
 
-```python
-from aicontrol_sdk import instrument
+Then point the agent's MCP client at `http://localhost:8001/mcp/<server_id>/`
+with an agent-scoped bearer token (`scripts/onboard_agent.py` issues one).
+AIControl evaluates Cedar policy on every `tools/list` and `tools/call`,
+audits the result, and forwards allowed calls to the real downstream server.
 
-await instrument(agent_name="my-agent", url="http://localhost:8001", token="...")
-# every tool call made through the detected framework (Anthropic Claude Agent SDK,
-# OpenAI Agents SDK, or Google ADK) is now intercepted by AIControl before it executes.
-```
+**Any MCP-client-capable framework works with zero AIControl-specific code** —
+this is true by construction, not a per-framework certification: it does not
+confirm that any specific framework's MCP client mode supports custom auth
+header injection or retry semantics compatible with this gateway. This
+replaces the previous `aicontrol-sdk` package and `instrument()`/`@control`
+model, which has been removed.
 
-Or use the framework-agnostic decorator on any callable:
-
-```python
-from aicontrol_sdk import control, PolicyDeniedError
-
-@control("query_database")
-async def query_database(table: str, limit: int = 100):
-    return db.query(f"SELECT * FROM {table} LIMIT {limit}")
-
-try:
-    await query_database(table="customers")
-except PolicyDeniedError as e:
-    print(f"Blocked: {e.reason}")
-```
-
-`aicontrol-sdk` isn't published to PyPI yet — install it straight from the cloned repo, or
-`pip install git+https://github.com/alpaaai/aicontrol-oss#subdirectory=sdk`. See
-[`sdk/README.md`](sdk/README.md) for the full configuration reference.
-
-**Any other language:** call `POST /intercept` directly — see
-[aictl.io/docs/integration](https://aictl.io/docs/integration).
+**Any other language or protocol:** any MCP-client library works against the
+gateway endpoint above — see [aictl.io/docs/integration](https://aictl.io/docs/integration).
 
 ---
 

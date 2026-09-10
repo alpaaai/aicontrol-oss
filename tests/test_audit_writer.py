@@ -122,7 +122,7 @@ async def test_write_event_fires_export_dispatch_when_business_licensed():
     that guarantees every persisted audit event reaches the SIEM export
     dispatch, regardless of which path wrote it. Fire-and-forget via
     asyncio.create_task, matching the existing Slack HITL pattern
-    (app/routers/intercept.py's post_slack_review call)."""
+    (app/routers/mcp_gateway.py's post_slack_review call)."""
     from app.services import audit_writer
 
     mock_session = AsyncMock()

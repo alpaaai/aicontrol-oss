@@ -15,11 +15,11 @@ def _all_paths(routes):
 
 
 @pytest.mark.asyncio
-async def test_intercept_route_exists():
-    """POST /intercept route must be registered on the app."""
+async def test_mcp_gateway_call_tool_route_exists():
+    """POST /mcp/{server_id}/call_tool route must be registered on the app."""
     from app.main import app
     routes = _all_paths(app.routes)
-    assert "/intercept" in routes
+    assert "/mcp/{server_id}/call_tool" in routes
 
 
 @pytest.mark.asyncio
