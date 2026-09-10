@@ -26,9 +26,6 @@ a human sign-off.
 - **Per-agent tool allowlists** — each agent has its own `approved_tools`, enforced
   independently of policy, so an agent can never call outside its own scope even if a
   policy would otherwise allow it.
-- **Admission-time scanning** — scan a skill or tool for known-risky patterns before it's
-  ever enrolled, via the built-in scanner integration (Cisco's open-source `skill-scanner`
-  — see [Admission-time scanning](#admission-time-scanning) below).
 - **Immutable audit trail** — every intercepted call writes an `audit_event` regardless of
   the decision (allow, deny, or review) — append-only, with the full parameters and which
   policy fired.
@@ -126,46 +123,26 @@ gateway endpoint above — see [aictl.io/docs/integration](https://aictl.io/docs
 
 ---
 
-## Admission-time scanning
-
-Before you enroll a new skill or tool, scan it:
-
-```bash
-curl -X POST http://localhost:8001/admission-scans \
-  -H "Authorization: Bearer <admin-token>" \
-  -H "Content-Type: application/json" \
-  -d '{"target_type": "skill", "target_ref": "/path/to/skill", "scanners": ["skill_scanner"]}'
-```
-
-Findings (with severity) show up in the response and in the dashboard's **Admission scans**
-page. The default scanner runs
-[Cisco's open-source `skill-scanner`](https://github.com/cisco-ai-defense/skill-scanner)
-(Apache-2.0) as an isolated subprocess, deterministic analyzers only — no LLM calls, no
-cloud calls, ever. See [`NOTICE`](NOTICE) for full attribution.
-
----
-
 ## Policy example
 
 ```json
 {
   "name": "block_large_disbursements",
   "description": "Block loan disbursements above $10,000 without review",
-  "rule_type": "tool_denylist",
   "condition": {
     "blocked_tools": ["initiate_transfer", "disburse_loan_funds"],
     "numeric_conditions": [
       { "parameter": "amount", "operator": "gt", "value": 10000 }
     ]
   },
-  "action": "deny",
+  "effect": "deny",
   "severity": "critical",
   "compliance_frameworks": ["SOC2", "OCC"]
 }
 ```
 
 Policies are recompiled immediately through the API or dashboard — no restart required.
-See [aictl.io/docs/policies](https://aictl.io/docs/policies) for all five rule types.
+See [aictl.io/docs/policies](https://aictl.io/docs/policies) for all supported condition keys.
 
 ---
 
