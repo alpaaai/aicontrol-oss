@@ -14,7 +14,7 @@ pydantic
 pydantic-settings
 
 # Policy engine
-cedarpy==4.8.7
+cedarpy==4.12.0
 
 # Human review
 slack-bolt
