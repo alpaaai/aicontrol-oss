@@ -64,6 +64,24 @@ test("an event with no workflow groups under a clear label, not the literal 'una
   await expect(group).not.toContainText(/^unassigned$/);
 });
 
+test("a Cedar evaluation error is visually distinguished from a normal deny", async ({ page }) => {
+  await page.route("**/audit-events*", (route) =>
+    route.fulfill({
+      json: {
+        events: [
+          { id: "e4", tool_name: "release_payment", decision: "deny", workflow: "claims_intake",
+            agent_name: "claims-adjuster", session_id: "s1", created_at: "2026-08-20T10:03:00Z",
+            decision_reason: "evaluation_error:ValueError", policy: null },
+        ],
+        total: 1,
+      },
+    }),
+  );
+  await page.goto("/audit");
+  await page.getByTestId("audit-row-e4").click();
+  await expect(page.getByTestId("engine-error-badge")).toBeVisible();
+});
+
 test("the audit table scrolls rather than clipping", async ({ page }) => {
   await page.goto("/audit");
   const overflow = await page.getByTestId("audit-table")

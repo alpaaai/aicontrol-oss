@@ -3,7 +3,7 @@ from app.services.demo_scenario_service import list_scenarios, get_scenario, all
 
 EXPECTED_IDS = {
     "insurance", "healthcare", "itsm", "lending",
-    "support", "revops", "lucid_motors", "toyota_europe", "toyota_it",
+    "support", "revops", "ev_manufacturing", "automotive_product_planning", "automotive_mcp_orchestration",
 }
 
 

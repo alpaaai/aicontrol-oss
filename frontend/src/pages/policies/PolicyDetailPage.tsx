@@ -13,6 +13,7 @@ export function PolicyDetailPage() {
   const { id } = useParams<{ id: string }>();
   const [policies, setPolicies] = useState<Policy[] | null>(null);
   const [activity, setActivity] = useState<PolicyActivity | null>(null);
+  const [activityError, setActivityError] = useState(false);
   const [showRule, setShowRule] = useState(false);
 
   useEffect(() => {
@@ -21,7 +22,8 @@ export function PolicyDetailPage() {
 
   useEffect(() => {
     if (!id) return;
-    getPolicyActivity(id).then(setActivity).catch(() => {});
+    setActivityError(false);
+    getPolicyActivity(id).then(setActivity).catch(() => setActivityError(true));
   }, [id]);
 
   const policy = policies?.find((p) => p.id === id) ?? null;
@@ -91,6 +93,8 @@ export function PolicyDetailPage() {
           <p className="text-body-sm text-ac-body">
             Fired {activity.fired} time{activity.fired === 1 ? "" : "s"} out of {activity.calls_evaluated} calls evaluated.
           </p>
+        ) : activityError ? (
+          <p className="text-body-sm text-ac-error">Couldn't load activity for this policy.</p>
         ) : (
           <div className="h-5 w-48 bg-ac-surface-sunk rounded animate-pulse" />
         )}

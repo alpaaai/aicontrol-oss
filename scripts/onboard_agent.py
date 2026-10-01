@@ -58,6 +58,14 @@ def main() -> None:
     agent = resp.json()
     agent_id = agent["id"]
     print(f"  Agent registered. ID: {agent_id}")
+    governance_mode = agent.get("governance_mode", "observe")
+    if governance_mode == "observe":
+        print(
+            "  Governance mode: observe (new agents start here by design --\n"
+            "  policies are evaluated and logged, but NOT enforced). Switch\n"
+            f"  to govern when ready: PUT /agents/{agent_id} "
+            '{"governance_mode": "govern"}'
+        )
 
     # Step 2: Issue scoped token
     print(f"Issuing scoped token for '{args.name}'...")

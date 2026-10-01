@@ -9,6 +9,7 @@ interface Props {
   onClose: () => void;
   onCreated: () => void;
   nlAuthoringEnabled: boolean;
+  featuresError?: boolean;
 }
 
 // The single entry point for creating a policy (spec §5 point 1 / D11), now a
@@ -16,15 +17,16 @@ interface Props {
 // mode when it's licensed; a free install opens straight to the structured
 // editor and never sees the manual-switch link, matching the prior inline
 // behavior where the editor was the only input.
-export function NewPolicyModal({ open, onClose, onCreated, nlAuthoringEnabled }: Props) {
+export function NewPolicyModal({ open, onClose, onCreated, nlAuthoringEnabled, featuresError }: Props) {
   const [mode, setMode] = useState<"nl" | "manual">(nlAuthoringEnabled ? "nl" : "manual");
   const [previewScope, setPreviewScope] = useState<PolicyScope | null>(null);
 
   useEffect(() => {
-    if (open) {
+    if (!open) return;
+    void Promise.resolve().then(() => {
       setMode(nlAuthoringEnabled ? "nl" : "manual");
       setPreviewScope(null);
-    }
+    });
   }, [open, nlAuthoringEnabled]);
 
   if (!open) return null;
@@ -51,6 +53,12 @@ export function NewPolicyModal({ open, onClose, onCreated, nlAuthoringEnabled }:
             ×
           </button>
         </div>
+
+        {featuresError && !nlAuthoringEnabled && (
+          <p className="text-body-sm text-ac-error mb-4">
+            Couldn't verify feature availability — showing manual entry only.
+          </p>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>

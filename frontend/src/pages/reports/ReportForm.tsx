@@ -23,11 +23,8 @@ function triggerDownload(blob: Blob, format: ReportFormat, dateFrom: string, dat
 }
 
 export function ReportForm({ onGenerated }: Props) {
-  const today = new Date().toISOString().split('T')[0]
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0]
-
-  const [dateFrom, setDateFrom] = useState(thirtyDaysAgo)
-  const [dateTo, setDateTo] = useState(today)
+  const [dateFrom, setDateFrom] = useState(() => new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0])
+  const [dateTo, setDateTo] = useState(() => new Date().toISOString().split('T')[0])
   const [frameworks, setFrameworks] = useState<Framework[]>(['soc2'])
   const [format, setFormat] = useState<ReportFormat>('pdf')
   const [generating, setGenerating] = useState(false)
@@ -47,8 +44,27 @@ export function ReportForm({ onGenerated }: Props) {
       const blob = await generateReport({ date_from: dateFrom, date_to: dateTo, frameworks, format })
       triggerDownload(blob, format, dateFrom, dateTo)
       onGenerated()
-    } catch (e: any) {
-      setError(e?.response?.data?.detail ?? 'Generation failed. Check enterprise license.')
+    } catch (e: unknown) {
+      // generateReport requests responseType: 'blob' (needed for the
+      // successful binary response), so axios also delivers an error body
+      // as a Blob instead of parsed JSON -- err.response.data.detail was
+      // always undefined here, so every failure (including an unrelated
+      // date-range validation error) showed the same misleading
+      // "Check enterprise license" fallback regardless of the real cause.
+      const err = e as { response?: { data?: unknown } }
+      let detail: string | undefined
+      const data = err?.response?.data
+      if (data instanceof Blob) {
+        try {
+          const parsed = JSON.parse(await data.text())
+          detail = parsed?.detail
+        } catch {
+          // Non-JSON error body (e.g. an HTML error page) -- fall through to the default message.
+        }
+      } else {
+        detail = (data as { detail?: string } | undefined)?.detail
+      }
+      setError(detail ?? 'Generation failed. Check enterprise license.')
     } finally {
       setGenerating(false)
     }

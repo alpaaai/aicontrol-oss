@@ -27,32 +27,62 @@ export function NLComposer(props: {
   const [value, setValue] = useState("");
   const [draft, setDraft] = useState<NLDraftResponse | null>(null);
   const [simulation, setSimulation] = useState<SimulationResultData | null>(null);
+  const [activateError, setActivateError] = useState("");
+  const [draftError, setDraftError] = useState("");
+  const [simulateError, setSimulateError] = useState("");
 
   const handleDraft = async () => {
     if (!value.trim()) return;
     setSimulation(null);
-    const result = await draftPolicy(value.trim());
-    setDraft(result);
-    props.onDraftChange?.(result.draft ? draftToPolicyScope(result.draft) : null);
+    setActivateError("");
+    setSimulateError("");
+    setDraftError("");
+    try {
+      const result = await draftPolicy(value.trim());
+      setDraft(result);
+      props.onDraftChange?.(result.draft ? draftToPolicyScope(result.draft) : null);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setDraftError(err?.response?.data?.detail ?? "Couldn't draft a policy from that description. Try again.");
+      throw e;
+    }
   };
 
   const handleSimulate = async () => {
     if (!draft?.draft) return;
-    const result = await simulatePolicy(draft.draft);
-    setSimulation(result);
+    setSimulateError("");
+    try {
+      const result = await simulatePolicy(draft.draft);
+      setSimulation(result);
+    } catch (e: unknown) {
+      const err = e as { response?: { data?: { detail?: string } } };
+      setSimulateError(err?.response?.data?.detail ?? "Couldn't simulate this policy. Try again.");
+      throw e;
+    }
   };
 
   const handleActivate = async () => {
     if (!draft?.draft) return;
-    await createPolicy({
-      name: value.trim().slice(0, 100),
-      condition: draft.draft.condition,
-      principal_type: draft.draft.principal_type,
-      principal_id: draft.draft.principal_id,
-      action_tool: draft.draft.action_tool,
-      resource_system: draft.draft.resource_system,
-      effect: draft.draft.effect,
-    });
+    setActivateError("");
+    try {
+      await createPolicy({
+        name: value.trim().slice(0, 100),
+        condition: draft.draft.condition,
+        principal_type: draft.draft.principal_type,
+        principal_id: draft.draft.principal_id,
+        action_tool: draft.draft.action_tool,
+        resource_system: draft.draft.resource_system,
+        effect: draft.draft.effect,
+      });
+    } catch (e: unknown) {
+      // Previously uncaught: a rejected createPolicy (e.g. a 422 from an
+      // under-scoped draft) left the Activate button stuck on "Activating…"
+      // forever with no error shown. Re-thrown so Button.tsx resets its own
+      // state instead of showing "Activated".
+      const err = e as { response?: { data?: { detail?: string } } };
+      setActivateError(err?.response?.data?.detail ?? "Couldn't activate this policy. Try again.");
+      throw e;
+    }
     // The draft stays on screen showing "Activated" -- the Button primitive's
     // own done state -- rather than resetting immediately, which would
     // unmount it before that state ever painted. A new description starts
@@ -86,9 +116,17 @@ export function NLComposer(props: {
         )}
       </div>
 
+      {draftError && <p className="mt-2 text-body-sm text-ac-error">{draftError}</p>}
+
       {draft && (
         <div className="mt-4">
-          <DraftReview draft={draft} onSimulate={handleSimulate} onActivate={handleActivate} />
+          <DraftReview
+            draft={draft}
+            onSimulate={handleSimulate}
+            onActivate={handleActivate}
+            error={activateError}
+            simulateError={simulateError}
+          />
         </div>
       )}
 

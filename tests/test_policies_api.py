@@ -1,10 +1,12 @@
 """Tests for policy CRUD endpoints."""
 import uuid
 import pytest
+import pytest_asyncio
 from contextlib import contextmanager
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import text
 
 from app.routers.policies import validate_rate_limit_condition, validate_scope
 
@@ -675,3 +677,89 @@ async def test_create_policy_rejects_blank_name():
         ) as client:
             response = await client.post("/policies", json=payload)
     assert response.status_code == 422
+
+
+@pytest_asyncio.fixture(scope="session")
+async def scoped_test_agent():
+    """A real agent row so agent-scoped policy validation has a name to match.
+    Session-scoped to match the DB-hitting fixture convention elsewhere in
+    this suite (see tests/conftest.py's seed_* fixtures)."""
+    from app.models.database import async_session_factory
+
+    agent_id = uuid.uuid4()
+    name = "test-agent-policy-scope"
+    async with async_session_factory() as db:
+        await db.execute(text(
+            "INSERT INTO agents (id, name, owner, status, created_at) "
+            "VALUES (:id, :name, 'ga-review', 'active', NOW())"
+        ), {"id": str(agent_id), "name": name})
+        await db.commit()
+
+    yield name
+
+    async with async_session_factory() as db:
+        await db.execute(text("DELETE FROM agents WHERE id = :id"), {"id": str(agent_id)})
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_create_policy_rejects_agent_principal_id_that_matches_no_agent_name():
+    """GA review finding: get_scoped_policies and cedar_client both scope
+    agent-typed policies by the agent's *name*, never its id -- a policy
+    authored with an agent's id (the identifier used everywhere else in the
+    API) used to save successfully and just never fire. Reject it instead."""
+    from app.main import app
+    payload = {
+        "name": f"test_policy_{uuid.uuid4().hex[:6]}",
+        "condition": {"blocked_tools": ["bad_tool"]},
+        "principal_type": "agent",
+        "principal_id": str(uuid.uuid4()),
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 422
+    assert "does not match any agent's name" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_create_policy_accepts_agent_principal_id_matching_a_real_agent_name(scoped_test_agent):
+    from app.main import app
+    payload = {
+        "name": f"test_policy_{uuid.uuid4().hex[:6]}",
+        "condition": {"blocked_tools": ["bad_tool"]},
+        "principal_type": "agent",
+        "principal_id": scoped_test_agent,
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            response = await client.post("/policies", json=payload)
+    assert response.status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_update_policy_rejects_agent_principal_id_that_matches_no_agent_name():
+    from app.main import app
+    create_payload = {
+        "name": f"test_policy_{uuid.uuid4().hex[:6]}",
+        "condition": {"blocked_tools": ["bad_tool"]},
+        "effect": "deny",
+    }
+    with _auth_override("admin"), _opa_patch():
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            created = await client.post("/policies", json=create_payload)
+            policy_id = created.json()["id"]
+            response = await client.put(f"/policies/{policy_id}", json={
+                "principal_type": "agent",
+                "principal_id": str(uuid.uuid4()),
+            })
+    assert response.status_code == 422
+    assert "does not match any agent's name" in response.json()["detail"]

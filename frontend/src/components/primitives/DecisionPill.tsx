@@ -1,13 +1,14 @@
 // Deny is the only filled pill. It is the heaviest object on any screen it
 // appears on, by design, and carries no hue that competes with the brand.
-const VARIANT: Record<"allow" | "review" | "deny", string> = {
+const VARIANT: Record<"allow" | "review" | "deny" | "error", string> = {
   allow: "bg-ac-decision-allow-soft text-ac-decision-allow",
   review: "bg-ac-decision-review-soft text-ac-decision-review",
   deny: "bg-ac-decision-deny text-ac-on-ink",
+  error: "bg-ac-decision-deny-soft text-ac-decision-deny",
 };
 
 export function DecisionPill(props: {
-  decision: "allow" | "review" | "deny";
+  decision: "allow" | "review" | "deny" | "error";
   "data-testid"?: string;
 }) {
   return (

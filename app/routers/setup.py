@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import re
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from jose import jwt
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import func, select
@@ -15,6 +15,7 @@ from sqlalchemy import func, select
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 from app.core.config import settings
+from app.core.rate_limiter import check_rate_limit, client_ip
 from app.models.database import async_session_factory
 from app.models.user import OrgSettings, User, UserRole
 
@@ -23,6 +24,9 @@ log = structlog.get_logger()
 
 ALGORITHM = "HS256"
 HUMAN_JWT_EXPIRY_HOURS = 8
+
+SETUP_COMPLETE_MAX_ATTEMPTS = 10
+SETUP_COMPLETE_WINDOW_SECONDS = 300
 
 
 def _hash_password(password: str) -> str:
@@ -76,9 +80,9 @@ class SetupCompleteBody(BaseModel):
     @classmethod
     def timezone_valid(cls, v: str) -> str:
         try:
-            from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+            from zoneinfo import ZoneInfo
             ZoneInfo(v)
-        except (KeyError, Exception):
+        except Exception:
             raise ValueError(f"'{v}' is not a valid IANA timezone")
         return v
 
@@ -92,7 +96,12 @@ async def setup_status():
 
 
 @router.post("/complete")
-async def setup_complete(body: SetupCompleteBody):
+async def setup_complete(body: SetupCompleteBody, request: Request):
+    check_rate_limit(
+        f"setup-complete:ip:{client_ip(request)}",
+        SETUP_COMPLETE_MAX_ATTEMPTS,
+        SETUP_COMPLETE_WINDOW_SECONDS,
+    )
     async with async_session_factory() as db:
         result = await db.execute(select(func.count()).select_from(User))
         if result.scalar() > 0:

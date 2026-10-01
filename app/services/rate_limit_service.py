@@ -4,7 +4,10 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.services.wal import count_unshipped_for_session_tool, default_wal_writer
+
+logger = get_logger("rate_limit_service")
 
 WINDOW_INTERVALS: dict[str, timedelta] = {
     "5m":  timedelta(minutes=5),
@@ -24,8 +27,15 @@ async def count_tool_calls_in_window(
     """
     Count prior audit_events rows for this tool in the given window.
     Count reflects calls already written — current call is not yet included.
-    Raises KeyError for unrecognised non-session window strings.
+    An unrecognised window value (malformed/admin-edited policy condition)
+    falls back to "session" rather than crashing the intercept -- a policy
+    authoring mistake must not turn into a 500 on every future call for that
+    tool.
     """
+    if window != "session" and window not in WINDOW_INTERVALS:
+        logger.warning("rate_limit_unknown_window", window=window, tool_name=tool_name)
+        window = "session"
+
     if window == "session":
         result = await db.execute(
             text(

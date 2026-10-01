@@ -2,12 +2,13 @@ import hashlib
 from datetime import datetime, timedelta
 
 import structlog
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from jose import jwt
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import select
 
 from app.core.config import settings
+from app.core.rate_limiter import check_rate_limit, client_ip
 from app.models.database import async_session_factory
 from app.models.user import User
 from app.routers.setup import _hash_password
@@ -18,6 +19,11 @@ log = structlog.get_logger()
 
 ALGORITHM = "HS256"
 HUMAN_JWT_EXPIRY_HOURS = 8
+
+LOGIN_MAX_ATTEMPTS = 10
+LOGIN_WINDOW_SECONDS = 300
+MAGIC_LINK_MAX_ATTEMPTS = 10
+MAGIC_LINK_WINDOW_SECONDS = 300
 
 
 def _issue_human_jwt(user: User) -> str:
@@ -66,22 +72,23 @@ class SetPasswordBody(BaseModel):
 
 
 @router.post("/login")
-async def login(body: LoginBody):
+async def login(body: LoginBody, request: Request):
+    ip = client_ip(request)
+    check_rate_limit(f"login:ip:{ip}", LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS)
+    check_rate_limit(f"login:account:{body.email.lower()}", LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_SECONDS)
+
     async with async_session_factory() as session:
         result = await session.execute(
             select(User).where(User.email == body.email.lower())
         )
         user = result.scalar_one_or_none()
 
-    if user is None or not user.password_hash or not _verify_password(body.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
+        if user is None or not user.password_hash or not _verify_password(body.password, user.password_hash):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    if not user.is_active:
-        raise HTTPException(status_code=403, detail="Account is deactivated")
+        if not user.is_active:
+            raise HTTPException(status_code=403, detail="Account is deactivated")
 
-    async with async_session_factory() as session:
-        result = await session.execute(select(User).where(User.email == body.email.lower()))
-        user = result.scalar_one()
         user.last_login = datetime.utcnow()
         await session.commit()
         await session.refresh(user)
@@ -96,7 +103,8 @@ async def login(body: LoginBody):
 
 
 @router.post("/magic-link/validate")
-async def validate_magic_link(body: MagicLinkValidateBody):
+async def validate_magic_link(body: MagicLinkValidateBody, request: Request):
+    check_rate_limit(f"magic-link:ip:{client_ip(request)}", MAGIC_LINK_MAX_ATTEMPTS, MAGIC_LINK_WINDOW_SECONDS)
     import hashlib as _hl
     token_hash = _hl.sha256(body.token.encode()).hexdigest()
     async with async_session_factory() as session:

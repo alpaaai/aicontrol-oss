@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 import app.core.license_gate as _lg
-from app.core.license import LicenseInfo
+from app.core.license_gate import LicenseInfo
 from httpx import AsyncClient, ASGITransport
 
 

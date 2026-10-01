@@ -1,7 +1,9 @@
 import { expect, test } from "@playwright/test";
 
-const FREE_ITEMS = ["Overview", "Agents", "Policies", "Audit log", "Metrics", "Policy Drift"];
-const PAID_ONLY = ["Reviews", "Reports", "Billing"];
+// Billing is deliberately ungated (Sidebar.tsx has no `requires` on it) --
+// it's the free tier's only path to upgrading, so it must stay visible there.
+const FREE_ITEMS = ["Overview", "Agents", "Policies", "Audit log", "Metrics", "Policy Drift", "Billing"];
+const PAID_ONLY = ["Reviews", "Reports"];
 
 test.beforeEach(async ({ page }) => {
   await page.route("**/license/features", (route) =>

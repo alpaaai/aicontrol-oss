@@ -37,14 +37,20 @@ const TYPE_META = {
 
 export function DriftWarningRow({ warning, onResolved }: Props) {
   const [resolving, setResolving] = useState(false)
+  const [resolveError, setResolveError] = useState('')
   const meta = TYPE_META[warning.warning_type as keyof typeof TYPE_META] ?? TYPE_META.ORPHANED_POLICY
   const Icon = meta.icon
 
   const handleResolve = async () => {
     setResolving(true)
+    setResolveError('')
     try {
       await resolveWarning(warning.id)
       onResolved()
+    } catch {
+      // Previously uncaught: a rejected resolveWarning left the button
+      // re-enabled with no indication anything failed.
+      setResolveError("Couldn't resolve this warning. Try again.")
     } finally {
       setResolving(false)
     }
@@ -67,6 +73,7 @@ export function DriftWarningRow({ warning, onResolved }: Props) {
             {warning.policy_name && <span>Policy: {warning.policy_name}</span>}
             <span>{timeAgo(warning.created_at)}</span>
           </div>
+          {resolveError && <p className="text-[11px] text-ac-error mt-1">{resolveError}</p>}
         </div>
 
         {warning.is_active && (

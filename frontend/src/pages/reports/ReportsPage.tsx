@@ -1,12 +1,25 @@
 import { useState } from 'react'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
+import { ReactivateGuard } from '../../components/shared/ReactivateGuard'
 import { ReportForm } from './ReportForm'
 import { ReportHistory } from './ReportHistory'
 import { useLicense } from '../../hooks/useLicense'
 
 export function ReportsPage() {
   const [refreshKey, setRefreshKey] = useState(0)
-  const { isEnterprise } = useLicense()
+  const { isEnterprise, needsReactivation } = useLicense()
+
+  if (needsReactivation) {
+    return (
+      <div className="p-6">
+        <h2 className="text-[18px] font-semibold text-ac-ink mb-4">Compliance reports</h2>
+        <ReactivateGuard
+          title="Reactivate your plan"
+          description="AI-native compliance report generation requires an active Enterprise subscription."
+        />
+      </div>
+    )
+  }
 
   if (!isEnterprise) {
     return (

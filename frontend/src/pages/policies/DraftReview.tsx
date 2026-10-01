@@ -10,6 +10,8 @@ export function DraftReview(props: {
   draft: NLDraftResponse;
   onSimulate: () => void;
   onActivate: () => void;
+  error?: string;
+  simulateError?: string;
 }) {
   const { draft } = props;
 
@@ -27,9 +29,11 @@ export function DraftReview(props: {
     <div data-testid="draft-review" className="space-y-4">
       <PolicySentence policy={scope} variant="display" editable />
       <div className="flex gap-2">
-        <Button variant="secondary" label="Simulate" onClick={props.onSimulate} />
+        <Button variant="secondary" label="Simulate" pendingLabel="Simulating…" onClick={props.onSimulate} />
         <Button label="Activate" pendingLabel="Activating…" doneLabel="Activated" onClick={props.onActivate} />
       </div>
+      {props.simulateError && <p className="text-body-sm text-ac-error">{props.simulateError}</p>}
+      {props.error && <p className="text-body-sm text-ac-error">{props.error}</p>}
     </div>
   );
 }

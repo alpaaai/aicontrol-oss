@@ -12,13 +12,17 @@ happen" decision.
 import asyncio
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, cast, or_, select
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
+from app.core.license_gate import get_license_info
 from app.core.logging import get_logger
-from app.models.schemas import Agent, Policy
+from app.models.schemas import Agent, AuditEvent, HITLReview, Policy
 from app.services.budget_alert_service import maybe_alert_budget_threshold
 from app.services.cedar_client import current_time_context, evaluate
 from app.services.policy_compiler import ALL_PARAMS_FIELD
@@ -83,6 +87,42 @@ async def get_scoped_policies(
     ]
 
 
+async def check_hitl_approved_retry(
+    db: AsyncSession,
+    *,
+    session_id,
+    tool_name: str,
+    tool_parameters: dict[str, Any],
+) -> bool:
+    """True if this exact call was already approved via HITL review (Slack
+    or dashboard -- both write hitl_reviews.status identically) within the
+    retry window. The caller is expected to poll GET /reviews/{id} then
+    retry the identical call in the same session; without this the retry
+    re-evaluates fresh and is blocked again.
+
+    Matched via JSONB containment (stored @> incoming), not equality:
+    audit_events.tool_parameters holds mcp_gateway's *enriched* arguments
+    (raw + a "domain" key for http_* tools), while this function only ever
+    receives the raw tool_parameters Cedar evaluated -- enrichment only adds
+    keys, never changes existing ones, so containment matches correctly in
+    both the enriched and non-enriched case.
+    """
+    cutoff = datetime.utcnow() - timedelta(minutes=settings.HITL_RETRY_WINDOW_MINUTES)
+    result = await db.execute(
+        select(HITLReview.id)
+        .join(AuditEvent, HITLReview.audit_event_id == AuditEvent.id)
+        .where(
+            HITLReview.status == "approved",
+            HITLReview.reviewed_at >= cutoff,
+            AuditEvent.session_id == session_id,
+            AuditEvent.tool_name == tool_name,
+            AuditEvent.tool_parameters.op("@>")(cast(tool_parameters, JSONB)),
+        )
+        .limit(1)
+    )
+    return result.scalar_one_or_none() is not None
+
+
 async def evaluate_tool_call(
     db: AsyncSession,
     *,
@@ -143,12 +183,23 @@ async def evaluate_tool_call(
         policies=policies,
     )
 
+    decision = decision_result["decision"]
+    reason = decision_result["reason"]
+    if decision == "review" and await check_hitl_approved_retry(
+        db, session_id=session_id, tool_name=tool_name, tool_parameters=tool_parameters,
+    ):
+        decision = "allow"
+        reason = "hitl_approved_retry"
+
     return GovernanceResult(
-        decision=decision_result["decision"],
-        reason=decision_result["reason"],
+        decision=decision,
+        reason=reason,
         fired_policy_id=decision_result.get("fired_policy_id") or None,
         fired_policy_name=decision_result.get("fired_policy_name") or None,
-        bypass=decision_result.get("bypass", False),
+        # cedar_client.evaluate()'s return dict never carries a "bypass" key
+        # (only decision/reason/fired_policy_id/fired_policy_name, on every
+        # branch) -- Cedar has no bypass concept, so this can never be True.
+        bypass=False,
         system=system,
         call_counts=call_counts,
         cumulative_tokens=cumulative_tokens,
@@ -217,6 +268,17 @@ async def evaluate_and_enforce(
         workflow=workflow,
         session_id=session_id,
     )
+
+    if gov_result.decision == "review":
+        try:
+            is_business_license = (await get_license_info(db)).is_business
+        except Exception:
+            # Fail-closed: an unreadable license is treated as community,
+            # not as a free pass for a review decision to sail through.
+            is_business_license = False
+        if not is_business_license:
+            gov_result.decision = "deny"
+            gov_result.reason = f"review_requires_business_license: {gov_result.reason}"
 
     asyncio.create_task(maybe_alert_budget_threshold(
         cumulative_tokens=gov_result.cumulative_tokens,

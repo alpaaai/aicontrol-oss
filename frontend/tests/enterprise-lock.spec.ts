@@ -26,8 +26,8 @@ test("paid destinations are absent from the nav on a community install", async (
   await expect(nav.getByRole("link", { name: "Reports" })).toHaveCount(0);
 });
 
-test("review queue page shows enterprise lock overlay", async ({ page }) => {
+test("review queue page shows business lock overlay", async ({ page }) => {
   await page.goto("/reviews");
-  await expect(page.getByText("Review Queue — Enterprise Feature")).toBeVisible();
+  await expect(page.getByText("Review Queue — Business Feature")).toBeVisible();
 });
 

@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { Shield, Lock, Activity, FileCheck } from "lucide-react";
 import { validateMagicLink, setPassword } from "@/api/invite";
 import { useAuth } from "@/hooks/useAuth";
+import { AuthFooter } from "@/components/shared/AuthFooter";
 
 const trustSignals = [
   { icon: Shield,     text: "Policy-enforced agent control" },
@@ -29,17 +30,21 @@ export function InvitePage() {
   const [formError, setFormError] = useState("");
 
   useEffect(() => {
-    if (!token) {
-      setState({ status: "invalid", message: "Invalid or expired invite link" });
-      return;
+    let cancelled = false;
+    async function load() {
+      if (!token) {
+        if (!cancelled) setState({ status: "invalid", message: "Invalid or expired invite link" });
+        return;
+      }
+      try {
+        const { data } = await validateMagicLink(token);
+        if (!cancelled) setState({ status: "ready", email: data.email, full_name: data.full_name });
+      } catch {
+        if (!cancelled) setState({ status: "invalid", message: "Invalid or expired invite link" });
+      }
     }
-    validateMagicLink(token)
-      .then(({ data }) => {
-        setState({ status: "ready", email: data.email, full_name: data.full_name });
-      })
-      .catch(() => {
-        setState({ status: "invalid", message: "Invalid or expired invite link" });
-      });
+    load();
+    return () => { cancelled = true; };
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -219,9 +224,7 @@ export function InvitePage() {
             </>
           )}
 
-          <p className="mt-10 text-[11px] text-ac-muted/60 text-center">
-            Secured by AIControl · Enterprise tier
-          </p>
+          <AuthFooter />
         </div>
       </div>
     </div>

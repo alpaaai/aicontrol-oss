@@ -4,8 +4,20 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
+from app.core.license_gate import require_business_license
 from app.main import app
 from app.models.database import async_session_factory
+
+
+@pytest.fixture(autouse=True)
+def _bypass_business_license_gate():
+    """This file's tests aren't about licensing (see test_reviews_license.py
+    for that) -- bypass require_business_license the same way
+    test_audit_export.py bypasses require_enterprise_license, rather than
+    relying on ambient org_settings state."""
+    app.dependency_overrides[require_business_license] = lambda: None
+    yield
+    app.dependency_overrides.pop(require_business_license, None)
 
 
 @pytest_asyncio.fixture(loop_scope="session")

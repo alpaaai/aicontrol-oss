@@ -41,10 +41,17 @@ async def test_count_rolling_window_uses_agent_id():
 
 
 @pytest.mark.asyncio
-async def test_count_invalid_window_raises():
+async def test_count_invalid_window_falls_back_to_session():
+    """An unrecognised window (a malformed/admin-edited policy condition)
+    must not crash every future call to this tool -- it falls back to the
+    session-scoped count instead, matching Cedar's own fail-closed-but-never-
+    500 posture."""
     db = make_db_mock(0)
-    with pytest.raises(KeyError):
-        await count_tool_calls_in_window(db, AGENT_ID, SESSION_ID, TOOL, "invalid")
+    result = await count_tool_calls_in_window(db, AGENT_ID, SESSION_ID, TOOL, "invalid")
+    assert result == 0
+    call_args = db.execute.call_args
+    assert "session_id" in str(call_args)
+    assert "agent_id" not in str(call_args)
 
 
 @pytest.mark.asyncio

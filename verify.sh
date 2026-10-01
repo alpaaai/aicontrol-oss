@@ -8,6 +8,13 @@ FAIL=0
 COMPOSE="-f docker-compose.yml -f docker-compose.app.yml"
 if [ -f .env ]; then set -a; source .env; set +a; fi
 
+if [ -z "${ADMIN_TOKEN:-}" ]; then
+  echo "ERROR: ADMIN_TOKEN not set in .env."
+  echo "verify.sh checks demo data (8 seed agents, lending demo run)."
+  echo "Run scripts/seed_demo.sh (or scripts/quickstart.sh) first."
+  exit 1
+fi
+
 check() {
   local label="$1"
   local cmd="$2"

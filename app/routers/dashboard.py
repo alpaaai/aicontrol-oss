@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import case, func, select, text
 
 from app.core.auth import require_human
@@ -46,7 +46,7 @@ def _outcome_kind(decision: str, tool_name: str) -> str:
 
 
 @router.get("/outcomes")
-async def get_outcomes(window: str = Query("7d"), _=Depends(require_human)):
+async def get_outcomes(window: str = Query("7d", pattern=r"^\d+[hd]$"), _=Depends(require_human)):
     since = _parse_window(window)
 
     async with async_session_factory() as db:
@@ -177,6 +177,16 @@ async def get_summary(window: str = Query("7d", pattern="^(24h|7d|30d)$"), _=Dep
             select(func.count()).select_from(Agent).where(Agent.status == "active")
         )).scalar()
 
+        # A policy scoped to resource_system fails open (silently never fires)
+        # for any call whose system system_resolver couldn't infer -- this
+        # count is the visible warning surface for that gap (was previously
+        # only a per-agent field, never a dashboard-level alert).
+        agents_with_unresolved_systems = (await db.execute(
+            select(func.count()).select_from(Agent)
+            .where(Agent.unresolved_systems.isnot(None))
+            .where(func.jsonb_array_length(Agent.unresolved_systems) > 0)
+        )).scalar()
+
         active_policies = (await db.execute(
             select(func.count()).select_from(Policy).where(Policy.active == True)
         )).scalar()
@@ -270,6 +280,7 @@ async def get_summary(window: str = Query("7d", pattern="^(24h|7d|30d)$"), _=Dep
         "top_tools": top_tools,
         "decisions_by_hour": decisions_by_hour,
         "active_warnings": active_warnings,
+        "agents_with_unresolved_systems": agents_with_unresolved_systems,
         "overdue_reviews": overdue_reviews,
         "top_denied_tool": top_denied_tool,
         "high_risk_sessions": high_risk_sessions,
@@ -367,11 +378,17 @@ async def list_activity_log(
             q = q.where(UserActivityLog.action == action)
             cq = cq.where(UserActivityLog.action == action)
         if date_from:
-            dt = datetime.fromisoformat(date_from)
+            try:
+                dt = datetime.fromisoformat(date_from)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="date_from must be an ISO 8601 date")
             q = q.where(UserActivityLog.created_at >= dt)
             cq = cq.where(UserActivityLog.created_at >= dt)
         if date_to:
-            dt = datetime.fromisoformat(date_to)
+            try:
+                dt = datetime.fromisoformat(date_to)
+            except ValueError:
+                raise HTTPException(status_code=422, detail="date_to must be an ISO 8601 date")
             q = q.where(UserActivityLog.created_at < dt + timedelta(days=1))
             cq = cq.where(UserActivityLog.created_at < dt + timedelta(days=1))
         total = (await db.execute(cq)).scalar()

@@ -6,7 +6,7 @@ Never import Anthropic SDK or OpenAI SDK directly in feature code.
 
 Customer provides LLM config via .env — AIControl never handles token billing.
 Token budget (max_tokens) is REQUIRED on every call. No default. Enforces discipline.
-AICONTROL_LLM_MOCK=true enables mock-first development — no real API calls.
+LLM_MOCK_ENABLED=true enables mock-first development — no real API calls.
 """
 import time
 import structlog

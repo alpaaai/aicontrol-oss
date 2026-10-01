@@ -1,8 +1,9 @@
 """Tests for HITL service — review row creation and Slack message."""
 import uuid
+from datetime import datetime, timedelta
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
-from app.core.license import LicenseInfo
+from app.core.license_gate import LicenseInfo
 
 _BUSINESS = LicenseInfo(plan="business", company="Acme", email="a@acme.com", expires_at=None)
 
@@ -25,6 +26,35 @@ async def test_create_hitl_review_adds_row():
 
     assert mock_session.add.called
     assert review_id is not None
+
+
+@pytest.mark.asyncio
+async def test_create_hitl_review_sets_response_deadline():
+    """create_hitl_review must set response_deadline to now + REVIEW_TIMEOUT_MINUTES."""
+    from app.services.hitl_service import create_hitl_review
+    from app.core.config import settings
+
+    mock_session = AsyncMock()
+    added_rows = []
+    mock_session.add = MagicMock(side_effect=lambda row: added_rows.append(row))
+    mock_session.flush = AsyncMock()
+
+    before = datetime.utcnow()
+    await create_hitl_review(
+        session=mock_session,
+        audit_event_id=uuid.uuid4(),
+        session_id=uuid.uuid4(),
+        assigned_to="compliance-team",
+    )
+    after = datetime.utcnow()
+
+    assert len(added_rows) == 1
+    deadline = added_rows[0].response_deadline
+    assert deadline is not None
+    assert deadline.tzinfo is None
+    expected_min = before + timedelta(minutes=settings.REVIEW_TIMEOUT_MINUTES)
+    expected_max = after + timedelta(minutes=settings.REVIEW_TIMEOUT_MINUTES)
+    assert expected_min <= deadline <= expected_max
 
 
 @pytest.mark.asyncio
@@ -84,7 +114,7 @@ async def test_post_slack_review_includes_tool_name():
 async def test_slack_hitl_skipped_for_community_license():
     """post_slack_review returns None without calling Slack when plan is community."""
     from app.services.hitl_service import post_slack_review
-    from app.core.license import LicenseInfo
+    from app.core.license_gate import LicenseInfo
 
     community = LicenseInfo(plan="community", company=None, email=None, expires_at=None)
     mock_client = MagicMock()
@@ -109,7 +139,7 @@ async def test_slack_hitl_skipped_for_community_license():
 async def test_slack_hitl_allowed_for_business_license():
     """post_slack_review sends Slack message when plan is business."""
     from app.services.hitl_service import post_slack_review
-    from app.core.license import LicenseInfo
+    from app.core.license_gate import LicenseInfo
 
     business = LicenseInfo(plan="business", company="Acme", email="a@acme.com", expires_at=None)
     mock_client = MagicMock()

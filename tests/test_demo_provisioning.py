@@ -13,12 +13,12 @@ from app.services.demo_scenario_service import get_scenario, all_scenario_ids
 @pytest_asyncio.fixture(scope="module", loop_scope="session", autouse=True)
 async def _restore_demo_agent_baseline():
     """provision_demo_agents() upserts scenario-scoped approved_tools onto
-    agent ids that scripts.seed.AGENTS also seeds (010/030/050/060 --
+    agent ids that conftest.AGENTS also seeds (010/030/050/060 --
     itsm/lending/support/revops share those fixed ids with the general
     dev/test baseline). Other test files assume that baseline, so restore it
     after every test in this module."""
     yield
-    from scripts.seed import AGENTS
+    from tests.conftest import AGENTS
 
     async with async_session_factory() as session:
         for agent in AGENTS:

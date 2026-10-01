@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
 from app.models.database import get_db
-from app.models.schemas import AuditEvent, Policy
+from app.models.schemas import Agent, AuditEvent, Policy
 from app.services.activity_log_service import write_activity_log
 from app.services.cedar_client import invalidate_policy_set_cache
 from app.services.policy_compiler import compile_condition, compile_policy
@@ -306,6 +306,26 @@ def validate_scope(body: "PolicyCreate | PolicyUpdate", condition: dict) -> list
     ]
 
 
+async def validate_agent_principal(db: AsyncSession, principal_type: Optional[str], principal_id: Optional[str]) -> list[str]:
+    """An agent-scoped policy's principal_id must be the agent's *name* --
+    governance_engine.get_scoped_policies and cedar_client both scope by name,
+    never by id. A policy authored with an agent's id (the identifier used
+    everywhere else in the API/UI) compiles and saves without error but can
+    never match a real call. Catch that at creation/update time instead of
+    letting it fail silently."""
+    if principal_type != "agent" or not principal_id:
+        return []
+    exists = (await db.execute(
+        select(Agent.id).where(Agent.name == principal_id)
+    )).scalar_one_or_none()
+    if exists is None:
+        return [
+            f"principal_id '{principal_id}' does not match any agent's name -- "
+            "agent-scoped policies bind by agent name, not agent id"
+        ]
+    return []
+
+
 class PolicyCreate(BaseModel):
     name: str = Field(min_length=1)
     description: Optional[str] = None
@@ -465,6 +485,7 @@ async def create_policy(
     _token: dict = Depends(require_admin),
 ) -> PolicyResponse:
     errors = validate_condition(body.condition) + validate_scope(body, body.condition)
+    errors += await validate_agent_principal(db, body.principal_type, body.principal_id)
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
     policy = Policy(
@@ -506,6 +527,11 @@ async def update_policy(
     updated = body.model_dump(exclude_none=True)
     effective_condition = updated.get("condition", policy.condition)
     errors = validate_condition(effective_condition)
+    errors += await validate_agent_principal(
+        db,
+        updated.get("principal_type", policy.principal_type),
+        updated.get("principal_id", policy.principal_id),
+    )
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))
     before = {k: getattr(policy, k) for k in updated}

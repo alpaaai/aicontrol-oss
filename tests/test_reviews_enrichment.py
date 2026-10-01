@@ -4,8 +4,16 @@ import pytest_asyncio
 from datetime import datetime, timedelta
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
+from app.core.license_gate import require_business_license
 from app.main import app
 from app.models.database import async_session_factory
+
+
+@pytest.fixture(autouse=True)
+def _bypass_business_license_gate():
+    app.dependency_overrides[require_business_license] = lambda: None
+    yield
+    app.dependency_overrides.pop(require_business_license, None)
 
 
 @pytest_asyncio.fixture(scope="session")

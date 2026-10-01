@@ -56,3 +56,11 @@ class OrgSettings(Base):
     timezone = Column(String(100), nullable=False, default="UTC", server_default="UTC")
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    # Licensing (plans/v4 self-serve onboarding + Stripe): DB-backed source
+    # for app/core/license_gate.py, synced daily from billing.aictl.io.
+    license_plan = Column(String(20), nullable=True)
+    license_status = Column(String(20), nullable=True)
+    license_synced_at = Column(DateTime(timezone=True), nullable=True)
+    # Plaintext, not hashed -- sent server-to-server on every sync call, so
+    # it can't be one-way hashed the way invite tokens are.
+    activation_code = Column(String(255), nullable=True)

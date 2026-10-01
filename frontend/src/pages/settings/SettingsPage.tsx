@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { Copy, CheckCircle, UserPlus, X, Pencil } from 'lucide-react'
 import { useAuth } from '../../hooks/useAuth'
-import { useLicense } from '../../hooks/useLicense'
 import { useOrgSettings } from '../../context/OrgSettingsContext'
 import { updateOrgSettings } from '@/api/orgSettings'
 import { listUsers } from '@/api/users'
@@ -455,15 +455,18 @@ function OrgSection({ isAdmin }: { isAdmin: boolean }) {
 function UsersSection({ currentUserId }: { currentUserId: string | undefined }) {
   const [users, setUsers] = useState<UserItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [resendTarget, setResendTarget] = useState<UserItem | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<UserItem | null>(null)
   const [actionErrors, setActionErrors] = useState<Record<string, string>>({})
 
   const reload = () => {
+    setLoading(true)
+    setLoadError(false)
     listUsers()
       .then(setUsers)
-      .catch(() => {})
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false))
   }
 
@@ -496,6 +499,8 @@ function UsersSection({ currentUserId }: { currentUserId: string | undefined }) 
 
       {loading ? (
         <p className="text-[13px] text-gray-400 py-4 text-center">Loading…</p>
+      ) : loadError ? (
+        <p className="text-[13px] text-red-500 py-4 text-center">Couldn't load users. Try refreshing the page.</p>
       ) : users.length === 0 ? (
         <p className="text-[13px] text-gray-400 py-4 text-center">No users yet.</p>
       ) : (
@@ -606,7 +611,6 @@ function UsersSection({ currentUserId }: { currentUserId: string | undefined }) 
 // ---------------------------------------------------------------------------
 export function SettingsPage() {
   const { user } = useAuth()
-  const { isEnterprise } = useLicense()
 
   return (
     <div className="p-6 max-w-3xl">
@@ -620,21 +624,11 @@ export function SettingsPage() {
         <p className="text-[12px] font-medium text-gray-500 uppercase tracking-wide py-2.5 border-b border-gray-50">
           License
         </p>
-        <SettingRow label="Plan" value={isEnterprise ? 'Enterprise' : 'Community'} />
-        <div className="flex items-center justify-between py-3 border-b border-gray-50">
-          <span className="text-[13px] text-gray-600">Enterprise features</span>
-          {isEnterprise ? (
-            <span className="text-[13px] text-gray-800 font-medium">Active</span>
-          ) : (
-            <button
-              disabled
-              className="px-3 py-1 bg-ac-primary text-white rounded-md text-xs font-medium
-                         opacity-50 cursor-not-allowed"
-              title="Upgrade coming soon"
-            >
-              Upgrade
-            </button>
-          )}
+        <div className="flex items-center justify-between py-3">
+          <span className="text-[13px] text-gray-600">Plan and billing</span>
+          <Link to="/billing" className="text-[13px] text-ac-primary font-medium hover:underline">
+            View billing &rarr;
+          </Link>
         </div>
       </div>
 

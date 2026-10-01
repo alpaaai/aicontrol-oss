@@ -23,6 +23,7 @@ export interface Agent {
   coverage_state: CoverageState;
   silent_noop_warnings: string[];
   unresolved_systems: string[];
+  governance_mode: string;
 }
 
 export const COVERAGE_LABEL: Record<CoverageState, string> = {
@@ -34,8 +35,42 @@ export const COVERAGE_LABEL: Record<CoverageState, string> = {
 export const listAgents = () =>
   apiClient.get<Agent[]>("/agents").then((r) => r.data);
 
+export interface AgentCreate {
+  name: string;
+  owner: string;
+  framework?: string;
+  approved_tools?: string[];
+}
+
+// GET /agents/{id} returns AgentResponse on the backend, a narrower shape
+// than the list endpoint's AgentListItem (no system_prompt_hash, approved_at,
+// created_at, last_active, deny_rate; adds governance_mode).
+export interface AgentDetail {
+  id: string;
+  name: string;
+  owner: string;
+  status: "active" | "suspended";
+  framework: string | null;
+  model_version: string | null;
+  approved_tools: string[];
+  approved_by: string | null;
+  governance_mode: string;
+  hook: string | null;
+  sdk_version: string | null;
+  workflow: string | null;
+  coverage_state: CoverageState;
+  silent_noop_warnings: string[];
+  unresolved_systems: string[];
+}
+
+export const createAgent = (body: AgentCreate) =>
+  apiClient.post<Agent>("/agents", body).then((r) => r.data);
+
 export const getAgent = (id: string) =>
-  apiClient.get<Agent>(`/agents/${id}`).then((r) => r.data);
+  apiClient.get<AgentDetail>(`/agents/${id}`).then((r) => r.data);
+
+export const updateAgentGovernanceMode = (id: string, governance_mode: "observe" | "govern") =>
+  apiClient.put<AgentDetail>(`/agents/${id}`, { governance_mode }).then((r) => r.data);
 
 // This endpoint already returns PolicyScope shape -- it exists to feed the
 // agent's governing-policies list directly, so it skips the mapper every

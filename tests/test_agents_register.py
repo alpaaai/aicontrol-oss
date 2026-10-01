@@ -77,6 +77,38 @@ async def test_register_agent_defaults_framework_and_tools():
 
 
 @pytest.mark.asyncio
+async def test_register_agent_reregister_updates_owner_framework_and_tools():
+    """Re-registering an existing agent name must update owner/framework/
+    approved_tools, not silently discard them (2.4 fix — the upsert used
+    to only update `name`, a no-op)."""
+    name = f"test-agent-{uuid.uuid4().hex[:6]}"
+    with _auth(role="agent") as app:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            first = await client.post(
+                "/agents/register",
+                json={"name": name, "owner": "team-a", "framework": "langchain"},
+            )
+            second = await client.post(
+                "/agents/register",
+                json={
+                    "name": name,
+                    "owner": "team-b",
+                    "framework": "crewai",
+                    "approved_tools": ["http_get"],
+                },
+            )
+
+    assert first.status_code == 201
+    assert second.status_code == 200
+    assert first.json()["id"] == second.json()["id"]
+    assert second.json()["owner"] == "team-b"
+    assert second.json()["framework"] == "crewai"
+    assert second.json()["approved_tools"] == ["http_get"]
+
+
+@pytest.mark.asyncio
 async def test_register_agent_allows_admin_role_too():
     """POST /agents/register must also work for admin-role tokens, not just agent-role."""
     name = f"test-agent-{uuid.uuid4().hex[:6]}"

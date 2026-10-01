@@ -3,12 +3,13 @@ import { listReviews } from '../../api/reviews'
 import type { Review } from '../../api/reviews'
 import { ReviewRow } from './ReviewRow'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
+import { ReactivateGuard } from '../../components/shared/ReactivateGuard'
 import { usePoll } from '../../hooks/usePoll'
 import { useLicense } from '../../hooks/useLicense'
 
 function ReviewQueueContent() {
   const fetcher = useCallback(() => listReviews('pending'), [])
-  const { data, refetch } = usePoll(fetcher, 15000)
+  const { data, error, loading, refetch } = usePoll(fetcher, 15000)
 
   // listReviews returns Review[] directly
   const reviews = data ?? []
@@ -25,7 +26,13 @@ function ReviewQueueContent() {
       </div>
 
       <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
-        {reviews.length === 0 ? (
+        {loading && data === null ? (
+          <div className="h-10 bg-gray-50 animate-pulse m-4 rounded" />
+        ) : error ? (
+          <div className="text-center text-sm text-red-600 py-10">
+            Couldn't load pending reviews. Try refreshing the page.
+          </div>
+        ) : reviews.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">
             No pending reviews. Queue is clear.
           </div>
@@ -44,12 +51,14 @@ function ReviewQueueContent() {
 function ResolvedReviews() {
   const [data, setData] = useState<Review[]>([])
   const [show, setShow] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (show) {
-      listReviews(undefined, 20).then(reviews =>
-        setData(reviews.filter(x => x.status !== 'pending'))
-      )
+      setLoadError(false)
+      listReviews(undefined, 20)
+        .then(reviews => setData(reviews.filter(x => x.status !== 'pending')))
+        .catch(() => setLoadError(true))
     }
   }, [show])
 
@@ -60,7 +69,11 @@ function ResolvedReviews() {
       </button>
       {show && (
         <div className="mt-2 bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
-          {data.map(r => (
+          {loadError ? (
+            <div className="text-center text-sm text-red-600 py-6">Couldn't load resolved reviews.</div>
+          ) : data.length === 0 ? (
+            <div className="text-center text-sm text-gray-400 py-6">No resolved reviews yet.</div>
+          ) : data.map(r => (
             <div key={r.id} className="flex items-center gap-3 px-4 py-2.5 border-b border-gray-50 text-[13px]">
               <span className={`text-[12px] font-medium ${r.status === 'approved' ? 'text-ac-decision-allow' : 'text-ac-decision-deny'}`}>
                 {r.status}
@@ -80,14 +93,25 @@ function ResolvedReviews() {
 }
 
 export function ReviewQueuePage() {
-  const { isEnterprise } = useLicense()
-  if (!isEnterprise) {
+  const { isBusiness, needsReactivation } = useLicense()
+  if (needsReactivation) {
+    return (
+      <div className="p-6">
+        <h2 className="text-[18px] font-semibold text-ac-ink mb-4">Review queue</h2>
+        <ReactivateGuard
+          title="Reactivate your plan"
+          description="In-dashboard review approvals require an active Business or Enterprise subscription."
+        />
+      </div>
+    )
+  }
+  if (!isBusiness) {
     return (
       <div className="p-6">
         <h2 className="text-[18px] font-semibold text-ac-ink mb-4">Review queue</h2>
         <EnterpriseLock
-          title="Review Queue — Enterprise Feature"
-          description="In-dashboard review approvals require an Enterprise license. Reviews are available via Slack integration on all plans."
+          title="Review Queue — Business Feature"
+          description="In-dashboard review approvals require a Business or Enterprise license. Reviews are available via Slack integration starting at Business tier."
         >
           <div className="p-4 space-y-3">
             {[...Array(3)].map((_, i) => (

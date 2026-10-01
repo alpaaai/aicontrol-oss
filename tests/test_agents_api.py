@@ -174,6 +174,27 @@ async def test_update_agent_governance_mode():
 
 
 @pytest.mark.asyncio
+async def test_list_agents_includes_governance_mode():
+    """GA review finding: governance_mode exists only in AgentResponse
+    (detail), not AgentListItem (list) -- the agent list page has no way
+    to surface which agents are silently non-enforcing without it."""
+    with _auth() as app:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            create_resp = await client.post("/agents", json={
+                "name": f"test-agent-{uuid.uuid4().hex[:6]}",
+                "owner": "test@example.com",
+                "governance_mode": "govern",
+            })
+            agent_id = create_resp.json()["id"]
+
+            list_resp = await client.get("/agents")
+    rows = {r["id"]: r for r in list_resp.json()}
+    assert rows[agent_id]["governance_mode"] == "govern"
+
+
+@pytest.mark.asyncio
 async def test_create_agent_accepts_governance_mode():
     """AgentCreate must accept governance_mode at creation time too."""
     with _auth() as app:

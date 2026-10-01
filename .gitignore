@@ -5,6 +5,9 @@ venv
 .venv/
 .venv
 .env
+# scripts/onboard_agent.py writes raw bearer tokens here on every run --
+# same secret-bearing status as .env above, never tracked.
+.aicontrol/
 __pycache__/
 *.pyc
 .DS_Store
@@ -29,3 +32,20 @@ CLAUDE.md
 .claude/
 scripts/prospecting/.env
 scripts/prospecting/state.json
+
+# Demo-only data/scripts — my local dev/demo use, not shipped to customers.
+# The /demo feature code (app/routers/demo.py, app/services/demo_provisioning.py,
+# app/services/demo_scenario_service.py, app/demo_scenarios/*.json) stays tracked;
+# these are the standalone seed/scenario scripts that feed manual demo runs.
+scripts/seed.py
+scripts/demo_reset.py
+scripts/demo_run.py
+scripts/demo_seed_synthetic.py
+scripts/seed_demo.sh
+scripts/demos/
+policies/demo_seeds/
+docker-compose.demo.yml
+tests/test_demo_reset.py
+tests/test_demo_seed_synthetic.py
+tests/test_demo_run_demo_sh.py
+tests/test_demo_cli_harness.py

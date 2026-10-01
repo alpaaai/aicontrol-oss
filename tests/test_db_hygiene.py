@@ -105,6 +105,32 @@ async def test_clean_all_nulls_a_dangling_policy_name_on_audit_events():
 
 
 @pytest.mark.asyncio
+async def test_clean_all_removes_a_leaked_compliance_report():
+    """GA review finding: compliance_reports has no sweep at all. pytest
+    writes real rows with report_path under /tmp/pytest-.../..., which
+    accumulate forever once pytest's own tmp dir retention rotates the
+    file out from under them -- Report History then points at a 404."""
+    report_id = str(uuid.uuid4())
+    async with async_session_factory() as session:
+        await session.execute(text(
+            "INSERT INTO compliance_reports "
+            "(id, date_from, date_to, frameworks, format, report_path, llm_model, mock_used) "
+            "VALUES (:id, '2026-01-01', '2026-01-31', ARRAY['eu_ai_act'], 'md', :path, 'mock', true)"
+        ), {"id": report_id, "path": f"/tmp/pytest-of-deven/pytest-1/test_hygiene_leak0/{report_id}.md"})
+        await session.commit()
+
+        counts_before = await db_hygiene.count_leaked(session)
+        assert counts_before["compliance_reports"] >= 1
+
+        await db_hygiene.clean_all(session)
+
+        result = await session.execute(
+            text("SELECT 1 FROM compliance_reports WHERE id = :id"), {"id": report_id}
+        )
+        assert result.first() is None
+
+
+@pytest.mark.asyncio
 async def test_clean_all_is_resilient_to_a_failing_sweep(monkeypatch):
     """One sweeper raising must not prevent the others from running --
     this is the defensive property that fixes the historical bug where an

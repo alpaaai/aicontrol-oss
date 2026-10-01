@@ -6,7 +6,7 @@ from unittest.mock import patch
 import pytest
 import pytest_asyncio
 import app.core.license_gate as _lg
-from app.core.license import LicenseInfo
+from app.core.license_gate import LicenseInfo
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import text
 
@@ -29,7 +29,9 @@ def _mock_admin():
 @contextmanager
 def _with_license():
     """Patch get_license_info to return enterprise plan for functional/auth tests."""
-    _enterprise = LicenseInfo(plan="enterprise", company="Test", email="t@t.com", expires_at=None)
+    _enterprise = LicenseInfo(
+        plan="enterprise", company="Test", email="t@t.com", expires_at=None, license_status="active"
+    )
     with patch.object(_lg, "get_license_info", return_value=_enterprise):
         yield
 

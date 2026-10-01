@@ -72,19 +72,30 @@ async def write_event(
     await session.flush()
     logger.info("audit_event_written", tool_name=tool_name, decision=decision)
 
-    if _export_dispatch_available and get_license_info().is_business:
-        record = AuditEventRecord(
-            id=event_id,
-            session_id=session_id,
-            agent_name=agent_name,
-            tool_name=tool_name,
-            tool_parameters=tool_parameters,
-            decision=decision,
-            decision_reason=decision_reason,
-            policy_name=policy_name,
-            duration_ms=duration_ms,
-            created_at=datetime.now(timezone.utc),
-        )
-        asyncio.create_task(dispatch_audit_event(record))
+    if _export_dispatch_available:
+        # License gating is for export dispatch only (a Business+ feature) --
+        # it must never be able to block or raise inside the core append
+        # path, which every decision (including community-tier deny/review)
+        # depends on regardless of license state.
+        try:
+            is_business = (await get_license_info(session)).is_business
+        except Exception:
+            logger.warning("audit_export_license_check_failed", tool_name=tool_name)
+            is_business = False
+
+        if is_business:
+            record = AuditEventRecord(
+                id=event_id,
+                session_id=session_id,
+                agent_name=agent_name,
+                tool_name=tool_name,
+                tool_parameters=tool_parameters,
+                decision=decision,
+                decision_reason=decision_reason,
+                policy_name=policy_name,
+                duration_ms=duration_ms,
+                created_at=datetime.now(timezone.utc),
+            )
+            asyncio.create_task(dispatch_audit_event(record))
 
     return event_id

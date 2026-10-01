@@ -23,7 +23,14 @@ echo ""
 echo -e "${BOLD}=== AIControl Quick Start ===${NC}"
 echo ""
 
+# Seed demo data (agents, policies, admin token, DEMO_TOKEN_* — writes .env)
+echo "[1/3] Seeding demo data..."
+bash scripts/seed_demo.sh
+set -a; source .env; set +a
+echo -e "${GREEN}[done]${NC} Agents, policies, admin token, and demo tokens seeded."
+
 # Print URLs and admin token
+echo ""
 echo -e "${CYAN}  API:         http://localhost:8001${NC}"
 echo -e "${CYAN}  Dashboard:   http://localhost:3000${NC}"
 echo -e "${CYAN}  API docs:    http://localhost:8001/docs${NC}"
@@ -33,11 +40,6 @@ echo ""
 echo -e "  Use the admin token directly with the API (curl, httpx, etc.)"
 echo -e "  Dashboard login is email + password — first login runs the setup wizard at http://localhost:3000."
 echo ""
-
-# Seed V2 demo data (idempotent)
-echo "[1/3] Seeding V2 demo data..."
-docker compose $COMPOSE exec -T api python3 scripts/seed.py
-echo -e "${GREEN}[done]${NC} Agents, policies, and V2 features seeded."
 
 # Run lending demo to populate audit log
 echo ""
@@ -80,14 +82,9 @@ echo ""
 echo -e "${YELLOW}Next steps:${NC}"
 echo "  1. Open Dashboard → Audit Log — filter by DENY to see denied calls"
 echo "  2. Open Dashboard → Policies — see rate-limit and approved_tools policies"
-if [ -n "${AICONTROL_LICENSE_KEY:-}" ]; then
-  echo "  3. Open Dashboard → Governance → Warnings — see drift detection"
-  echo "  4. Open Dashboard → Reports — generate a compliance report"
-else
-  echo "  3. For enterprise features (drift detection, compliance reports):"
-  echo "     Set AICONTROL_LICENSE_KEY + VITE_ENTERPRISE=true in .env"
-  echo "     Then: docker compose $COMPOSE build frontend && docker compose $COMPOSE up -d"
-fi
+echo "  3. For enterprise features (drift detection, compliance reports):"
+echo "     Buy a plan, then enter the activation code emailed at checkout"
+echo "     on Dashboard → Billing"
 echo ""
 echo "  Full demo walkthrough: scripts/demos/demo-walkthrough-workato-fde.md"
 echo "  Docs: https://aictl.io/docs"

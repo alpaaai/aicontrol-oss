@@ -129,3 +129,16 @@ async def require_human(
             detail="Human token required",
         )
     return payload
+
+
+async def require_human_admin(payload: dict = Depends(require_human)) -> dict:
+    """Dependency: human JWT whose role claim is admin. Unlike require_admin
+    (machine/agent tokens, DB-backed), this checks the role already embedded
+    in the human JWT payload -- no DB lookup, matching require_human's own
+    signature-only design."""
+    if payload.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin role required",
+        )
+    return payload

@@ -1,6 +1,7 @@
 """HITL service — creates review rows and posts Slack notifications."""
 import json
 import uuid
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from slack_sdk import WebClient
@@ -10,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.license_gate import get_license_info
 from app.core.logging import get_logger
+from app.models.database import async_session_factory
 from app.models.schemas import HITLReview
 
 logger = get_logger("hitl_service")
@@ -29,6 +31,8 @@ async def create_hitl_review(
         status="pending",
         assigned_to=assigned_to,
         notified_via="slack",
+        response_deadline=datetime.utcnow()
+        + timedelta(minutes=settings.REVIEW_TIMEOUT_MINUTES),
     )
     session.add(review)
     await session.flush()
@@ -51,7 +55,12 @@ async def post_slack_review(
     """Post interactive Slack message with approve/deny buttons.
     Returns Slack message ts or None on failure.
     """
-    license_info = get_license_info()
+    try:
+        async with async_session_factory() as session:
+            license_info = await get_license_info(session)
+    except Exception:
+        logger.warning("slack_skipped", reason="license check failed")
+        return None
     if not license_info.is_business:
         logger.info("slack_skipped", reason="Slack HITL requires Business or Enterprise license")
         return None

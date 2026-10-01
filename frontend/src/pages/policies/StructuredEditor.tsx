@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPolicy, type PolicyScope } from "@/api/policies";
+import { listAgents, type Agent } from "@/api/agents";
 import { Button } from "@/components/primitives/Button";
 
 const NUMERIC_OPS: Record<string, string> = { gt: ">", gte: "≥", lt: "<", lte: "≤", eq: "=" };
@@ -20,6 +21,12 @@ export function StructuredEditor(props: { onCreated?: () => void; onScopeChange?
   const [conditionField, setConditionField] = useState("");
   const [conditionOp, setConditionOp] = useState<keyof typeof NUMERIC_OPS>("gt");
   const [conditionValue, setConditionValue] = useState("");
+  const [error, setError] = useState("");
+  const [agents, setAgents] = useState<Agent[]>([]);
+
+  useEffect(() => {
+    listAgents().then(setAgents).catch(() => setAgents([]));
+  }, []);
 
   const reset = () => {
     setName("");
@@ -56,6 +63,7 @@ export function StructuredEditor(props: { onCreated?: () => void; onScopeChange?
 
   const handleCreate = async () => {
     if (!name.trim()) return;
+    setError("");
     try {
       await createPolicy({
         name: name.trim(),
@@ -68,9 +76,13 @@ export function StructuredEditor(props: { onCreated?: () => void; onScopeChange?
       });
       reset();
       props.onCreated?.();
-    } catch {
+    } catch (e: unknown) {
       // Validation errors surface from the API; the form keeps its values so
       // the founder can correct and resubmit rather than losing the draft.
+      // Re-thrown so Button.tsx doesn't show "Created" for a failed create.
+      const err = e as { response?: { data?: { detail?: string } } };
+      setError(err?.response?.data?.detail ?? "Couldn't create policy. Check the fields and try again.");
+      throw e;
     }
   };
 
@@ -83,7 +95,12 @@ export function StructuredEditor(props: { onCreated?: () => void; onScopeChange?
       <h2 className="text-title-sm text-ac-ink mb-4">Build a policy</h2>
       <div className="space-y-3">
         <input className={inputClass} placeholder="Policy name" value={name} onChange={(e) => setName(e.target.value)} />
-        <input className={inputClass} placeholder="Agent (blank = every agent)" value={principalId} onChange={(e) => setPrincipalId(e.target.value)} />
+        <select className={inputClass} value={principalId} onChange={(e) => setPrincipalId(e.target.value)}>
+          <option value="">Agent (blank = every agent)</option>
+          {agents.map((a) => (
+            <option key={a.id} value={a.name}>{a.name}</option>
+          ))}
+        </select>
         <input className={inputClass} placeholder="Tool (blank = any tool)" value={actionTool} onChange={(e) => setActionTool(e.target.value)} />
         <input className={inputClass} placeholder="System (blank = anywhere)" value={resourceSystem} onChange={(e) => setResourceSystem(e.target.value)} />
         <select className={inputClass} value={effect} onChange={(e) => setEffect(e.target.value as "deny" | "review")}>
@@ -100,6 +117,7 @@ export function StructuredEditor(props: { onCreated?: () => void; onScopeChange?
           <input className={inputClass} placeholder="Value" value={conditionValue} onChange={(e) => setConditionValue(e.target.value)} />
         </div>
         <Button label="Create policy" pendingLabel="Creating…" doneLabel="Created" onClick={handleCreate} />
+        {error && <p className="text-body-sm text-ac-error">{error}</p>}
       </div>
     </div>
   );

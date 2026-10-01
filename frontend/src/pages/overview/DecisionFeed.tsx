@@ -33,11 +33,13 @@ function FeedRow({ event }: { event: AuditEvent }) {
 
 export function DecisionFeed() {
   const fetcher = useCallback(() => listAuditEvents({ limit: 20 }), []);
-  const { data } = usePoll(fetcher, 4000);
+  const { data, error } = usePoll(fetcher, 4000);
 
   return (
     <div data-testid="decision-feed" className="max-h-[480px] overflow-y-auto border border-ac-hairline rounded-lg bg-ac-surface-card">
-      {data?.events.length ? (
+      {error ? (
+        <p className="text-body-sm text-ac-error py-6 text-center">Couldn't load recent calls. Try refreshing the page.</p>
+      ) : data?.events.length ? (
         data.events.map((event) => <FeedRow key={event.id} event={event} />)
       ) : (
         <p className="text-body-sm text-ac-muted py-6 text-center">No governed calls yet</p>

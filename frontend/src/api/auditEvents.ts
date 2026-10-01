@@ -7,8 +7,8 @@ export interface AuditEvent {
   agent_id: string;
   agent_name: string;
   tool_name: string;
-  tool_parameters: string | null;
-  decision: "allow" | "deny" | "review";
+  tool_parameters: Record<string, unknown> | null;
+  decision: "allow" | "deny" | "review" | "error";
   decision_reason: string | null;
   policy_id: string | null;
   policy_name: string | null;

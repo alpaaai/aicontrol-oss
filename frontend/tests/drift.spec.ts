@@ -21,6 +21,22 @@ test("drift page shows enterprise lock for community", async ({ page }) => {
   await expect(page.getByText("Policy Drift — Enterprise Feature")).toBeVisible();
 });
 
+test("drift page shows a reactivate prompt for a canceled enterprise org, not the lock or content", async ({ page }) => {
+  await page.route("**/license-info", (route) =>
+    route.fulfill({
+      json: { plan: "enterprise", company: "Acme", is_enterprise: true, is_business: true, expires_at: null },
+    }),
+  );
+  await page.route("**/license/features", (route) =>
+    route.fulfill({
+      json: { tier: "enterprise", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: true }, license_status: "canceled" },
+    }),
+  );
+  await page.goto("/drift");
+  await expect(page.getByText(/Reactivate your plan/i)).toBeVisible();
+  await expect(page.getByText("Policy Drift — Enterprise Feature")).not.toBeVisible();
+});
+
 test("drift page lists active warnings and resolves one", async ({ page }) => {
   await page.route("**/license-info", (route) =>
     route.fulfill({

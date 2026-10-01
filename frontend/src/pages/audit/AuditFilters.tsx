@@ -22,13 +22,14 @@ export function AuditFilters({ onFilter, groupBy, onGroupByChange }: Props) {
   const [dateTo, setDateTo] = useState("");
 
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [agentsError, setAgentsError] = useState(false);
   const [agentId, setAgentId] = useState("");
   const [agentSearch, setAgentSearch] = useState("");
   const [agentOpen, setAgentOpen] = useState(false);
   const agentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    listAgents().then(setAgents).catch(() => {});
+    listAgents().then(setAgents).catch(() => setAgentsError(true));
   }, []);
 
   useEffect(() => {
@@ -81,6 +82,7 @@ export function AuditFilters({ onFilter, groupBy, onGroupByChange }: Props) {
             <option value="allow">Allow</option>
             <option value="deny">Deny</option>
             <option value="review">Review</option>
+            <option value="error">Error</option>
           </select>
         </div>
 
@@ -90,8 +92,9 @@ export function AuditFilters({ onFilter, groupBy, onGroupByChange }: Props) {
             value={agentId ? (selectedAgent?.name ?? agentSearch) : agentSearch}
             onChange={(e) => { setAgentSearch(e.target.value); setAgentId(""); setAgentOpen(true); }}
             onFocus={() => setAgentOpen(true)}
-            placeholder="All agents"
-            className={inputClass + " w-44"}
+            placeholder={agentsError ? "Couldn't load agents" : "All agents"}
+            disabled={agentsError}
+            className={inputClass + " w-44" + (agentsError ? " opacity-50 cursor-not-allowed" : "")}
           />
           {agentOpen && filteredAgents.length > 0 && (
             <div className="absolute z-20 top-full mt-1 left-0 w-44 bg-ac-surface-card border border-ac-hairline rounded-lg overflow-y-auto max-h-48">

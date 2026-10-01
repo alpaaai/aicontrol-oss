@@ -1,7 +1,7 @@
 import { apiClient } from './client';
 
 export interface LicenseInfo {
-  plan: 'community' | 'business' | 'enterprise';
+  plan: 'community' | 'business' | 'enterprise' | 'trial';
   company: string | null;
   is_enterprise: boolean;
   is_business: boolean;
@@ -19,8 +19,11 @@ export interface FeatureFlags {
 }
 
 export interface LicenseFeatures {
-  tier: 'free' | 'enterprise';
+  tier: 'free' | 'business' | 'enterprise';
   features: FeatureFlags;
+  // "active" | "past_due" | "canceled" | null (community, or business/
+  // enterprise not yet synced). See app/routers/license.py.
+  license_status: 'active' | 'past_due' | 'canceled' | 'unreachable' | null;
 }
 
 export const getLicenseFeatures = (): Promise<LicenseFeatures> =>

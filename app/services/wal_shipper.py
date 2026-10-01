@@ -57,8 +57,14 @@ class WalShipper:
             return 0
 
         shipped = 0
-        async with self.session_factory() as session:
-            for line in pending:
+        for line in pending:
+            # One session per line, committed individually: a shared session
+            # across the whole batch meant a later line's IntegrityError
+            # (session.rollback()) discarded every earlier line's
+            # flushed-but-uncommitted insert too, even though their
+            # checkpoints had already advanced past them -- those rows were
+            # gone from Postgres but never re-shipped (3.5 fix).
+            async with self.session_factory() as session:
                 try:
                     await write_event(
                         session=session,
@@ -83,13 +89,13 @@ class WalShipper:
                         bypass=line.get("bypass", False),
                         enforced=line.get("enforced", True),
                     )
-                    shipped += 1
                 except IntegrityError:
                     logger.warning("wal_ship_duplicate_skipped", event_id=line["event_id"])
                     await session.rollback()
                     continue
-                self._write_checkpoint(line["wal_seq"])
-            await session.commit()
+                await session.commit()
+                shipped += 1
+            self._write_checkpoint(line["wal_seq"])
 
         logger.info("wal_shipped", count=shipped)
         return shipped

@@ -1,13 +1,22 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { usePoll } from "@/hooks/usePoll";
 import { getOutcomes } from "@/api/dashboard";
 import { StatCard } from "./StatCard";
 import { AgentOutcomeTable } from "./AgentOutcomeTable";
 import { DecisionFeed } from "./DecisionFeed";
+import { BaselineDialog } from "./BaselineDialog";
 
 export function OverviewPage() {
   const fetcher = useCallback(() => getOutcomes("7d"), []);
-  const { data, loading } = usePoll(fetcher, 30000);
+  const { data, loading, error } = usePoll(fetcher, 30000);
+  const [showBaselineDialog, setShowBaselineDialog] = useState(
+    () => sessionStorage.getItem("show_baseline_dialog") === "true",
+  );
+
+  const closeBaselineDialog = () => {
+    sessionStorage.removeItem("show_baseline_dialog");
+    setShowBaselineDialog(false);
+  };
 
   const agents = data?.agents ?? [];
   const totalCalls = agents.reduce((sum, a) => sum + a.calls, 0);
@@ -23,6 +32,10 @@ export function OverviewPage() {
         <div className="space-y-4">
           <div className="h-24 bg-ac-surface-sunk rounded-md animate-pulse" />
           <div className="h-64 bg-ac-surface-sunk rounded-md animate-pulse" />
+        </div>
+      ) : error ? (
+        <div className="text-center text-sm text-ac-error py-10">
+          Couldn't load overview data. Try refreshing the page.
         </div>
       ) : (
         <>
@@ -47,6 +60,8 @@ export function OverviewPage() {
       )}
 
       <DecisionFeed />
+
+      {showBaselineDialog && <BaselineDialog onClose={closeBaselineDialog} />}
     </div>
   );
 }

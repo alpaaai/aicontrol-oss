@@ -14,6 +14,9 @@ named so it matches one of the SWEEPS patterns below --
     agents.name (discovery) IN (exact names below)
     api_tokens.description LIKE 'pytest-%'
     mcp_servers.name       LIKE 'test-mcp-server-%'
+    user_activity_log.before_state/after_state text LIKE '%test-agent-%'
+        OR '%test-mcp-server-%' OR '%test_%' (policy names)
+    compliance_reports.report_path/md_path LIKE '/tmp/pytest%'
 
 Adding a new kind of test-created row means adding a sweep here, not
 inventing a new prefix and a bespoke fixture elsewhere.
@@ -108,15 +111,48 @@ async def _clean_discovery(session: AsyncSession) -> None:
     ), {"names": list(_DISCOVERY_AGENT_NAMES)})
 
 
+# Reserved: issued once per pytest session by tests/conftest.py's
+# _seed_and_token_setup and used by every test that needs a live admin/agent
+# token (the `client`, `admin_token`, `agent_token` fixtures). These match
+# the 'pytest-%' pattern below but are not leaks -- deleting them mid-run
+# breaks every later test that depends on them. Session-scoped teardown
+# already retires them via conftest's own _cleanup_pytest_fixture_tokens.
+RESERVED_TOKEN_DESCRIPTIONS = ("pytest-admin-fixture", "pytest-agent-fixture")
+
+
 async def _clean_tokens(session: AsyncSession) -> None:
     await session.execute(text(
-        "DELETE FROM api_tokens WHERE description LIKE 'pytest-%'"
-    ))
+        "DELETE FROM api_tokens WHERE description LIKE 'pytest-%' "
+        "AND description != ALL(:reserved)"
+    ), {"reserved": list(RESERVED_TOKEN_DESCRIPTIONS)})
 
 
 async def _clean_mcp_servers(session: AsyncSession) -> None:
     await session.execute(text(
         "DELETE FROM mcp_servers WHERE name LIKE 'test-mcp-server-%'"
+    ))
+
+
+_ACTIVITY_LOG_LEAK_WHERE = (
+    "before_state::text LIKE '%test-agent-%' OR after_state::text LIKE '%test-agent-%' "
+    "OR before_state::text LIKE '%test-mcp-server-%' OR after_state::text LIKE '%test-mcp-server-%' "
+    "OR before_state::text LIKE '%test\\_%' OR after_state::text LIKE '%test\\_%' "
+    "OR before_state::text LIKE '%not\\_lib\\_%' OR after_state::text LIKE '%not\\_lib\\_%'"
+)
+
+
+async def _clean_activity_log(session: AsyncSession) -> None:
+    await session.execute(text(f"DELETE FROM user_activity_log WHERE {_ACTIVITY_LOG_LEAK_WHERE}"))
+
+
+_COMPLIANCE_REPORT_LEAK_WHERE = (
+    "report_path LIKE '/tmp/pytest%' OR md_path LIKE '/tmp/pytest%'"
+)
+
+
+async def _clean_compliance_reports(session: AsyncSession) -> None:
+    await session.execute(text(
+        f"DELETE FROM compliance_reports WHERE {_COMPLIANCE_REPORT_LEAK_WHERE}"
     ))
 
 
@@ -148,13 +184,26 @@ SWEEPS = [
     ),
     Sweep(
         label="api_tokens",
-        count_sql="SELECT count(*) FROM api_tokens WHERE description LIKE 'pytest-%'",
+        count_sql=(
+            "SELECT count(*) FROM api_tokens WHERE description LIKE 'pytest-%' "
+            f"AND description NOT IN {tuple(RESERVED_TOKEN_DESCRIPTIONS)}"
+        ),
         clean=_clean_tokens,
     ),
     Sweep(
         label="mcp_servers",
         count_sql="SELECT count(*) FROM mcp_servers WHERE name LIKE 'test-mcp-server-%'",
         clean=_clean_mcp_servers,
+    ),
+    Sweep(
+        label="user_activity_log",
+        count_sql=f"SELECT count(*) FROM user_activity_log WHERE {_ACTIVITY_LOG_LEAK_WHERE}",
+        clean=_clean_activity_log,
+    ),
+    Sweep(
+        label="compliance_reports",
+        count_sql=f"SELECT count(*) FROM compliance_reports WHERE {_COMPLIANCE_REPORT_LEAK_WHERE}",
+        clean=_clean_compliance_reports,
     ),
 ]
 

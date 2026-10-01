@@ -62,6 +62,14 @@ test("no engine vocabulary appears on the page", async ({ page }) => {
 });
 
 test("agent detail lists the policies governing that agent as sentences", async ({ page }) => {
+  // Same SPA-route-vs-API-call collision as the shared **/agents route above:
+  // page.goto("/agents/a1") is itself a document navigation matching this glob.
+  await page.route("**/agents/a1", (route) =>
+    route.request().resourceType() === "document"
+      ? route.continue()
+      : route.fulfill({ json: { ...AGENTS[0], model_version: null, approved_tools: [],
+          approved_by: null, governance_mode: "govern" } }),
+  );
   await page.route("**/agents/a1/policies", (route) =>
     route.fulfill({
       json: [{ id: "p1", principalType: "agent", principalId: "claims-adjuster",
@@ -75,6 +83,12 @@ test("agent detail lists the policies governing that agent as sentences", async 
 });
 
 test("an agent with no policies gets an invitation, not a blank", async ({ page }) => {
+  await page.route("**/agents/a2", (route) =>
+    route.request().resourceType() === "document"
+      ? route.continue()
+      : route.fulfill({ json: { ...AGENTS[1], model_version: null, approved_tools: [],
+          approved_by: null, governance_mode: "govern" } }),
+  );
   await page.route("**/agents/a2/policies", (route) => route.fulfill({ json: [] }));
   await page.goto("/agents/a2");
   await expect(page.getByTestId("governing-policies"))

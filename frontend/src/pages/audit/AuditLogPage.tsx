@@ -16,18 +16,24 @@ export function AuditLogPage() {
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const { isEnterprise } = useLicense();
 
+  const [loadError, setLoadError] = useState(false);
+  const [exportError, setExportError] = useState(false);
+
   const load = useCallback(async (f: Filters) => {
     setLoading(true);
+    setLoadError(false);
     try {
       const result = await listAuditEvents(f);
       setData(result);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    load(filters);
+    void Promise.resolve().then(() => load(filters));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleFilter = (f: Filters) => {
@@ -46,13 +52,21 @@ export function AuditLogPage() {
           {isEnterprise && (
             <button
               onClick={async () => {
-                const blob = await exportAuditEvents(filters);
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "audit_events.csv";
-                a.click();
-                URL.revokeObjectURL(url);
+                setExportError(false);
+                try {
+                  const blob = await exportAuditEvents(filters);
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = "audit_events.csv";
+                  a.click();
+                  URL.revokeObjectURL(url);
+                } catch {
+                  // Previously reused loadError here, which rendered "Couldn't
+                  // load audit events. Try Refresh." for an export failure --
+                  // wrong cause and a fix that does nothing for this button.
+                  setExportError(true);
+                }
               }}
               className="text-body-sm text-ac-body hover:text-ac-ink border border-ac-hairline-strong rounded-md px-3 py-1.5"
             >
@@ -69,6 +83,13 @@ export function AuditLogPage() {
       </div>
 
       <AuditFilterBar onFilter={handleFilter} groupBy={groupBy} onGroupByChange={setGroupBy} />
+
+      {loadError && (
+        <p className="text-body-sm text-ac-error mb-3">Couldn't load audit events. Try Refresh.</p>
+      )}
+      {exportError && (
+        <p className="text-body-sm text-ac-error mb-3">Couldn't export audit events. Try again.</p>
+      )}
 
       <AuditTable events={data?.events ?? []} loading={loading} groupBy={groupBy} />
 

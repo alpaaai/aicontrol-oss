@@ -10,13 +10,15 @@ type NavItem = { label: string; path: string; requires?: keyof FeatureFlags };
 const NAV_ITEMS: NavItem[] = [
   { label: "Overview",  path: "/overview" },
   { label: "Agents",    path: "/agents" },
+  { label: "MCP Servers", path: "/mcp-servers" },
   { label: "Policies",  path: "/policies" },
   { label: "Audit log", path: "/audit" },
   { label: "Reviews",   path: "/reviews", requires: "hitl" },
   { label: "Policy Drift", path: "/drift" },
   { label: "Metrics",   path: "/metrics" },
   { label: "Reports",   path: "/reports", requires: "compliance_reports" },
-  { label: "Billing",   path: "/billing", requires: "compliance_reports" },
+  { label: "Activity log", path: "/activity" },
+  { label: "Billing",   path: "/billing" },
 ];
 
 export function Sidebar() {

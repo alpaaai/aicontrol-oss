@@ -29,7 +29,7 @@ function parameterMatchValue(value: unknown): string {
   return `is ${value}`;
 }
 
-const CONDITION_PHRASES: Record<string, (v: any) => string> = {
+const CONDITION_PHRASES: Record<string, (v: unknown) => string> = {
   numeric_conditions: (v) =>
     Object.entries(v as Record<string, Record<string, number>>)
       .flatMap(([field, ops]) =>
@@ -38,13 +38,16 @@ const CONDITION_PHRASES: Record<string, (v: any) => string> = {
       .join(" and "),
   tool_name_contains: (v) => `the tool name contains ${(v as string[]).join(" or ")}`,
   tool_name_in: (v) => `the tool is ${(v as string[]).join(" or ")}`,
-  rate_limit: (v) => `called more than ${(v as any).max_calls} times`,
+  rate_limit: (v) => `called more than ${(v as { max_calls: number }).max_calls} times`,
   parameter_match: (v) =>
     Object.entries(v as Record<string, unknown>)
       .map(([k, val]) => `${k} ${parameterMatchValue(val)}`)
       .join(" and "),
-  time_conditions: (v) => `outside ${(v as any).hours[0]}:00-${(v as any).hours[1]}:00`,
-  token_budget: (v) => `the budget of ${(v as any).max_tokens?.toLocaleString()} tokens is exceeded`,
+  time_conditions: (v) => {
+    const hours = (v as { hours: [number, number] }).hours;
+    return `outside ${hours[0]}:00-${hours[1]}:00`;
+  },
+  token_budget: (v) => `the budget of ${(v as { max_tokens?: number }).max_tokens?.toLocaleString()} tokens is exceeded`,
 };
 
 function humanizeTool(tool: string): string {

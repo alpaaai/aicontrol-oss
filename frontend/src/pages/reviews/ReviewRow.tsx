@@ -24,18 +24,31 @@ function isOverdue(review: Review): boolean {
   return Date.now() - new Date(review.created_at).getTime() > 4 * 3600000
 }
 
+function extractErrorMessage(err: unknown): string {
+  if (err && typeof err === 'object' && 'response' in err) {
+    const detail = (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+    if (detail) return detail
+  }
+  return 'Failed to resolve review. Please try again.'
+}
+
 export function ReviewRow({ review, onActioned }: Props) {
   const [approving, setApproving] = useState(false)
   const [denying, setDenying] = useState(false)
   const [note, setNote] = useState('')
   const [showNote, setShowNote] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const overdue = isOverdue(review)
 
   const handleAction = async (action: 'approve' | 'deny') => {
     if (action === 'approve') setApproving(true)
     else setDenying(true)
+    setError(null)
     try {
       await actionReview(review.id, action, note || undefined)
+      onActioned()
+    } catch (err) {
+      setError(extractErrorMessage(err))
       onActioned()
     } finally {
       setApproving(false)
@@ -99,6 +112,10 @@ export function ReviewRow({ review, onActioned }: Props) {
               {review.status}
             </span>
           </div>
+
+          {error && (
+            <p className="mt-1.5 text-[11px] text-ac-decision-deny font-medium">{error}</p>
+          )}
 
           {showNote && (
             <input

@@ -9,11 +9,25 @@ export function ReportHistory({ refreshKey }: Props) {
   const [reports, setReports] = useState<ComplianceReport[]>([])
   const [loading, setLoading] = useState(true)
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
-    setLoading(true)
-    // listReports returns ComplianceReport[] directly
-    listReports().then(r => setReports(r)).finally(() => setLoading(false))
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      setLoadError(false)
+      try {
+        // listReports returns ComplianceReport[] directly
+        const r = await listReports()
+        if (!cancelled) setReports(r)
+      } catch {
+        if (!cancelled) setLoadError(true)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
   }, [refreshKey])
 
   const handleDownload = async (report: ComplianceReport) => {
@@ -37,7 +51,10 @@ export function ReportHistory({ refreshKey }: Props) {
       <h3 className="text-[14px] font-semibold text-ac-ink mb-3">Report History</h3>
       <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
         {loading && <div className="h-10 bg-gray-50 animate-pulse m-4 rounded" />}
-        {!loading && reports.length === 0 && (
+        {!loading && loadError && (
+          <div className="text-center text-sm text-red-600 py-8">Couldn't load report history. Try refreshing.</div>
+        )}
+        {!loading && !loadError && reports.length === 0 && (
           <div className="text-center text-sm text-gray-400 py-8">No reports generated yet.</div>
         )}
         {reports.map(r => (

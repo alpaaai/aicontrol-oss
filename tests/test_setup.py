@@ -26,7 +26,10 @@ async def test_users_table_has_new_columns():
 
 @pytest.mark.asyncio
 async def test_org_settings_table_exists():
-    expected = {"id", "org_name", "timezone", "created_at", "updated_at"}
+    expected = {
+        "id", "org_name", "timezone", "created_at", "updated_at",
+        "license_plan", "license_status", "license_synced_at", "activation_code",
+    }
     async with async_session_factory() as db:
         result = await db.execute(
             text(

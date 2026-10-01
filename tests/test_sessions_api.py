@@ -1,7 +1,18 @@
 """Tests for GET /sessions and GET /sessions/{id}/events."""
 import pytest
 from httpx import AsyncClient, ASGITransport
+from app.core.license_gate import require_enterprise_license
 from app.main import app
+
+
+@pytest.fixture(autouse=True)
+def _bypass_enterprise_license_gate():
+    """This file's tests aren't about licensing -- bypass
+    require_enterprise_license the same way test_audit_export.py bypasses
+    it, rather than relying on ambient org_settings state."""
+    app.dependency_overrides[require_enterprise_license] = lambda: None
+    yield
+    app.dependency_overrides.pop(require_enterprise_license, None)
 
 
 @pytest.mark.asyncio

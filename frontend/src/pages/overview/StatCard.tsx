@@ -10,8 +10,10 @@ interface StatCardProps {
 }
 
 export function StatCard({ label, value, delta, deltaPositive, onDeltaClick, live, index = 0, featured }: StatCardProps) {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
   return (
     <div
+      data-testid={`stat-card-${slug}`}
       className="bg-ac-surface-card border border-ac-hairline rounded-lg p-4 flex-1 min-w-[140px] relative overflow-hidden"
       style={{ animationDelay: `${index * 70}ms` }}
     >
@@ -26,7 +28,7 @@ export function StatCard({ label, value, delta, deltaPositive, onDeltaClick, liv
         )}
         <p className="text-caption text-ac-muted">{label}</p>
       </div>
-      <p className="text-display-sm text-ac-ink tabular-nums font-display">{value}</p>
+      <p data-testid={`stat-value-${slug}`} className="text-display-sm text-ac-ink tabular-nums font-display">{value}</p>
       {delta && (
         onDeltaClick ? (
           <button

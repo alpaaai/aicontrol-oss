@@ -24,7 +24,11 @@ class Agent(Base):
     approved_by: Mapped[Optional[str]] = mapped_column(String(100))
     approved_at: Mapped[Optional[datetime]] = mapped_column(TIMESTAMP)
     metadata_: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, server_default="{}")
-    governance_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="govern")
+    # 'observe' since migration 3c9073bb00c2 (D16) -- pre-migration agent rows
+    # keep whatever they already had (that migration is new-rows-only), but a
+    # brand-new agent must start non-enforcing so an upgrade can never
+    # silently arm enforcement on rows that never asked for it.
+    governance_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="observe")
     # Coverage: what the adapter reported about itself at bind time. Separates
     # "this agent has never run" from "this agent ran and the hook never fired",
     # which traffic alone cannot distinguish.

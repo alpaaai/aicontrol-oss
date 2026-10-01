@@ -66,22 +66,26 @@ test.beforeEach(async ({ page }) => {
 
 test("the overview shows stat rail with totals", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("Tool calls", { exact: true })).toBeVisible();
-  await expect(page.getByText("Active agents", { exact: true })).toBeVisible();
-  await expect(page.getByText("Approval Needed", { exact: true })).toBeVisible();
-  await expect(page.getByText("Denied", { exact: true })).toBeVisible();
+  // "Approval Needed" and "Denied" each also appear as AgentOutcomeTable
+  // column headers, so scope to the stat cards (data-testid, not text) to
+  // avoid a strict-mode multi-match.
+  await expect(page.getByTestId("stat-card-tool-calls")).toBeVisible();
+  await expect(page.getByTestId("stat-card-active-agents")).toBeVisible();
+  await expect(page.getByTestId("stat-card-approval-needed")).toBeVisible();
+  await expect(page.getByTestId("stat-card-denied")).toBeVisible();
 });
 
 test("stat rail computes totals from agent data", async ({ page }) => {
   await page.goto("/");
-  // Total calls: 142+98+87+85=412
-  await expect(page.getByRole("heading", { level: 1, name: /412/ })).toBeVisible();
+  // Total calls: 142+98+87+85=412 -- StatCard renders the value in a <p>,
+  // not a heading; the page's only <h1> is the "Overview" title.
+  await expect(page.getByTestId("stat-value-tool-calls")).toHaveText("412");
   // Active agents: 4
-  await expect(page.getByText("4", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("stat-value-active-agents")).toHaveText("4");
   // Approval needed: 2+1+0+0=3
-  await expect(page.getByText("3", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("stat-value-approval-needed")).toHaveText("3");
   // Denied: 3+1+1+0=5
-  await expect(page.getByText("5", { exact: true })).toBeVisible();
+  await expect(page.getByTestId("stat-value-denied")).toHaveText("5");
 });
 
 test("agent outcome table shows agent names not counts", async ({ page }) => {
@@ -93,7 +97,11 @@ test("agent outcome table shows agent names not counts", async ({ page }) => {
 
 test("agent outcome table shows calls approval-needed and denied columns", async ({ page }) => {
   await page.goto("/");
-  await expect(page.getByText("Approval Needed", { exact: true })).toBeVisible();
+  // "Approval Needed" also labels the stat card above the table; scope to
+  // the column header specifically to avoid a strict-mode multi-match.
+  await expect(
+    page.getByText("Approval Needed", { exact: true }).last()
+  ).toBeVisible();
   // Each agent row should have its counts
   await expect(page.getByText("142")).toBeVisible(); // claims-processor calls
   await expect(page.getByText("98")).toBeVisible(); // document-extractor calls

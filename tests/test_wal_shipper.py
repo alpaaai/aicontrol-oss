@@ -112,3 +112,70 @@ async def test_replay_and_start_ships_pre_existing_unshipped_lines(tmp_path, cle
             assert result.scalar_one() == 1
     finally:
         await shipper.stop()
+
+
+@pytest.mark.asyncio
+async def test_a_later_duplicate_line_does_not_roll_back_an_earlier_shipped_line(
+    tmp_path, clean_test_session
+):
+    """3.5 fix: _ship_once used to write each line's checkpoint immediately
+    after its own write_event() flush succeeded, but commit only once at the
+    end of the whole batch, all inside one shared session. A later line's
+    IntegrityError called session.rollback() on that same shared session --
+    which discards every earlier line's flushed-but-uncommitted insert too --
+    while the checkpoint had already advanced past those earlier lines. The
+    result: the earlier row is gone from Postgres, but never re-shipped,
+    because the checkpoint says it's done. This test pre-seeds a duplicate
+    event_id as the SECOND line so it raises IntegrityError, and asserts the
+    FIRST line's row still exists after the batch."""
+    from app.services.wal import WalWriter
+    from app.services.wal_shipper import WalShipper
+    from app.models.database import async_session_factory
+
+    agent_id, session_id = clean_test_session
+    wal_path = tmp_path / "audit.jsonl"
+    writer = WalWriter(wal_path)
+
+    first_event_id = writer.append({
+        "session_id": str(session_id), "agent_id": str(agent_id),
+        "agent_name": "wal-shipper-test-agent", "tool_name": "rollback_scope_test_first",
+        "tool_parameters": {}, "decision": "allow", "decision_reason": "default_allow",
+        "sequence_number": 1, "duration_ms": 3,
+    })
+
+    # Pre-insert a row under a fixed event_id directly, then append a WAL
+    # line reusing that same event_id as the batch's second line -- its
+    # write_event() will raise IntegrityError on the primary key.
+    duplicate_event_id = uuid.uuid4()
+    async with async_session_factory() as session:
+        await session.execute(text("""
+            INSERT INTO audit_events
+                (id, session_id, agent_id, agent_name, tool_name, tool_parameters,
+                 decision, decision_reason, sequence_number, duration_ms)
+            VALUES (:id, :session_id, :agent_id, 'wal-shipper-test-agent',
+                    'rollback_scope_test_preexisting', '{}', 'allow', 'default_allow', 2, 1)
+        """), {"id": str(duplicate_event_id), "session_id": str(session_id), "agent_id": str(agent_id)})
+        await session.commit()
+
+    with open(wal_path, "a") as f:
+        f.write(json.dumps({
+            "session_id": str(session_id), "agent_id": str(agent_id),
+            "agent_name": "wal-shipper-test-agent", "tool_name": "rollback_scope_test_second",
+            "tool_parameters": {}, "decision": "allow", "decision_reason": "default_allow",
+            "sequence_number": 2, "duration_ms": 3,
+            "event_id": str(duplicate_event_id), "wal_seq": 1,
+        }) + "\n")
+
+    shipper = WalShipper(wal_path=wal_path, session_factory=async_session_factory)
+    await shipper._ship_once()
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("SELECT COUNT(*) FROM audit_events WHERE id = :id"),
+            {"id": str(first_event_id)},
+        )
+        assert result.scalar_one() == 1, (
+            "first line's row was rolled back by the second line's IntegrityError "
+            "despite its checkpoint already having advanced -- it will never be "
+            "re-shipped"
+        )

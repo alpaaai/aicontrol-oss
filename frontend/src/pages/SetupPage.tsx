@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Shield, Lock, Activity, FileCheck } from "lucide-react";
 import { completeSetup } from "@/api/setup";
 import { useAuth } from "@/hooks/useAuth";
+import { AuthFooter } from "@/components/shared/AuthFooter";
 
 // IANA timezone list (common subset)
 const TIMEZONES = [
@@ -296,9 +297,7 @@ export function SetupPage() {
             </>
           )}
 
-          <p className="mt-10 text-[11px] text-ac-muted/60 text-center">
-            Secured by AIControl · Enterprise tier
-          </p>
+          <AuthFooter />
         </div>
       </div>
     </div>

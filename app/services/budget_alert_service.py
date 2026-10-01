@@ -13,6 +13,7 @@ from slack_sdk.errors import SlackApiError
 from app.core.config import settings
 from app.core.license_gate import get_license_info
 from app.core.logging import get_logger
+from app.models.database import async_session_factory
 
 logger = get_logger("budget_alert_service")
 
@@ -28,7 +29,12 @@ async def maybe_alert_budget_threshold(
     """No-op unless a token_budget policy targeting tool_name has crossed
     80% of its threshold. Silently skips (logged) if Slack isn't configured
     or the license isn't Business+ — never raises, this is advisory only."""
-    license_info = get_license_info()
+    try:
+        async with async_session_factory() as session:
+            license_info = await get_license_info(session)
+    except Exception:
+        logger.warning("budget_alert_skipped", reason="license check failed")
+        return
     if not license_info.is_business:
         logger.info("budget_alert_skipped", reason="requires Business or Enterprise license")
         return

@@ -1,0 +1,20 @@
+# API
+fastapi
+uvicorn[standard]
+httpx
+
+# Database
+sqlalchemy[asyncio]
+alembic
+asyncpg
+
+# Data validation
+pydantic
+pydantic-settings
+
+# Utilities
+python-dotenv
+structlog
+
+# Payments
+stripe==15.6.1

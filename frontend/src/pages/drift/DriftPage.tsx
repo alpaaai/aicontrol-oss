@@ -3,12 +3,13 @@ import { listWarnings } from '../../api/warnings'
 import type { PolicyWarning } from '../../api/warnings'
 import { DriftWarningRow } from './DriftWarningRow'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
+import { ReactivateGuard } from '../../components/shared/ReactivateGuard'
 import { usePoll } from '../../hooks/usePoll'
 import { useLicense } from '../../hooks/useLicense'
 
 function DriftPageContent() {
   const fetcher = useCallback(() => listWarnings(true), [])
-  const { data, refetch } = usePoll(fetcher, 15000)
+  const { data, error, loading, refetch } = usePoll(fetcher, 15000)
 
   const warnings = data ?? []
 
@@ -24,7 +25,13 @@ function DriftPageContent() {
       </div>
 
       <div className="bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
-        {warnings.length === 0 ? (
+        {loading && data === null ? (
+          <div className="h-10 bg-gray-50 animate-pulse m-4 rounded" />
+        ) : error ? (
+          <div className="text-center text-sm text-red-600 py-10">
+            Couldn't load drift warnings. Try refreshing the page.
+          </div>
+        ) : warnings.length === 0 ? (
           <div className="text-center text-sm text-gray-400 py-10">
             No active drift warnings. Policy coverage is in sync.
           </div>
@@ -43,12 +50,14 @@ function DriftPageContent() {
 function ResolvedWarnings() {
   const [data, setData] = useState<PolicyWarning[]>([])
   const [show, setShow] = useState(false)
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => {
     if (show) {
-      listWarnings(false).then(warnings =>
-        setData(warnings.filter(w => !w.is_active))
-      )
+      setLoadError(false)
+      listWarnings(false)
+        .then(warnings => setData(warnings.filter(w => !w.is_active)))
+        .catch(() => setLoadError(true))
     }
   }, [show])
 
@@ -59,7 +68,9 @@ function ResolvedWarnings() {
       </button>
       {show && (
         <div className="mt-2 bg-ac-surface-card border border-ac-hairline rounded-lg shadow-ac-surface-card overflow-hidden">
-          {data.length === 0 ? (
+          {loadError ? (
+            <div className="text-center text-sm text-red-600 py-6">Couldn't load resolved warnings.</div>
+          ) : data.length === 0 ? (
             <div className="text-center text-sm text-gray-400 py-6">No resolved warnings yet.</div>
           ) : (
             data.map(w => (
@@ -79,7 +90,18 @@ function ResolvedWarnings() {
 }
 
 export function DriftPage() {
-  const { isEnterprise } = useLicense()
+  const { isEnterprise, needsReactivation } = useLicense()
+  if (needsReactivation) {
+    return (
+      <div className="p-6">
+        <h2 className="text-[18px] font-semibold text-ac-ink mb-4">Policy drift</h2>
+        <ReactivateGuard
+          title="Reactivate your plan"
+          description="Automated drift detection requires an active Enterprise subscription."
+        />
+      </div>
+    )
+  }
   if (!isEnterprise) {
     return (
       <div className="p-6">

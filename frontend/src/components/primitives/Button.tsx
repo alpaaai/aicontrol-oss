@@ -22,8 +22,20 @@ export function Button(props: {
   const handleClick = async () => {
     if (!props.onClick) return;
     if (props.pendingLabel) setState("pending");
-    await props.onClick();
-    setState(props.doneLabel ? "done" : "idle");
+    try {
+      await props.onClick();
+      setState(props.doneLabel ? "done" : "idle");
+    } catch (err) {
+      // A rejected onClick (the caller's own request failed) used to leave
+      // the button stuck on pendingLabel forever if the caller didn't catch
+      // its own error, or -- if the caller swallowed the error internally --
+      // to unconditionally show doneLabel here even though nothing
+      // succeeded. Reset to idle either way so the button reflects reality
+      // and can be retried; the caller is still responsible for surfacing
+      // its own error message.
+      setState("idle");
+      throw err;
+    }
   };
 
   const label =

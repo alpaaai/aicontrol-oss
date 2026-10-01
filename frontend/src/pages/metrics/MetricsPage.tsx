@@ -9,10 +9,10 @@ import { StatCard } from "@/pages/overview/StatCard";
 export function MetricsPage() {
   const [window, setWindow] = useState<"24h" | "7d" | "30d">("7d");
   const fetcher = useCallback(() => getSummary(window), [window]);
-  const { data, loading } = usePoll(fetcher, 30000);
+  const { data, loading, error } = usePoll(fetcher, 30000);
 
   const metricsFetcher = useCallback(() => getMetrics(), []);
-  const { data: metrics, loading: metricsLoading } = usePoll(metricsFetcher, 60000);
+  const { data: metrics, loading: metricsLoading, error: metricsError } = usePoll(metricsFetcher, 60000);
 
   return (
     <div className="p-6 space-y-5">
@@ -29,6 +29,12 @@ export function MetricsPage() {
           <option value="30d">Last 30 days</option>
         </select>
       </div>
+
+      {(error || metricsError) && (
+        <div className="text-center text-sm text-ac-error py-2">
+          Couldn't load metrics. Try refreshing the page.
+        </div>
+      )}
 
       <div className="flex gap-4 flex-wrap">
         <StatCard

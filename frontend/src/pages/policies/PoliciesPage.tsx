@@ -8,17 +8,27 @@ import { EmptyState } from "@/components/primitives/EmptyState";
 
 export function PoliciesPage() {
   const [policies, setPolicies] = useState<Policy[] | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [features, setFeatures] = useState<FeatureFlags | null>(null);
+  const [featuresError, setFeaturesError] = useState(false);
   const [tab, setTab] = useState<"active" | "library">("active");
   const [modalOpen, setModalOpen] = useState(false);
 
-  const reload = () => listPolicies().then(setPolicies).catch(() => setPolicies([]));
+  const reload = () => {
+    setLoadError(false);
+    return listPolicies()
+      .then(setPolicies)
+      .catch(() => {
+        setPolicies([]);
+        setLoadError(true);
+      });
+  };
 
   useEffect(() => {
     reload();
     getLicenseFeatures()
       .then((r) => setFeatures(r.features))
-      .catch(() => {});
+      .catch(() => setFeaturesError(true));
   }, []);
 
   // GET /policies returns every row -- active, library templates, and plain
@@ -55,6 +65,7 @@ export function PoliciesPage() {
         onClose={() => setModalOpen(false)}
         onCreated={reload}
         nlAuthoringEnabled={!!features?.nl_authoring}
+        featuresError={featuresError}
       />
 
       <div>
@@ -84,6 +95,10 @@ export function PoliciesPage() {
         </div>
         {visible === null ? (
           <div className="h-40 bg-ac-surface-sunk rounded-lg animate-pulse" />
+        ) : loadError ? (
+          <p className="text-body-sm text-ac-error py-8 text-center">
+            Couldn't load policies. Try refreshing the page.
+          </p>
         ) : visible.length === 0 ? (
           <EmptyState
             title={

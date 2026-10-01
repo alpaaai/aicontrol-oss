@@ -6,13 +6,17 @@ from sqlalchemy import text
 
 
 @pytest.mark.asyncio
-async def test_new_agent_defaults_to_govern_mode(client, admin_token):
+async def test_new_agent_defaults_to_observe_mode(client, admin_token):
+    """D16 (migration 3c9073bb00c2): a brand-new agent starts non-enforcing
+    so an upgrade can never silently arm enforcement on a row that never
+    asked for it. Pre-migration rows keep whatever they already had --
+    unaffected here since this test always creates a fresh row."""
     resp = await client.post("/agents", headers=admin_token, json={
         "name": "test-agent-governance-mode",
         "owner": "test@test.com",
     })
     assert resp.status_code == 201
-    assert resp.json()["governance_mode"] == "govern"
+    assert resp.json()["governance_mode"] == "observe"
 
 
 @pytest.mark.asyncio

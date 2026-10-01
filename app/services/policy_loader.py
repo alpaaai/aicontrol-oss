@@ -64,6 +64,17 @@ async def upsert_policies(session: AsyncSession, policies: list[dict]) -> None:
 
 
 async def load_all(session: AsyncSession) -> None:
-    """Full startup sequence: YAML -> compile -> Postgres."""
+    """Full startup sequence: YAML -> compile -> Postgres.
+
+    Also seeds the 18 inactive Policy Library templates (scripts/
+    seed_library_policies.py) -- documented as available out of the box
+    (Policy Library tab, aictl.io Getting Started), but nothing previously
+    called that script automatically. upsert_policies is idempotent (merge
+    on name), so re-running this on every startup is safe and picks up
+    template edits.
+    """
     policies = load_yaml()
     await upsert_policies(session, policies)
+
+    from scripts.seed_library_policies import LIBRARY_POLICIES
+    await upsert_policies(session, LIBRARY_POLICIES)

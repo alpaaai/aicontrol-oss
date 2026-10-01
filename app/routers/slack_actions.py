@@ -4,6 +4,7 @@ import hmac
 import json
 import time
 import uuid
+from datetime import datetime
 from urllib.parse import unquote_plus
 from typing import Any
 
@@ -45,14 +46,35 @@ def _verify_slack_signature(request_body: bytes, headers: dict) -> bool:
     return hmac.compare_digest(computed, slack_signature)
 
 
+def _resolve_reviewer_email(client: WebClient, slack_user_id: str) -> str:
+    """Resolve a Slack user ID to their email via users.info, for audit-identity
+    consistency with the API review path (which stores the human JWT's email
+    claim). Falls back to the raw Slack user ID if the lookup fails or the
+    workspace hasn't granted the users:read.email scope."""
+    try:
+        response = client.users_info(user=slack_user_id)
+        email = response.get("user", {}).get("profile", {}).get("email")
+        return email or slack_user_id
+    except Exception as e:
+        logger.warning(
+            "slack_user_lookup_failed", slack_user_id=slack_user_id, error=str(e)
+        )
+        return slack_user_id
+
+
 async def handle_action(
     session: AsyncSession,
     action_id: str,
     review_id: uuid.UUID,
     reviewer: str,
 ) -> None:
-    """Update HITLReview row based on approve/deny action."""
-    review = await session.get(HITLReview, review_id)
+    """Update HITLReview row based on approve/deny action.
+
+    `reviewer` is the raw Slack user ID from the interaction payload; it is
+    resolved to an email address (matching the API review path's identity
+    format) when a bot token is configured.
+    """
+    review = await session.get(HITLReview, review_id, with_for_update=True)
     if not review:
         logger.warning("hitl_review_not_found", review_id=str(review_id))
         return
@@ -62,26 +84,32 @@ async def handle_action(
                     status=review.status)
         return
 
+    client = None
+    if settings.slack_bot_token and \
+       settings.slack_bot_token != "xoxb-placeholder":
+        client = WebClient(token=settings.slack_bot_token)
+
+    reviewer_identity = _resolve_reviewer_email(client, reviewer) if client else reviewer
+
     new_status = "approved" if action_id == "hitl_approve" else "denied"
     review.status = new_status
-    review.reviewer = reviewer
+    review.reviewer = reviewer_identity
+    review.reviewed_at = datetime.utcnow()
     await session.flush()
 
     logger.info(
         "hitl_resolved",
         review_id=str(review_id),
         status=new_status,
-        reviewer=reviewer,
+        reviewer=reviewer_identity,
     )
 
-    if settings.slack_bot_token and \
-       settings.slack_bot_token != "xoxb-placeholder":
-        client = WebClient(token=settings.slack_bot_token)
+    if client:
         icon = "Approved" if new_status == "approved" else "Denied"
         try:
             client.chat_postMessage(
                 channel=settings.slack_review_channel,
-                text=f"{icon}: Review `{str(review_id)[:8]}...` by {reviewer}",
+                text=f"{icon}: Review `{str(review_id)[:8]}...` by {reviewer_identity}",
             )
         except Exception as e:
             logger.error("slack_confirmation_failed", error=str(e))

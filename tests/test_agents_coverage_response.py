@@ -59,13 +59,18 @@ async def test_agent_with_no_handshake_reads_unknown(client, admin_token, make_a
 
 @pytest.mark.asyncio
 async def test_agent_with_traffic_after_the_handshake_reads_governed(
-    client, agent_token, admin_token, make_agent
+    client, agent_token, admin_token, make_agent, _require_demo_mode_on_server
 ):
     agent_id = await make_agent(
         framework="crewai", hook="before_tool_call", sdk_version="1.0",
         coverage_last_seen_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
     )
-    intercepted = await client.post("/intercept", headers=agent_token, json={
+    # /demo/call_tool (governance_engine's shared enforcement path) is the
+    # only HTTP route left that produces a real audit_event for an arbitrary
+    # agent_id without a registered MCP server -- the deleted POST /intercept
+    # served this role before the gateway pivot; this test just needs traffic
+    # to land, not anything demo-specific.
+    intercepted = await client.post("/demo/call_tool", headers=agent_token, json={
         "session_id": str(uuid.uuid4()),
         "agent_id": str(agent_id),
         "agent_name": "test-agent-coverage-traffic",
@@ -120,12 +125,12 @@ async def test_the_list_endpoint_carries_coverage_too(client, admin_token, make_
 
 @pytest.mark.asyncio
 async def test_an_unresolved_system_is_recorded_on_the_agent(
-    client, agent_token, admin_token, make_agent
+    client, agent_token, admin_token, make_agent, _require_demo_mode_on_server
 ):
     """The 2.2 fail-open mitigation: a policy bound to a system does not match
     a call whose system is unknown, so the unknowns must be visible."""
     agent_id = await make_agent()
-    resp = await client.post("/intercept", headers=agent_token, json={
+    resp = await client.post("/demo/call_tool", headers=agent_token, json={
         "session_id": str(uuid.uuid4()),
         "agent_id": str(agent_id),
         "agent_name": "test-agent-coverage-unresolved",

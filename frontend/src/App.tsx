@@ -11,11 +11,13 @@ import { getSetupStatus } from "./api/setup";
 
 import { OverviewPage } from "./pages/overview/OverviewPage";
 import { AuditLogPage } from "./pages/audit/AuditLogPage";
+import { ActivityLogPage } from "./pages/activity/ActivityLogPage";
 import { MetricsPage } from "./pages/metrics/MetricsPage";
 import { PoliciesPage } from "./pages/policies/PoliciesPage";
 import { PolicyDetailPage } from "./pages/policies/PolicyDetailPage";
 import { AgentsPage } from "./pages/agents/AgentsPage";
 import { AgentDetailPage } from "./pages/agents/AgentDetailPage";
+import { McpServersPage } from "./pages/mcp-servers/McpServersPage";
 import { TokensPage } from "./pages/tokens/TokensPage";
 import { ReviewQueuePage } from "./pages/reviews/ReviewQueuePage";
 import { ReportsPage } from "./pages/reports/ReportsPage";
@@ -68,10 +70,12 @@ export default function App() {
           <Route path="policies/:id"  element={<PolicyDetailPage />} />
           <Route path="agents"        element={<AgentsPage />} />
           <Route path="agents/:id"    element={<AgentDetailPage />} />
+          <Route path="mcp-servers"   element={<McpServersPage />} />
           <Route path="tokens"        element={<TokensPage />} />
           <Route path="reviews"       element={<ReviewQueuePage />} />
           <Route path="reports"       element={<ReportsPage />} />
           <Route path="settings"      element={<SettingsPage />} />
+          <Route path="activity"      element={<ActivityLogPage />} />
           <Route path="billing"       element={<BillingPage />} />
           <Route path="drift"         element={<DriftPage />} />
         </Route>

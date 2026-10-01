@@ -10,10 +10,24 @@ export function TokensPage() {
   const [tokens, setTokens] = useState<TokenListItem[]>([]);
   const [activeOnly, setActiveOnly] = useState(true);
   const [tokensLoading, setTokensLoading] = useState(true);
+  const [tokensError, setTokensError] = useState(false);
 
   useEffect(() => {
-    setTokensLoading(true);
-    listTokens(activeOnly).then(setTokens).finally(() => setTokensLoading(false));
+    let cancelled = false;
+    async function load() {
+      setTokensLoading(true);
+      setTokensError(false);
+      try {
+        const t = await listTokens(activeOnly);
+        if (!cancelled) setTokens(t);
+      } catch {
+        if (!cancelled) setTokensError(true);
+      } finally {
+        if (!cancelled) setTokensLoading(false);
+      }
+    }
+    load();
+    return () => { cancelled = true; };
   }, [activeOnly, createdCount]);
 
   return (
@@ -88,7 +102,13 @@ export function TokensPage() {
             <div className="h-10 bg-gray-50 animate-pulse m-4 rounded" />
           )}
 
-          {!tokensLoading && tokens.length === 0 && (
+          {!tokensLoading && tokensError && (
+            <div className="text-center text-sm text-red-600 py-8">
+              Couldn't load tokens. Try refreshing.
+            </div>
+          )}
+
+          {!tokensLoading && !tokensError && tokens.length === 0 && (
             <div className="text-center text-sm text-ac-muted py-8">
               No tokens found.
             </div>

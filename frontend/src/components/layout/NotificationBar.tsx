@@ -35,6 +35,14 @@ export function NotificationBar() {
           message: `Deny rate today is ${data.deny_rate_today}% — above normal threshold`,
         })
       }
+      if (data.agents_with_unresolved_systems > 0) {
+        items.push({
+          id: 'unresolved_systems',
+          type: 'warning',
+          message: `${data.agents_with_unresolved_systems} agent${data.agents_with_unresolved_systems > 1 ? 's' : ''} calling tools with an unresolved system — system-scoped policies won't fire for them`,
+          to: '/agents',
+        })
+      }
       setNotifications(prev => {
         const ids = new Set(prev.map(n => n.id))
         return [...prev, ...items.filter(n => !ids.has(n.id))]

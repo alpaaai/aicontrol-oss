@@ -36,7 +36,17 @@ export function AuditRow(props: { event: AuditEvent }) {
 
       {open && (
         <div className="border-t border-ac-hairline px-4 py-3 space-y-3 bg-ac-canvas-soft">
-          <p className="text-body-sm text-ac-body">{event.decision_reason ?? "No reason provided"}</p>
+          <div className="flex items-center gap-2">
+            {event.decision_reason?.startsWith("evaluation_error:") && (
+              <span
+                data-testid="engine-error-badge"
+                className="inline-flex items-center rounded-full px-[10px] py-[3px] text-label-uc bg-ac-decision-deny-soft text-ac-decision-deny"
+              >
+                Engine error
+              </span>
+            )}
+            <p className="text-body-sm text-ac-body">{event.decision_reason ?? "No reason provided"}</p>
+          </div>
           <div className="grid grid-cols-2 gap-3 text-body-sm">
             <div>
               <p className="text-caption text-ac-muted">Agent</p>
@@ -58,7 +68,7 @@ export function AuditRow(props: { event: AuditEvent }) {
           {event.tool_parameters && (
             <div>
               <p className="text-caption text-ac-muted mb-1">Parameters</p>
-              <p className="text-code text-ac-body-strong bg-ac-surface-sunk rounded-md px-2 py-1.5 break-all">{event.tool_parameters}</p>
+              <p className="text-code text-ac-body-strong bg-ac-surface-sunk rounded-md px-2 py-1.5 break-all">{JSON.stringify(event.tool_parameters)}</p>
             </div>
           )}
           {event.tool_response && (

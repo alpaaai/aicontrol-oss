@@ -184,3 +184,44 @@ async def test_write_event_does_not_dispatch_when_not_business_licensed():
         await asyncio.sleep(0)
 
     mock_dispatch.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_write_event_persists_even_when_license_check_raises():
+    """get_license_info() raises HTTPException(402) on an invalid/expired
+    license activation. It used to be called unguarded inside write_event
+    -- a bad license key could raise mid-function, after the audit_event was
+    already flushed, corrupting the caller's review/deny flow (e.g. an
+    orphaned HITLReview-less audit_event in mcp_gateway.py's review branch)
+    with an unrelated 402 instead of the intended response. Export dispatch
+    is a Business+ feature; a license problem there must never be able to
+    block the core append path every decision depends on regardless of
+    license state."""
+    from fastapi import HTTPException
+    from app.services import audit_writer
+
+    mock_session = AsyncMock()
+    mock_session.add = AsyncMock()
+    mock_session.flush = AsyncMock()
+    mock_dispatch = AsyncMock()
+
+    with patch.object(audit_writer, "get_license_info", side_effect=HTTPException(402, "bad license")), \
+         patch.object(audit_writer, "dispatch_audit_event", mock_dispatch), \
+         patch.object(audit_writer, "_export_dispatch_available", True):
+        event_id = await audit_writer.write_event(
+            session=mock_session,
+            session_id=uuid.uuid4(),
+            agent_id=uuid.uuid4(),
+            agent_name="test-agent",
+            tool_name="release_payment",
+            tool_parameters={},
+            decision="review",
+            decision_reason="requires_review",
+            sequence_number=1,
+            duration_ms=10,
+        )
+        await asyncio.sleep(0)
+
+    assert event_id is not None
+    mock_session.add.assert_called_once()
+    mock_dispatch.assert_not_awaited()

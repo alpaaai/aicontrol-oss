@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getAgent, getAgentPolicies, COVERAGE_LABEL } from "@/api/agents";
-import type { Agent } from "@/api/agents";
+import { getAgent, getAgentPolicies, updateAgentGovernanceMode, COVERAGE_LABEL } from "@/api/agents";
+import type { AgentDetail } from "@/api/agents";
 import type { PolicyScope } from "@/api/policies";
 import { PolicySentence } from "@/components/primitives/PolicySentence";
 import { EmptyState } from "@/components/primitives/EmptyState";
@@ -10,14 +10,73 @@ import { EmptyState } from "@/components/primitives/EmptyState";
 // to "I can't tell which policy fires when."
 export function AgentDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [agent, setAgent] = useState<Agent | null>(null);
+  const [agent, setAgent] = useState<AgentDetail | null>(null);
   const [policies, setPolicies] = useState<PolicyScope[] | null>(null);
+  const [policiesError, setPoliciesError] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentLoading, setAgentLoading] = useState(true);
+  const [switchingMode, setSwitchingMode] = useState(false);
+
+  const handleToggleGovernanceMode = async () => {
+    if (!agent) return;
+    const next = agent.governance_mode === "govern" ? "observe" : "govern";
+    setSwitchingMode(true);
+    try {
+      const updated = await updateAgentGovernanceMode(agent.id, next);
+      setAgent(updated);
+    } finally {
+      setSwitchingMode(false);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
-    getAgent(id).then(setAgent).catch(() => {});
-    getAgentPolicies(id).then(setPolicies).catch(() => setPolicies([]));
+    let cancelled = false;
+
+    async function load() {
+      setAgentLoading(true);
+      setAgentError(null);
+      try {
+        const a = await getAgent(id!);
+        if (!cancelled) setAgent(a);
+      } catch {
+        if (!cancelled) {
+          setAgentError("Couldn't load this agent. It may have been removed, or there's a connection problem.");
+        }
+      } finally {
+        if (!cancelled) setAgentLoading(false);
+      }
+    }
+    load();
+    setPoliciesError(false);
+    getAgentPolicies(id).then(setPolicies).catch(() => {
+      setPolicies([]);
+      setPoliciesError(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [id]);
+
+  if (agentLoading) {
+    return (
+      <div className="p-6 max-w-3xl">
+        <div className="h-24 bg-ac-surface-sunk rounded-lg animate-pulse" />
+      </div>
+    );
+  }
+
+  if (agentError || !agent) {
+    return (
+      <div className="p-6 max-w-3xl">
+        <Link to="/agents" className="text-body-sm text-ac-muted hover:text-ac-ink">
+          &larr; Agents
+        </Link>
+        <EmptyState title={agentError ?? "Agent not found."} />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-8 max-w-3xl">
@@ -30,6 +89,31 @@ export function AgentDetailPage() {
           {agent?.workflow ?? "unassigned"}
         </p>
       </div>
+
+      {agent && (
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex items-center rounded-full px-[10px] py-[3px] text-label-uc ${
+              agent.governance_mode === "govern"
+                ? "bg-ac-decision-allow-soft text-ac-decision-allow"
+                : "bg-ac-surface-sunk text-ac-warning border border-ac-warning"
+            }`}
+          >
+            {agent.governance_mode === "govern" ? "Enforcing" : "Observe only — not enforcing"}
+          </span>
+          <button
+            onClick={handleToggleGovernanceMode}
+            disabled={switchingMode}
+            className="text-body-sm text-ac-primary hover:underline disabled:opacity-50"
+          >
+            {switchingMode
+              ? "Switching…"
+              : agent.governance_mode === "govern"
+                ? "Switch to observe"
+                : "Switch to govern"}
+          </button>
+        </div>
+      )}
 
       {agent && (
         <dl className="grid grid-cols-2 gap-x-8 gap-y-3 text-body-sm">
@@ -68,6 +152,8 @@ export function AgentDetailPage() {
         <div data-testid="governing-policies" className="space-y-4">
           {policies === null ? (
             <div className="h-20 bg-ac-surface-sunk rounded-lg animate-pulse" />
+          ) : policiesError ? (
+            <EmptyState title="Couldn't load policies for this agent. Try refreshing the page." />
           ) : policies.length === 0 ? (
             <EmptyState title="No policies govern this agent yet — describe one in plain English." />
           ) : (

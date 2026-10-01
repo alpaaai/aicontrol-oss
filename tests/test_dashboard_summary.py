@@ -15,7 +15,7 @@ REQUIRED_SUMMARY_KEYS = [
     "allow_count_today", "deny_count_today", "review_count_today",
     "deny_rate_today", "active_sessions",
     "pending_reviews", "active_agents", "active_policies",
-    "top_tools", "decisions_by_hour",
+    "top_tools", "decisions_by_hour", "agents_with_unresolved_systems",
 ]
 
 
@@ -124,6 +124,37 @@ async def test_window_7d_zero_fills_168_hourly_buckets(human_admin_token):
     assert body["granularity"] == "hour"
     distinct_hours = {row["hour"] for row in body["decisions_by_hour"]}
     assert len(distinct_hours) == 24 * 7
+
+
+@pytest_asyncio.fixture(scope="session")
+async def agent_with_unresolved_system():
+    """One agent with a non-empty unresolved_systems list (2.1 fix: this must
+    surface in the dashboard summary count, not stay a silent per-agent field)."""
+    agent_id = uuid.uuid4()
+    name = f"test-agent-unresolved-{uuid.uuid4().hex[:6]}"
+    async with async_session_factory() as db:
+        await db.execute(text("""
+            INSERT INTO agents (id, name, owner, status, unresolved_systems)
+            VALUES (:id, :name, 'test', 'active', CAST(:systems AS jsonb))
+        """), {"id": str(agent_id), "name": name, "systems": '["some_unmapped_tool"]'})
+        await db.commit()
+
+    yield agent_id
+
+    async with async_session_factory() as db:
+        await db.execute(text("DELETE FROM agents WHERE id = :id"), {"id": str(agent_id)})
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_agents_with_unresolved_systems_counted(human_admin_token, agent_with_unresolved_system):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(
+            "/dashboard/summary",
+            headers={"Authorization": f"Bearer {human_admin_token}"},
+        )
+    assert resp.status_code == 200
+    assert resp.json()["agents_with_unresolved_systems"] >= 1
 
 
 @pytest.mark.asyncio

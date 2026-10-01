@@ -1,9 +1,6 @@
 """Shared pytest fixtures."""
-import base64
 import importlib
-import json
 import os
-import time
 import uuid
 import pytest
 import pytest_asyncio
@@ -12,6 +9,121 @@ import httpx
 from sqlalchemy import text
 
 from scripts import db_hygiene
+
+# Demo agent fixture data, copied from scripts/seed.py (which is gitignored --
+# demo-only, not shipped). Kept here so core test infra doesn't depend on a
+# file that may be absent on a fresh clone or in CI.
+AGENTS = [
+    {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "name": "claims-processing-agent",
+        "owner": "ai-team@acme-insurance.com",
+        "status": "active",
+        "tools": '[]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000010",
+        "name": "loan-underwriting-agent",
+        "owner": "lending-team@bank.com",
+        "status": "active",
+        "tools": '["query_credit_bureau", "run_risk_model"]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000020",
+        "name": "clinical-documentation-agent",
+        "owner": "clinical-ops@hospital.org",
+        "status": "active",
+        "tools": '["read_patient_record", "query_lab_results"]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000030",
+        "name": "incident-response-agent",
+        "owner": "platform-ops@company.com",
+        "status": "active",
+        "tools": '[]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000040",
+        "name": "supplier-sourcing-agent",
+        "owner": "procurement@manufacturer.com",
+        "status": "active",
+        "tools": '[]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000050",
+        "name": "support-resolution-agent",
+        "owner": "cx-platform@company.com",
+        "status": "active",
+        "tools": '[]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000060",
+        "name": "crm-automation-agent",
+        "owner": "revops@company.com",
+        "status": "active",
+        "tools": '[]',
+    },
+    {
+        "id": "00000000-0000-0000-0000-000000000070",
+        "name": "insurance-claims-agent",
+        "owner": "claims-ops@insurer.com",
+        "status": "active",
+        "tools": '[]',
+    },
+]
+
+AGENT_APPROVED_TOOLS = {
+    "00000000-0000-0000-0000-000000000010": [
+        "query_credit_bureau",
+        "run_risk_model",
+        "get_income_verification",
+        "get_employment_history",
+        "approve_loan",
+        "deny_loan",
+    ],
+    "00000000-0000-0000-0000-000000000020": [
+        "read_patient_record",
+        "write_soap_note",
+        "get_lab_results",
+        "get_medication_list",
+        "schedule_followup",
+    ],
+    "00000000-0000-0000-0000-000000000030": [
+        "get_incident_details",
+        "update_incident_status",
+        "assign_ticket",
+        "get_runbook",
+        "restart_service",
+        "send_notification",
+    ],
+    "00000000-0000-0000-0000-000000000040": [
+        "query_inventory_system",
+        "query_approved_supplier_catalog",
+        "create_purchase_order",
+        "get_supplier_quote",
+    ],
+    "00000000-0000-0000-0000-000000000050": [
+        "read_customer_account",
+        "update_ticket_status",
+        "send_email",
+        "create_refund",
+        "escalate_ticket",
+    ],
+    "00000000-0000-0000-0000-000000000060": [
+        "update_deal_stage",
+        "log_sales_activity",
+        "get_account_details",
+        "create_task",
+        "send_follow_up",
+    ],
+    "00000000-0000-0000-0000-000000000070": [
+        "get_claim_details",
+        "validate_policy_coverage",
+        "process_claim_payment",
+        "request_additional_info",
+        "flag_for_review",
+    ],
+}
 
 # When tests run on the host machine, Docker internal hostnames won't resolve.
 # Load .env (if present) and replace Docker internal hostnames with localhost.
@@ -54,6 +166,41 @@ except Exception:
 os.environ["WAL_DIR"] = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", ".pytest_wal"
 )
+
+# DEMO_MODE defaults to false (3.1 fix: a real deployment must opt in to the
+# unauthenticated /demo/* endpoints). This line does NOT make the demo tests
+# pass by itself: the shared `client` fixture below talks over real HTTP to
+# whatever process is already listening on AICONTROL_TEST_BASE_URL /
+# localhost:8001 (see `client` fixture) -- it never imports app.main or
+# constructs the FastAPI app in this pytest process. Setting os.environ here
+# only affects in-process app construction (e.g. tests that build their own
+# ASGITransport(app=...), like test_health_endpoint.py), not that external
+# server. For test_demo_router.py / test_demo_scenario_decisions.py /
+# the /demo/call_tool tests in test_agents_coverage_response.py to pass, the
+# dev server itself must be started with DEMO_MODE=true in ITS environment
+# (`DEMO_MODE=true uvicorn app.main:app --reload --port 8001`) -- otherwise
+# every one of those tests 404s with no indication why. See
+# `_require_demo_mode_on_server` fixture below, which fails fast with that
+# explanation instead of letting it surface as a bare 404.
+os.environ["DEMO_MODE"] = "true"
+
+
+@pytest_asyncio.fixture(scope="session")
+async def _require_demo_mode_on_server():
+    """Fail fast with an actionable message if the live server under test
+    doesn't have DEMO_MODE=true, instead of letting every /demo/* test in
+    the module fail with an unexplained 404 Not Found."""
+    base_url = os.environ.get("AICONTROL_TEST_BASE_URL", "http://localhost:8001")
+    async with httpx.AsyncClient(base_url=base_url, timeout=10.0) as c:
+        resp = await c.get("/demo/status")
+    if resp.status_code == 404:
+        pytest.fail(
+            f"{base_url}/demo/status returned 404 -- the server under test "
+            "was not started with DEMO_MODE=true. Restart it with "
+            "`DEMO_MODE=true uvicorn app.main:app --reload --port 8001` "
+            "before running these tests.",
+            pytrace=False,
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -134,6 +281,42 @@ async def _cleanup_test_agents():
         await session.commit()
 
 
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _cleanup_test_mcp_servers():
+    """Session setup + teardown: remove test-mcp-server-* rows so they don't
+    accumulate across pytest runs. test_mcp_servers_router.py creates these
+    inline with no cleanup of its own -- same class of gap the agents/
+    policies/discovery sweeps above already cover, just never extended here;
+    confirmed leaking via `python scripts/db_hygiene_check.py` after a plain
+    `pytest tests/` run (mcp_servers: 4, user_activity_log: 5 referencing
+    them) with no other test having touched either table that session."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        await db_hygiene._clean_mcp_servers(session)
+        await session.commit()
+    yield
+    async with async_session_factory() as session:
+        await db_hygiene._clean_mcp_servers(session)
+        await session.commit()
+
+
+@pytest_asyncio.fixture(scope="session", autouse=True)
+async def _cleanup_test_activity_log():
+    """Session setup + teardown: remove user_activity_log rows referencing
+    test-agent-*/test-mcp-server-*/test_*/not_lib_* data (db_hygiene.py's
+    _clean_activity_log) so they don't accumulate across pytest runs. Same
+    gap as _cleanup_test_mcp_servers above -- db_hygiene.py already defines
+    the sweep, nothing in this file was calling it automatically."""
+    from app.models.database import async_session_factory
+    async with async_session_factory() as session:
+        await db_hygiene._clean_activity_log(session)
+        await session.commit()
+    yield
+    async with async_session_factory() as session:
+        await db_hygiene._clean_activity_log(session)
+        await session.commit()
+
+
 async def _cleanup_test_discovery_rows(session):
     # Agents promoted from a discovery row are covered by the 'test-%' agents
     # sweep above; this only needs to clear discovered_agents itself.
@@ -203,7 +386,6 @@ async def _seed_and_token_setup():
     """Session-scoped: seed demo agents + issue admin and agent tokens once."""
     from app.core.auth import create_token, hash_token
     from app.models.database import async_session_factory
-    from scripts.seed import AGENTS
 
     async with async_session_factory() as session:
         # Seed demo agents (idempotent)
@@ -309,6 +491,22 @@ def human_admin_token():
         "sub": "00000000-0000-0000-0000-000000000001",
         "email": "test_human@aicontrol.dev",
         "role": "admin",
+        "type": "human",
+        "exp": datetime.utcnow() + timedelta(hours=8),
+    }
+    return jwt.encode(payload, settings.secret_key, algorithm="HS256")
+
+
+@pytest.fixture
+def human_analyst_token():
+    """Non-admin human JWT — for asserting admin-only endpoints reject it."""
+    from datetime import datetime, timedelta
+    from jose import jwt
+    from app.core.config import settings
+    payload = {
+        "sub": "00000000-0000-0000-0000-000000000002",
+        "email": "test_analyst@aicontrol.dev",
+        "role": "analyst",
         "type": "human",
         "exp": datetime.utcnow() + timedelta(hours=8),
     }
@@ -457,70 +655,3 @@ async def seed_policy():
     async with async_session_factory() as db:
         await db.execute(text("DELETE FROM policies WHERE id = :id"), {"id": str(policy_id)})
         await db.commit()
-
-
-# ── License test fixtures ─────────────────────────────────────────────────────
-
-def _b64url(data: bytes) -> str:
-    return base64.urlsafe_b64encode(data).rstrip(b"=").decode()
-
-
-def _make_test_jwt(private_key, plan: str, iss: str = "aictl.io",
-                   days: int = 365, company: str = "Test Corp") -> str:
-    from cryptography.hazmat.primitives.asymmetric import padding
-    from cryptography.hazmat.primitives import hashes
-
-    header = {"alg": "RS256", "typ": "JWT"}
-    payload = {
-        "iss": iss,
-        "jti": str(uuid.uuid4()),
-        "company": company,
-        "email": "admin@test.com",
-        "plan": plan,
-        "issued_at": int(time.time()),
-        "exp": int(time.time()) + days * 86400,
-    }
-    h = _b64url(json.dumps(header, separators=(",", ":")).encode())
-    p = _b64url(json.dumps(payload, separators=(",", ":")).encode())
-    sig_input = f"{h}.{p}".encode()
-    sig = private_key.sign(sig_input, padding.PKCS1v15(), hashes.SHA256())
-    return f"{h}.{p}.{_b64url(sig)}"
-
-
-@pytest.fixture(scope="session")
-def test_rsa_keypair():
-    """Generate a fresh RSA keypair for test use only."""
-    from cryptography.hazmat.primitives.asymmetric import rsa
-    from cryptography.hazmat.primitives import serialization
-    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    public_pem = private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    ).decode()
-    return private_key, public_pem
-
-
-@pytest.fixture(scope="session")
-def valid_enterprise_token(test_rsa_keypair):
-    private_key, _ = test_rsa_keypair
-    return _make_test_jwt(private_key, "enterprise")
-
-
-@pytest.fixture(scope="session")
-def valid_business_token(test_rsa_keypair):
-    private_key, _ = test_rsa_keypair
-    return _make_test_jwt(private_key, "business")
-
-
-@pytest.fixture(scope="session")
-def expired_enterprise_token(test_rsa_keypair):
-    private_key, _ = test_rsa_keypair
-    return _make_test_jwt(private_key, "enterprise", days=-1)
-
-
-@pytest.fixture
-def patch_license_public_key(test_rsa_keypair):
-    """Patch PUBLIC_KEY so decode_license_key uses the test keypair."""
-    _, public_pem = test_rsa_keypair
-    with patch("app.core.license.PUBLIC_KEY", public_pem):
-        yield

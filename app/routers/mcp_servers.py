@@ -6,9 +6,10 @@ model (Decision 9) — see app/models/mcp_server.py for why."""
 import uuid
 from datetime import datetime
 from typing import Literal, Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,6 +17,7 @@ from app.core.auth import require_admin
 from app.core.logging import get_logger
 from app.models.database import get_db
 from app.models.mcp_server import MCPServer
+from app.services.activity_log_service import write_activity_log
 
 router = APIRouter(prefix="/mcp-servers", tags=["mcp_servers"])
 logger = get_logger("mcp_servers_api")
@@ -25,6 +27,14 @@ class MCPServerCreate(BaseModel):
     name: str
     base_url: str
     approved_tools: list[str] = []
+
+    @field_validator("base_url")
+    @classmethod
+    def _base_url_must_be_http_url(cls, v: str) -> str:
+        parsed = urlparse(v)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            raise ValueError("base_url must be an absolute http(s) URL, e.g. https://mcp.example.com/mcp")
+        return v
 
 
 class MCPServerResponse(BaseModel):
@@ -52,6 +62,13 @@ async def register_mcp_server(
     await db.commit()
     await db.refresh(server)
     logger.info("mcp_server_registered", server_id=str(server.id), name=server.name)
+    await write_activity_log(
+        action="mcp_server.create",
+        resource_type="mcp_server",
+        resource_id=str(server.id),
+        after_state={"name": server.name, "base_url": server.base_url},
+        user_email=_token.get("email"),
+    )
     return server
 
 
@@ -91,6 +108,7 @@ async def update_mcp_server(
     server = await db.get(MCPServer, server_id)
     if server is None:
         raise HTTPException(status_code=404, detail="MCP server not found")
+    before = {"status": server.status, "approved_tools": server.approved_tools, "name": server.name}
     if body.status is not None:
         server.status = body.status
     if body.approved_tools is not None:
@@ -98,6 +116,14 @@ async def update_mcp_server(
     await db.commit()
     await db.refresh(server)
     logger.info("mcp_server_updated", server_id=str(server_id), status=server.status)
+    await write_activity_log(
+        action="mcp_server.update",
+        resource_type="mcp_server",
+        resource_id=str(server_id),
+        before_state=before,
+        after_state={"status": server.status, "approved_tools": server.approved_tools},
+        user_email=_token.get("email"),
+    )
     return server
 
 
@@ -110,6 +136,14 @@ async def delete_mcp_server(
     server = await db.get(MCPServer, server_id)
     if server is None:
         raise HTTPException(status_code=404, detail="MCP server not found")
+    name = server.name
     await db.delete(server)
     await db.commit()
     logger.info("mcp_server_deleted", server_id=str(server_id))
+    await write_activity_log(
+        action="mcp_server.delete",
+        resource_type="mcp_server",
+        resource_id=str(server_id),
+        before_state={"name": name},
+        user_email=_token.get("email"),
+    )

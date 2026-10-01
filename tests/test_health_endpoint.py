@@ -20,7 +20,7 @@ async def test_health_reports_the_in_process_engine():
 async def test_health_engine_status_is_not_licence_gated():
     """The engine runs in-process on every tier, so unlike drift detection there
     is nothing to gate -- a community install reports the same value."""
-    with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", ""):
+    with patch("app.main.has_enterprise_license", return_value=False):
         async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
             response = await client.get("/health")
 
@@ -30,13 +30,18 @@ async def test_health_engine_status_is_not_licence_gated():
 
 @pytest.mark.asyncio
 async def test_health_drift_detector_status_enterprise():
-    """Enterprise license key → real drift_detector_status returned."""
+    """Enterprise-plan license → real drift_detector_status returned.
+
+    Gated on the decoded plan (has_enterprise_license), not bare key presence
+    (2.5 fix) -- a set-but-undecodable string like "test-key" is not enough,
+    unlike before this fix.
+    """
     mock_detector = MagicMock()
     mock_detector.status = "healthy"
     _main.app.state.drift_detector = mock_detector
 
     try:
-        with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", "test-key"):
+        with patch("app.main.has_enterprise_license", return_value=True):
             async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
                 response = await client.get("/health")
         assert response.status_code == 200
@@ -48,7 +53,7 @@ async def test_health_drift_detector_status_enterprise():
 @pytest.mark.asyncio
 async def test_health_drift_detector_status_community():
     """No license key → drift_detector_status returns enterprise_only."""
-    with patch.object(_main._settings, "AICONTROL_LICENSE_KEY", ""):
+    with patch("app.main.has_enterprise_license", return_value=False):
         async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
             response = await client.get("/health")
 

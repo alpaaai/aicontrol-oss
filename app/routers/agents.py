@@ -13,6 +13,7 @@ from app.core.auth import require_admin, require_agent
 from app.core.logging import get_logger
 from app.models.database import get_db
 from app.models.schemas import Agent, APIToken, AuditEvent, Policy
+from app.services.activity_log_service import write_activity_log
 
 router = APIRouter(prefix="/agents", tags=["agents"])
 logger = get_logger("agents_api")
@@ -89,6 +90,7 @@ class AgentListItem(BaseModel):
     coverage_state: str = "unknown"
     silent_noop_warnings: list = []
     unresolved_systems: list = []
+    governance_mode: str = "observe"
 
 
 def derive_coverage_state(agent: Any, has_recent_traffic: bool) -> str:
@@ -135,7 +137,10 @@ async def register_agent(
         text("""
             INSERT INTO agents (id, name, owner, status, framework, approved_tools)
             VALUES (:id, :name, :owner, 'active', :framework, CAST(:tools AS jsonb))
-            ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
+            ON CONFLICT (name) DO UPDATE SET
+                owner = EXCLUDED.owner,
+                framework = EXCLUDED.framework,
+                approved_tools = EXCLUDED.approved_tools
             RETURNING id, (xmax = 0) AS inserted
         """),
         {
@@ -210,6 +215,7 @@ async def list_agents(
             Agent.coverage_last_seen_at,
             Agent.silent_noop_warnings,
             Agent.unresolved_systems,
+            Agent.governance_mode,
             last_active_sq.label("last_active"),
             total_sq.label("total_count"),
             deny_sq.label("deny_count"),
@@ -239,6 +245,7 @@ async def list_agents(
             coverage_state=derive_coverage_state(r, bool(r.recent_traffic_count)),
             silent_noop_warnings=r.silent_noop_warnings or [],
             unresolved_systems=r.unresolved_systems or [],
+            governance_mode=r.governance_mode,
         )
         for r in rows
     ]
@@ -341,6 +348,13 @@ async def create_agent(
     db.add(agent)
     await db.flush()
     logger.info("agent_created", agent_id=str(agent.id), name=agent.name)
+    await write_activity_log(
+        action="agent.create",
+        resource_type="agent",
+        resource_id=str(agent.id),
+        after_state={"name": agent.name, "owner": agent.owner},
+        user_email=_token.get("email"),
+    )
     return agent
 
 
@@ -354,10 +368,21 @@ async def update_agent(
     agent = await db.get(Agent, agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-    for field, value in body.model_dump(exclude_none=True).items():
+    updated = body.model_dump(exclude_none=True)
+    before = {k: getattr(agent, k) for k in updated}
+    before["name"] = agent.name
+    for field, value in updated.items():
         setattr(agent, field, value)
     await db.flush()
     logger.info("agent_updated", agent_id=str(agent_id))
+    await write_activity_log(
+        action="agent.update",
+        resource_type="agent",
+        resource_id=str(agent_id),
+        before_state=before,
+        after_state=updated,
+        user_email=_token.get("email"),
+    )
     return agent
 
 
@@ -370,8 +395,16 @@ async def delete_agent(
     agent = await db.get(Agent, agent_id)
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
+    name = agent.name
     await db.delete(agent)
     logger.info("agent_deleted", agent_id=str(agent_id))
+    await write_activity_log(
+        action="agent.delete",
+        resource_type="agent",
+        resource_id=str(agent_id),
+        before_state={"name": name},
+        user_email=_token.get("email"),
+    )
 
 
 @router.patch("/{agent_id}/approved-tools", response_model=ApprovedToolsResponse)
@@ -386,11 +419,20 @@ async def update_approved_tools(
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
 
+    before = list(agent.approved_tools or [])
     agent.approved_tools = body.approved_tools
     await db.commit()
     await db.refresh(agent)
 
     logger.info("approved_tools_updated", agent_id=str(agent_id), count=len(body.approved_tools))
+    await write_activity_log(
+        action="agent.approved_tools_update",
+        resource_type="agent",
+        resource_id=str(agent_id),
+        before_state={"approved_tools": before, "name": agent.name},
+        after_state={"approved_tools": body.approved_tools},
+        user_email=_token.get("email"),
+    )
     return ApprovedToolsResponse(
         agent_id=agent.id,
         approved_tools=agent.approved_tools or [],
@@ -421,4 +463,12 @@ async def revoke_agent_token(
         raise HTTPException(status_code=404, detail="No active token found for this agent")
 
     logger.info("agent_token_revoked", agent_id=str(agent_id), count=len(revoked_ids))
+    await write_activity_log(
+        action="agent.token_revoke",
+        resource_type="agent",
+        resource_id=str(agent_id),
+        before_state={"name": agent.name},
+        after_state={"revoked": len(revoked_ids)},
+        user_email=_token.get("email"),
+    )
     return {"revoked": len(revoked_ids)}

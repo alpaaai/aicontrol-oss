@@ -34,6 +34,28 @@ async def test_register_mcp_server_as_admin(admin_token):
 
 
 @pytest.mark.asyncio
+async def test_register_mcp_server_rejects_url_without_scheme(admin_token):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/mcp-servers",
+            json={"name": "test-mcp-server-reg-badurl", "base_url": "mcp.example.com/mcp"},
+            headers=admin_token,
+        )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_register_mcp_server_rejects_non_http_scheme(admin_token):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.post(
+            "/mcp-servers",
+            json={"name": "test-mcp-server-reg-ftp", "base_url": "ftp://mcp.example.com/mcp"},
+            headers=admin_token,
+        )
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_list_mcp_servers(admin_token, db_session):
     from app.models.mcp_server import MCPServer
     import uuid as uuid_mod

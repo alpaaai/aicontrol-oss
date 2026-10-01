@@ -6,7 +6,7 @@
   "incident_headline": "In 2024, an attacker embedded a hidden instruction in the loss description field of a commercial property claim. When the claims processing agent read the document, it followed the embedded instruction and attempted to query every open claim in the database. The agent had no way to distinguish the legitimate claim content from the injected instruction.",
   "agent_id": "10000000-0000-0000-0000-000000000001",
   "agent_name": "claims-adjuster",
-  "owner": "claims-ops@aon.com",
+  "owner": "claims-ops@insurer.com",
   "workflow": "claims_settlement",
   "approved_tools": ["read_claim_document", "release_payment", "db_query"],
   "closing_line": "You can't tell whether your claims agent is following your adjuster's notes or an attacker's injected instruction by looking at the API call. AIControl evaluates what the call is actually doing — and stops the one that's outside policy.",

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { login } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { Shield, Lock, Activity, FileCheck } from "lucide-react";
+import { AuthFooter } from "@/components/shared/AuthFooter";
 
 const trustSignals = [
   { icon: Shield,     text: "Policy-enforced agent control" },
@@ -171,9 +172,7 @@ export function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-10 text-[11px] text-ac-muted/60 text-center">
-            Secured by AIControl · Enterprise tier
-          </p>
+          <AuthFooter />
         </div>
       </div>
     </div>

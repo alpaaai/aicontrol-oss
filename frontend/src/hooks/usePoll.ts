@@ -23,7 +23,7 @@ export function usePoll<T>(
   }, [fetcher]);
 
   useEffect(() => {
-    if (options.immediate !== false) run();
+    if (options.immediate !== false) void Promise.resolve().then(() => run());
     timerRef.current = setInterval(run, intervalMs);
     return () => clearInterval(timerRef.current);
   }, [run, intervalMs, options.immediate]);

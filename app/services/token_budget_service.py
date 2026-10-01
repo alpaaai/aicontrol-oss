@@ -6,13 +6,23 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.logging import get_logger
 from app.services.rate_limit_service import WINDOW_INTERVALS
 from app.services.wal import default_wal_writer, sum_unshipped_for_session_tool
+
+logger = get_logger("token_budget_service")
 
 
 async def _sum_in_window(
     db: AsyncSession, column: str, agent_id: str, session_id: str, tool_name: str, window: str,
 ) -> float:
+    # An unrecognised window (malformed/admin-edited policy condition) falls
+    # back to "session" rather than crashing the intercept -- mirrors
+    # rate_limit_service.count_tool_calls_in_window's handling.
+    if window != "session" and window not in WINDOW_INTERVALS:
+        logger.warning("token_budget_unknown_window", window=window, tool_name=tool_name)
+        window = "session"
+
     if window == "session":
         result = await db.execute(
             text(f"SELECT COALESCE(SUM({column}), 0) FROM audit_events WHERE session_id = :session_id AND tool_name = :tool_name"),

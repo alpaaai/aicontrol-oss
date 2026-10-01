@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -18,7 +19,7 @@ router = APIRouter(prefix="/audit-events", tags=["audit-events"])
 
 @router.get("/export", dependencies=[Depends(require_enterprise_license)])
 async def export_audit_events(
-    decision: Optional[str] = Query(None, pattern="^(allow|deny|review)$"),
+    decision: Optional[str] = Query(None, pattern="^(allow|deny|review|error)$"),
     agent_id: Optional[str] = Query(None),
     tool_name: Optional[str] = Query(None),
     date_from: Optional[datetime] = Query(None),
@@ -48,8 +49,8 @@ async def export_audit_events(
 
     buf = io.StringIO()
     writer = csv.DictWriter(buf, fieldnames=[
-        "id", "created_at", "agent_name", "tool_name", "decision",
-        "decision_reason", "policy_name", "session_id", "duration_ms",
+        "id", "created_at", "agent_name", "tool_name", "tool_parameters",
+        "decision", "decision_reason", "policy_name", "session_id", "duration_ms",
     ])
     writer.writeheader()
     for r in rows:
@@ -58,6 +59,7 @@ async def export_audit_events(
             "created_at": r.created_at.isoformat() if r.created_at else "",
             "agent_name": r.agent_name or "",
             "tool_name": r.tool_name,
+            "tool_parameters": json.dumps(r.tool_parameters) if r.tool_parameters else "",
             "decision": r.decision,
             "decision_reason": r.decision_reason or "",
             "policy_name": r.policy_name or "",
@@ -74,7 +76,7 @@ async def export_audit_events(
 
 @router.get("")
 async def list_audit_events(
-    decision: Optional[str] = Query(None, pattern="^(allow|deny|review)$"),
+    decision: Optional[str] = Query(None, pattern="^(allow|deny|review|error)$"),
     agent_id: Optional[str] = Query(None),
     tool_name: Optional[str] = Query(None),
     date_from: Optional[datetime] = Query(None),
@@ -84,7 +86,8 @@ async def list_audit_events(
     _=Depends(require_human),
 ):
     # Community plan: enforce 7-day retention at query layer
-    license_info = _lg.get_license_info()
+    async with async_session_factory() as _license_db:
+        license_info = await _lg.get_license_info(_license_db)
     if license_info.plan == "community":
         retention_cutoff = datetime.utcnow() - timedelta(days=7)
         if date_from is None or date_from < retention_cutoff:
@@ -123,7 +126,7 @@ async def list_audit_events(
                 "agent_id": str(r.agent_id),
                 "agent_name": r.agent_name,
                 "tool_name": r.tool_name,
-                "tool_parameters": str(r.tool_parameters)[:120] if r.tool_parameters else None,
+                "tool_parameters": r.tool_parameters,
                 "decision": r.decision,
                 "decision_reason": r.decision_reason,
                 "policy_id": str(r.policy_id) if r.policy_id else None,

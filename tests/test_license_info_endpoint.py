@@ -5,7 +5,7 @@ from unittest.mock import patch
 from fastapi import HTTPException
 
 from app.main import app
-from app.core.license import LicenseInfo
+from app.core.license_gate import LicenseInfo
 
 
 @pytest.fixture
@@ -17,6 +17,13 @@ def community_info():
 def enterprise_info():
     return LicenseInfo(
         plan="enterprise", company="Aon", email="admin@aon.com", expires_at=None
+    )
+
+
+@pytest.fixture
+def trial_info():
+    return LicenseInfo(
+        plan="trial", company="Acme", email="admin@acme.com", expires_at=None
     )
 
 
@@ -49,6 +56,20 @@ async def test_license_info_enterprise(enterprise_info):
     assert data["is_enterprise"] is True
     assert data["is_business"] is True
     assert data["company"] == "Aon"
+
+
+@pytest.mark.asyncio
+async def test_license_info_trial(trial_info):
+    with patch("app.routers.license.get_license_info", return_value=trial_info):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r = await client.get("/license-info")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["plan"] == "trial"
+    assert data["is_enterprise"] is True
+    assert data["is_business"] is True
 
 
 @pytest.mark.asyncio

@@ -1,12 +1,16 @@
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from sqlalchemy import select
+
 from app.core.config import settings as _settings
+from app.core.license_gate import has_enterprise_license
 from app.core.logging import configure_logging, get_logger
 from app.models.database import async_session_factory
+from app.models.user import OrgSettings
 from app.routers.auth import router as auth_router
 from app.routers.audit_events import router as audit_events_router
 from app.routers.dashboard import router as dashboard_router
@@ -22,10 +26,13 @@ from app.routers.billing import router as billing_router
 from app.routers.users import router as users_router
 from app.routers.setup import router as setup_router
 from app.routers.org_settings import router as org_settings_router
+from app.routers.org_settings import settings_router
 from app.routers.mcp_gateway import router as mcp_gateway_router
 from app.routers.mcp_servers import router as mcp_servers_router
 from app.services.cedar_client import invalidate_policy_set_cache
+from app.services.license_sync import LicenseSync
 from app.services.policy_loader import load_all
+from app.services.retention_purger import RetentionPurger
 from app.services.wal import default_wal_writer
 from app.services.wal_shipper import WalShipper
 
@@ -50,6 +57,19 @@ configure_logging(env=_settings.app_env)
 logger = get_logger("main")
 
 
+async def _safe_has_enterprise_license() -> bool:
+    """has_enterprise_license() raises HTTPException(402) for a set-but-invalid/
+    expired key -- correct for a request handler, but here it is called outside
+    a request (startup) and inside /health, neither of which should 402 or crash
+    over a bad license key. An unusable key is treated the same as no key: not
+    enterprise."""
+    try:
+        async with async_session_factory() as session:
+            return await has_enterprise_license(session)
+    except HTTPException:
+        return False
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Run policy loader on startup and start the drift detector."""
@@ -63,8 +83,11 @@ async def lifespan(app: FastAPI):
     await wal_shipper.replay_and_start()
     app.state.wal_shipper = wal_shipper
 
-    # DriftDetector — enterprise only, and only importable when enterprise/ is present
-    if _settings.AICONTROL_LICENSE_KEY and DriftDetector is not None:
+    # DriftDetector — enterprise only, and only importable when enterprise/ is present.
+    # Gated on the decoded plan (has_enterprise_license), not bare key presence: a
+    # Business-tier or invalid/expired key would otherwise start the background scan
+    # even though GET /warnings (require_enterprise_license) can never show its results.
+    if DriftDetector is not None and await _safe_has_enterprise_license():
         drift_detector = DriftDetector(
             session_factory=async_session_factory,
             interval_hours=_settings.drift_scan_interval_hours,
@@ -75,12 +98,42 @@ async def lifespan(app: FastAPI):
     else:
         app.state.drift_detector = None
 
+    # Retention purge — every tier (unlike DriftDetector, this isn't
+    # enterprise-gated: Community's 7-day window needs enforcement too).
+    retention_purger = RetentionPurger(
+        session_factory=async_session_factory,
+        interval_hours=_settings.retention_purge_interval_hours,
+    )
+    retention_purger.start()
+    app.state.retention_purger = retention_purger
+
+    # License sync -- only started when an activation code is on file at
+    # boot (community installs, and business/enterprise installs not yet
+    # activated, skip it entirely). Checked once here, same pattern as
+    # DriftDetector's has_enterprise_license gate above.
+    async with async_session_factory() as session:
+        has_activation_code = (
+            await session.execute(select(OrgSettings.activation_code).where(OrgSettings.activation_code.isnot(None)))
+        ).first() is not None
+
+    if has_activation_code:
+        license_sync = LicenseSync(
+            session_factory=async_session_factory,
+        )
+        license_sync.start()
+        app.state.license_sync = license_sync
+    else:
+        app.state.license_sync = None
+
     logger.info("aicontrol_ready")
 
     yield
 
     if app.state.drift_detector is not None:
         await app.state.drift_detector.stop()
+    if app.state.license_sync is not None:
+        await app.state.license_sync.stop()
+    await app.state.retention_purger.stop()
     await app.state.wal_shipper.stop()
     await _http_client.aclose()
     logger.info("aicontrol_stopping")
@@ -118,6 +171,9 @@ app.include_router(tokens_router)
 app.include_router(billing_router)
 app.include_router(users_router)
 app.include_router(org_settings_router)
+app.include_router(settings_router)
+if _settings.DEMO_MODE:
+    app.include_router(demo_router)
 app.include_router(mcp_gateway_router)
 app.include_router(mcp_servers_router)
 if compliance_router is not None:
@@ -134,7 +190,7 @@ if warnings_router is not None:
 async def health(request: Request) -> dict:
     """Liveness check — returns ok when the app process is running."""
     drift_detector = getattr(request.app.state, "drift_detector", None)
-    has_license = bool(_settings.AICONTROL_LICENSE_KEY)
+    is_enterprise = await _safe_has_enterprise_license()
     return {
         "status": "ok",
         "service": "aicontrol",
@@ -144,7 +200,7 @@ async def health(request: Request) -> dict:
         "policy_engine_status": "in_process",
         "drift_detector_status": (
             (drift_detector.status if drift_detector else "unknown")
-            if has_license
+            if is_enterprise
             else "enterprise_only"
         ),
     }
