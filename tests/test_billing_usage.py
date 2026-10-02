@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from app.main import app
 from app.core.license_gate import LicenseInfo
 from app.core import license_gate
+from tests.conftest import restore_org_settings, snapshot_org_settings
 
 
 def _community():
@@ -212,7 +213,7 @@ async def _set_activation_code(code):
     from app.models.database import async_session_factory
 
     async with async_session_factory() as db:
-        saved = (await db.execute(text("SELECT id, org_name, timezone FROM org_settings"))).fetchall()
+        saved = await snapshot_org_settings(db)
         await db.execute(text("DELETE FROM org_settings"))
         await db.execute(
             text("""
@@ -230,16 +231,7 @@ async def _restore_org_settings(existing):
     from app.models.database import async_session_factory
 
     async with async_session_factory() as db:
-        await db.execute(text("DELETE FROM org_settings"))
-        for row in existing:
-            await db.execute(
-                text("""
-                    INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at)
-                    VALUES (:id, :name, :tz, now(), now())
-                    ON CONFLICT DO NOTHING
-                """),
-                {"id": str(row[0]), "name": row[1], "tz": row[2]},
-            )
+        await restore_org_settings(db, existing)
         await db.commit()
 
 
@@ -346,7 +338,7 @@ async def _set_activation_code_and_synced_at(code, synced_at):
     from app.models.database import async_session_factory
 
     async with async_session_factory() as db:
-        saved = (await db.execute(text("SELECT id, org_name, timezone FROM org_settings"))).fetchall()
+        saved = await snapshot_org_settings(db)
         await db.execute(text("DELETE FROM org_settings"))
         await db.execute(
             text("""

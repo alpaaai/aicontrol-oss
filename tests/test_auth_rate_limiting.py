@@ -8,6 +8,7 @@ from sqlalchemy import text
 from app.main import app
 from app.models.database import async_session_factory
 from app.core.rate_limiter import reset_rate_limits
+from tests.conftest import restore_org_settings, snapshot_org_settings
 
 
 @pytest.fixture(autouse=True)
@@ -60,6 +61,7 @@ async def _isolated_setup_db():
     so this test must not depend on or permanently mutate real DB state."""
     async with async_session_factory() as db:
         saved_users = (await db.execute(text(_USER_SELECT_SQL))).fetchall()
+        saved_org_settings = await snapshot_org_settings(db)
         await db.execute(text("DELETE FROM org_settings"))
         await db.execute(text("DELETE FROM users"))
         await db.commit()
@@ -67,10 +69,10 @@ async def _isolated_setup_db():
     yield
 
     async with async_session_factory() as db:
-        await db.execute(text("DELETE FROM org_settings"))
         await db.execute(text("DELETE FROM users"))
         for row in saved_users:
             await db.execute(text(_USER_INSERT_SQL), _user_row_to_params(row))
+        await restore_org_settings(db, saved_org_settings)
         await db.commit()
 
 

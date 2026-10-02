@@ -10,6 +10,7 @@ from sqlalchemy import text
 
 from app.main import app
 from app.models.database import async_session_factory
+from tests.conftest import restore_org_settings, snapshot_org_settings
 from app.services.billing_client import BillingClientError
 
 
@@ -22,8 +23,7 @@ async def _org_row():
     tests/conftest.py's own fixtures, which are all session-scoped for the
     same reason)."""
     async with async_session_factory() as db:
-        saved = await db.execute(text("SELECT id, org_name, timezone FROM org_settings"))
-        existing = saved.fetchall()
+        existing = await snapshot_org_settings(db)
         await db.execute(text("DELETE FROM org_settings"))
         result = await db.execute(
             text("""
@@ -36,16 +36,7 @@ async def _org_row():
         await db.commit()
     yield {"id": row_id}
     async with async_session_factory() as db:
-        await db.execute(text("DELETE FROM org_settings"))
-        for row in existing:
-            await db.execute(
-                text("""
-                    INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at)
-                    VALUES (:id, :name, :tz, now(), now())
-                    ON CONFLICT DO NOTHING
-                """),
-                {"id": str(row[0]), "name": row[1], "tz": row[2]},
-            )
+        await restore_org_settings(db, existing)
         await db.commit()
 
 

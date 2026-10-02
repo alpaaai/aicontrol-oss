@@ -1,7 +1,7 @@
 """Every demo scenario's steps must produce their expected decision through a
 real /demo/call_tool call against real Cedar policy evaluation -- this is the
 guarantee the whole unification effort exists to make true. One parametrized
-test walks all 8 scenarios; a couple of named tests pin down the two
+test walks every scenario; a couple of named tests pin down the two
 specific defects the design spec called out by name.
 """
 import uuid
@@ -12,6 +12,7 @@ from sqlalchemy import text
 
 from app.services.demo_provisioning import provision_demo_agents, issue_scenario_token
 from app.services.demo_scenario_service import all_scenario_ids, get_scenario
+from tests.conftest import restore_org_settings, snapshot_org_settings
 
 pytestmark = pytest.mark.usefixtures("_require_demo_mode_on_server")
 
@@ -33,8 +34,7 @@ async def _enterprise_license_for_demo():
     from app.models.database import async_session_factory
 
     async with async_session_factory() as db:
-        saved = await db.execute(text("SELECT id, org_name, timezone FROM org_settings"))
-        existing = saved.fetchall()
+        existing = await snapshot_org_settings(db)
         await db.execute(text("DELETE FROM org_settings"))
         await db.execute(text(
             "INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at, license_plan) "
@@ -43,16 +43,7 @@ async def _enterprise_license_for_demo():
         await db.commit()
     yield
     async with async_session_factory() as db:
-        await db.execute(text("DELETE FROM org_settings"))
-        for row in existing:
-            await db.execute(
-                text("""
-                    INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at)
-                    VALUES (:id, :name, :tz, now(), now())
-                    ON CONFLICT DO NOTHING
-                """),
-                {"id": str(row[0]), "name": row[1], "tz": row[2]},
-            )
+        await restore_org_settings(db, existing)
         await db.commit()
 
 

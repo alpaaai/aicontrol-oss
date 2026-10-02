@@ -5,6 +5,7 @@ from sqlalchemy import text
 from httpx import AsyncClient, ASGITransport
 from app.main import app
 from app.models.database import async_session_factory
+from tests.conftest import restore_org_settings, snapshot_org_settings
 
 
 # ── Schema verification (Task 1) ─────────────────────────────────────────────
@@ -88,30 +89,32 @@ async def _snapshot_and_clear_users(db):
     """Save every user column, then wipe users + org_settings. Returns saved rows."""
     result = await db.execute(text(_USER_SELECT_SQL))
     saved_users = result.fetchall()
+    saved_org_settings = await snapshot_org_settings(db)
     await db.execute(text("DELETE FROM org_settings"))
     await db.execute(text("DELETE FROM users"))
-    return saved_users
+    return saved_users, saved_org_settings
 
 
-async def _restore_users(db, saved_users):
+async def _restore_users(db, saved):
     """Wipe users + org_settings, then reinsert saved rows with all columns intact."""
-    await db.execute(text("DELETE FROM org_settings"))
+    saved_users, saved_org_settings = saved
     await db.execute(text("DELETE FROM users"))
     for row in saved_users:
         await db.execute(text(_USER_INSERT_SQL), _user_row_to_params(row))
+    await restore_org_settings(db, saved_org_settings)
 
 
 @pytest_asyncio.fixture(scope="session")
 async def _setup_db_clean():
     """Clear users + org_settings before setup behavioral tests, restore after."""
     async with async_session_factory() as db:
-        saved_users = await _snapshot_and_clear_users(db)
+        saved = await _snapshot_and_clear_users(db)
         await db.commit()
 
     yield
 
     async with async_session_factory() as db:
-        await _restore_users(db, saved_users)
+        await _restore_users(db, saved)
         await db.commit()
 
 

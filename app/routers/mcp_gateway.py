@@ -342,7 +342,8 @@ async def call_tool(
             decision_reason=gov_result.reason,
         ))
         return {"jsonrpc": "2.0", "id": body.get("id"),
-                "result": {"content": [{"type": "text", "text": f"Pending human review: {gov_result.reason}"}], "isError": True}}
+                "result": {"content": [{"type": "text", "text": f"Pending human review: {gov_result.reason}"}], "isError": True,
+                           "_meta": {"review_id": str(review_id)}}}
 
     if gov_result.decision != "allow":
         # Written even when observe mode collapses enforced_decision to

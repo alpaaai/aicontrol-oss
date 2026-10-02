@@ -219,6 +219,25 @@ def reset_config_and_db_engine():
 
 
 
+async def snapshot_org_settings(db) -> list[dict]:
+    """Every org_settings row with every column, for restore_org_settings.
+    SELECT * so a column added later is covered without editing this."""
+    result = await db.execute(text("SELECT * FROM org_settings"))
+    return [dict(row) for row in result.mappings().all()]
+
+
+async def restore_org_settings(db, rows: list[dict]) -> None:
+    """Replace org_settings with the rows snapshot_org_settings returned.
+    Caller commits."""
+    await db.execute(text("DELETE FROM org_settings"))
+    for row in rows:
+        columns = ", ".join(row)
+        params = ", ".join(f":{c}" for c in row)
+        await db.execute(
+            text(f"INSERT INTO org_settings ({columns}) VALUES ({params})"), row
+        )
+
+
 @pytest_asyncio.fixture(loop_scope="session")
 async def db_session():
     """An async ORM session that never commits. Tests flush to exercise the

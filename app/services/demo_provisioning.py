@@ -7,7 +7,7 @@ Provisioning is exempt from the "real HTTP only" rule (see the design spec)
 functions directly, in-process; app/routers/demo.py wraps them for the
 browser, which cannot call Python directly.
 
-There are 9 scenario agents (see app/demo_scenarios/*.json).
+There are 10 scenario agents (see app/demo_scenarios/*.json).
 """
 import json
 
@@ -75,7 +75,7 @@ async def issue_scenario_token(scenario_id: str) -> str:
 
 async def issue_demo_token() -> str:
     """Issue a fresh unscoped (agent_id = NULL) token for the browser demo
-    page: it drives /intercept calls across all 9 scenario agents in one
+    page: it drives /intercept calls across all 10 scenario agents in one
     session, so it must not be bound to any single agent_id -- /intercept
     only enforces agent-token scoping when the token's agent_id is set."""
     token = create_token(role="agent", description="demo:shared")

@@ -18,14 +18,14 @@ from app.core.license_gate import (
     require_enterprise_license,
 )
 from app.models.database import async_session_factory
+from tests.conftest import restore_org_settings, snapshot_org_settings
 
 
 async def _set_org_settings(license_plan=None, license_status=None, org_name="Acme"):
     """Replace org_settings with a single known row; caller restores via
     _restore_org_settings after the test."""
     async with async_session_factory() as db:
-        saved = await db.execute(text("SELECT id, org_name, timezone FROM org_settings"))
-        existing = saved.fetchall()
+        existing = await snapshot_org_settings(db)
         await db.execute(text("DELETE FROM org_settings"))
         await db.execute(
             text("""
@@ -46,24 +46,14 @@ async def _set_org_settings(license_plan=None, license_status=None, org_name="Ac
 
 async def _restore_org_settings(existing):
     async with async_session_factory() as db:
-        await db.execute(text("DELETE FROM org_settings"))
-        for row in existing:
-            await db.execute(
-                text("""
-                    INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at)
-                    VALUES (:id, :name, :tz, now(), now())
-                    ON CONFLICT DO NOTHING
-                """),
-                {"id": str(row[0]), "name": row[1], "tz": row[2]},
-            )
+        await restore_org_settings(db, existing)
         await db.commit()
 
 
 @pytest.mark.asyncio
 async def test_get_license_info_no_row_returns_community():
     async with async_session_factory() as db:
-        saved = await db.execute(text("SELECT id, org_name, timezone FROM org_settings"))
-        existing = saved.fetchall()
+        existing = await snapshot_org_settings(db)
         await db.execute(text("DELETE FROM org_settings"))
         await db.commit()
     try:
