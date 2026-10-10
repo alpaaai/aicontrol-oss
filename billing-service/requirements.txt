@@ -17,4 +17,4 @@ python-dotenv
 structlog
 
 # Payments
-stripe==15.6.1
+stripe==16.0.0
