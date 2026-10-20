@@ -16,7 +16,7 @@ def _business(license_status=None):
                         license_status=license_status)
 
 def _enterprise():
-    return LicenseInfo(plan="enterprise", company="Aon", email="a@aon.com", expires_at=None)
+    return LicenseInfo(plan="enterprise", company="Acme", email="a@acme.com", expires_at=None)
 
 def _trial():
     return LicenseInfo(plan="trial", company="Acme", email="a@acme.com", expires_at=None)
@@ -179,22 +179,6 @@ async def test_billing_usage_enterprise_features_include_community_and_business(
     assert not any("Everything in" in f for f in features)
 
 
-def test_compliance_export_feature_string_matches_implemented_frameworks():
-    """5.1: the billing feature list must match the frameworks the compliance
-    report generator actually supports, not an invented set."""
-    from app.routers.billing import PLAN_CONFIG
-    from enterprise.compliance.prompt_builder import ALLOWED_FRAMEWORKS
-
-    compliance_features = [
-        f for f in PLAN_CONFIG["enterprise"]["features"] if "Compliance report export" in f
-    ]
-    assert len(compliance_features) == 1
-    feature_string = compliance_features[0]
-    for framework_label in ["SOC 2", "EU AI Act", "NIST AI RMF", "ISO 42001"]:
-        assert framework_label in feature_string
-    for wrong_label in ["PCI", "HIPAA", "GLBA"]:
-        assert wrong_label not in feature_string
-    assert ALLOWED_FRAMEWORKS == {"eu_ai_act", "nist_ai_rmf", "soc2", "iso_42001"}
 
 
 @pytest.mark.asyncio

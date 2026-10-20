@@ -172,8 +172,6 @@ app.include_router(billing_router)
 app.include_router(users_router)
 app.include_router(org_settings_router)
 app.include_router(settings_router)
-if _settings.DEMO_MODE:
-    app.include_router(demo_router)
 app.include_router(mcp_gateway_router)
 app.include_router(mcp_servers_router)
 if compliance_router is not None:

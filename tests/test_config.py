@@ -58,23 +58,3 @@ def test_development_allows_default_secret_key():
     from app.core.config import Settings
     s = Settings(database_url="postgresql+asyncpg://x/y", secret_key="changeme")
     assert s.secret_key == "changeme"
-
-
-def test_demo_mode_defaults_to_disabled():
-    """A real customer deployment must not expose the unauthenticated
-    demo endpoints (they hard-delete audit_events/hitl_reviews) unless
-    explicitly opted in. tests/conftest.py sets DEMO_MODE=true in the test
-    process env so the demo router test suite works -- clear it here to
-    check the actual class default, not the test env override."""
-    from app.core.config import Settings
-    with patch.dict(os.environ, {}, clear=False):
-        os.environ.pop("DEMO_MODE", None)
-        s = Settings(database_url="postgresql+asyncpg://x/y")
-    assert s.DEMO_MODE is False
-
-
-def test_demo_mode_can_be_explicitly_enabled():
-    from app.core.config import Settings
-    s = Settings(database_url="postgresql+asyncpg://x/y", DEMO_MODE=True)
-    assert s.DEMO_MODE is True
-

@@ -58,20 +58,13 @@ bash install.sh
 ```
 
 `install.sh` walks you through generating a `.env` with real secrets, pulls the prebuilt
-images, runs database migrations, and seeds demo agents — a bare `docker compose up` skips
+images, and runs database migrations — a bare `docker compose up` skips
 all of that (it also won't start the API or dashboard at all, since those live in
 `docker-compose.app.yml`, not the default compose file).
 
 **First run:** open `http://localhost:3000` — the setup wizard runs automatically. Set your
 organisation name, timezone, and root admin email + password, then log in with those
 credentials.
-
-Want 30 days of realistic historical activity in the dashboard instead of a blank audit log?
-After `install.sh` finishes:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.app.yml -f docker-compose.demo.yml up demo-seed
-```
 
 ---
 

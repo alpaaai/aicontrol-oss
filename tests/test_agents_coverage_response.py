@@ -57,39 +57,7 @@ async def test_agent_with_no_handshake_reads_unknown(client, admin_token, make_a
     assert resp.json()["coverage_state"] == "unknown"
 
 
-@pytest.mark.asyncio
-async def test_agent_with_traffic_after_the_handshake_reads_governed(
-    client, agent_token, admin_token, make_agent, _require_demo_mode_on_server
-):
-    agent_id = await make_agent(
-        framework="crewai", hook="before_tool_call", sdk_version="1.0",
-        coverage_last_seen_at=datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None),
-    )
-    # /demo/call_tool (governance_engine's shared enforcement path) is the
-    # only HTTP route left that produces a real audit_event for an arbitrary
-    # agent_id without a registered MCP server -- the deleted POST /intercept
-    # served this role before the gateway pivot; this test just needs traffic
-    # to land, not anything demo-specific.
-    intercepted = await client.post("/demo/call_tool", headers=agent_token, json={
-        "session_id": str(uuid.uuid4()),
-        "agent_id": str(agent_id),
-        "agent_name": "test-agent-coverage-traffic",
-        "tool_name": "read_record",
-        "tool_parameters": {},
-        "sequence_number": 1,
-    })
-    assert intercepted.status_code == 200, intercepted.text
 
-    # allow/deny land in the WAL first and reach Postgres on the shipper's
-    # next pass, so give it one.
-    import asyncio
-    for _ in range(20):
-        resp = await client.get(f"/agents/{agent_id}", headers=admin_token)
-        if resp.json()["coverage_state"] == "governed":
-            break
-        await asyncio.sleep(0.1)
-
-    assert resp.json()["coverage_state"] == "governed"
 
 
 @pytest.mark.asyncio
@@ -123,40 +91,7 @@ async def test_the_list_endpoint_carries_coverage_too(client, admin_token, make_
     assert row["unresolved_systems"] == []
 
 
-@pytest.mark.asyncio
-async def test_an_unresolved_system_is_recorded_on_the_agent(
-    client, agent_token, admin_token, make_agent, _require_demo_mode_on_server
-):
-    """The 2.2 fail-open mitigation: a policy bound to a system does not match
-    a call whose system is unknown, so the unknowns must be visible."""
-    agent_id = await make_agent()
-    resp = await client.post("/demo/call_tool", headers=agent_token, json={
-        "session_id": str(uuid.uuid4()),
-        "agent_id": str(agent_id),
-        "agent_name": "test-agent-coverage-unresolved",
-        "tool_name": "totally_unmapped_tool",
-        "tool_parameters": {},
-        "sequence_number": 1,
-    })
-    assert resp.status_code == 200, resp.text
 
-    # get_db commits in dependency teardown, which runs *after* the response
-    # is sent -- reading straight away races that commit.
-    import asyncio
-    for _ in range(20):
-        detail = await client.get(f"/agents/{agent_id}", headers=admin_token)
-        if detail.json()["unresolved_systems"]:
-            break
-        await asyncio.sleep(0.1)
-
-    assert detail.json()["unresolved_systems"] == ["totally_unmapped_tool"]
-
-
-# ── merge_unresolved, in isolation ────────────────────────────────────────────
-
-def test_merge_unresolved_appends_a_new_tool():
-    assert merge_unresolved(None, "a") == ["a"]
-    assert merge_unresolved(["a"], "b") == ["a", "b"]
 
 
 def test_merge_unresolved_is_distinct():

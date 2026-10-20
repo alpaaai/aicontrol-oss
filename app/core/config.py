@@ -46,14 +46,6 @@ class Settings(BaseSettings):
     # app/services/billing_client.py.
     AICONTROL_LICENSE_SYNC_URL: str = "https://billing.aictl.io"
 
-    # Demo dashboard — pre-issued agent JWT for browser-based demo runner.
-    DEMO_TOKEN: str = ""
-    # Gates app/routers/demo.py (unauthenticated seed/reset/call_tool endpoints
-    # that hard-delete rows from audit_events/hitl_reviews). Off by default:
-    # a real customer deployment must opt in explicitly. AIControl's own
-    # sales-demo environment sets this to true.
-    DEMO_MODE: bool = False
-
     # AI-native features — customer's own LLM account. AIControl never bills tokens.
     LLM_PROVIDER: str = "anthropic"
     LLM_MODEL: str = "claude-haiku-4-5-20251001"

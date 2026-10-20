@@ -16,7 +16,7 @@ def community_info():
 @pytest.fixture
 def enterprise_info():
     return LicenseInfo(
-        plan="enterprise", company="Aon", email="admin@aon.com", expires_at=None
+        plan="enterprise", company="Acme", email="admin@acme.com", expires_at=None
     )
 
 
@@ -55,7 +55,7 @@ async def test_license_info_enterprise(enterprise_info):
     assert data["plan"] == "enterprise"
     assert data["is_enterprise"] is True
     assert data["is_business"] is True
-    assert data["company"] == "Aon"
+    assert data["company"] == "Acme"
 
 
 @pytest.mark.asyncio

@@ -167,42 +167,6 @@ os.environ["WAL_DIR"] = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "..", ".pytest_wal"
 )
 
-# DEMO_MODE defaults to false (3.1 fix: a real deployment must opt in to the
-# unauthenticated /demo/* endpoints). This line does NOT make the demo tests
-# pass by itself: the shared `client` fixture below talks over real HTTP to
-# whatever process is already listening on AICONTROL_TEST_BASE_URL /
-# localhost:8001 (see `client` fixture) -- it never imports app.main or
-# constructs the FastAPI app in this pytest process. Setting os.environ here
-# only affects in-process app construction (e.g. tests that build their own
-# ASGITransport(app=...), like test_health_endpoint.py), not that external
-# server. For test_demo_router.py / test_demo_scenario_decisions.py /
-# the /demo/call_tool tests in test_agents_coverage_response.py to pass, the
-# dev server itself must be started with DEMO_MODE=true in ITS environment
-# (`DEMO_MODE=true uvicorn app.main:app --reload --port 8001`) -- otherwise
-# every one of those tests 404s with no indication why. See
-# `_require_demo_mode_on_server` fixture below, which fails fast with that
-# explanation instead of letting it surface as a bare 404.
-os.environ["DEMO_MODE"] = "true"
-
-
-@pytest_asyncio.fixture(scope="session")
-async def _require_demo_mode_on_server():
-    """Fail fast with an actionable message if the live server under test
-    doesn't have DEMO_MODE=true, instead of letting every /demo/* test in
-    the module fail with an unexplained 404 Not Found."""
-    base_url = os.environ.get("AICONTROL_TEST_BASE_URL", "http://localhost:8001")
-    async with httpx.AsyncClient(base_url=base_url, timeout=10.0) as c:
-        resp = await c.get("/demo/status")
-    if resp.status_code == 404:
-        pytest.fail(
-            f"{base_url}/demo/status returned 404 -- the server under test "
-            "was not started with DEMO_MODE=true. Restart it with "
-            "`DEMO_MODE=true uvicorn app.main:app --reload --port 8001` "
-            "before running these tests.",
-            pytrace=False,
-        )
-
-
 @pytest.fixture(autouse=True)
 def reset_config_and_db_engine():
     """
