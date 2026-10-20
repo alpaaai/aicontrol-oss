@@ -46,6 +46,3 @@ scripts/demos/
 policies/demo_seeds/
 docker-compose.demo.yml
 tests/test_demo_reset.py
-tests/test_demo_seed_synthetic.py
-tests/test_demo_run_demo_sh.py
-tests/test_demo_cli_harness.py
