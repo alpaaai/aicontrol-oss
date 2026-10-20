@@ -3,8 +3,8 @@ import type { PolicyScope } from "./policies";
 
 export interface AuditEvent {
   id: string;
-  session_id: string;
-  agent_id: string;
+  session_id: string | null;
+  agent_id: string | null;
   agent_name: string;
   tool_name: string;
   tool_parameters: Record<string, unknown> | null;

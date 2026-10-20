@@ -107,3 +107,17 @@ async def test_put_org_settings_requires_auth():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         resp = await c.put("/org-settings", json={"org_name": "X", "timezone": "UTC"})
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_put_org_settings_rejects_non_admin_human(_org_row, human_analyst_token):
+    """Org name/timezone are tenant-wide settings (the timezone drives time-window
+    policies' display and reports). Any signed-in analyst or auditor could
+    rewrite them because the route only required a human JWT, not an admin one."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        resp = await c.put(
+            "/org-settings",
+            json={"org_name": "Hijacked", "timezone": "UTC"},
+            headers={"Authorization": f"Bearer {human_analyst_token}"},
+        )
+    assert resp.status_code == 403

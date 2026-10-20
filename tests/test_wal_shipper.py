@@ -179,3 +179,158 @@ async def test_a_later_duplicate_line_does_not_roll_back_an_earlier_shipped_line
             "despite its checkpoint already having advanced -- it will never be "
             "re-shipped"
         )
+
+
+def _wal_line(session_id, agent_id, tool_name, seq, event_id=None, **overrides):
+    return {
+        "session_id": str(session_id), "agent_id": str(agent_id),
+        "agent_name": "wal-shipper-test-agent", "tool_name": tool_name,
+        "tool_parameters": {}, "decision": "allow", "decision_reason": "default_allow",
+        "sequence_number": seq, "duration_ms": 1,
+        "event_id": str(event_id or uuid.uuid4()), "wal_seq": seq,
+        **overrides,
+    }
+
+
+def _write_lines(path, lines):
+    with open(path, "a") as f:
+        for line in lines:
+            f.write(json.dumps(line) + "\n")
+
+
+@pytest.mark.asyncio
+async def test_missing_session_row_is_retried_not_dropped(tmp_path, clean_test_session):
+    """The request that appended a WAL line has not necessarily committed its
+    sessions row yet when the shipper runs. The FK IntegrityError that causes
+    must not be treated as a harmless duplicate -- the checkpoint must stay put
+    so the line ships once the session row exists."""
+    from app.models.database import async_session_factory
+    from app.services.wal_shipper import WalShipper
+
+    agent_id, _ = clean_test_session
+    late_session_id = uuid.UUID("e3333333-3333-3333-3333-333333333333")
+    wal_path = tmp_path / "audit.jsonl"
+    event_id = uuid.uuid4()
+    _, ok_session_id = clean_test_session
+    _write_lines(wal_path, [
+        _wal_line(late_session_id, agent_id, "fk_race_tool", 0, event_id),
+        _wal_line(ok_session_id, agent_id, "fk_race_followup_tool", 1),
+    ])
+
+    shipper = WalShipper(wal_path=wal_path, session_factory=async_session_factory)
+    try:
+        assert await shipper._ship_once() == 0
+
+        async with async_session_factory() as session:
+            await session.execute(text(
+                "INSERT INTO sessions (id, agent_id, status) VALUES (:id, :a, 'active')"
+            ), {"id": str(late_session_id), "a": str(agent_id)})
+            await session.commit()
+
+        assert await shipper._ship_once() == 2
+        async with async_session_factory() as session:
+            count = (await session.execute(
+                text("SELECT COUNT(*) FROM audit_events WHERE id = :id"), {"id": str(event_id)}
+            )).scalar_one()
+        assert count == 1
+    finally:
+        async with async_session_factory() as session:
+            await session.execute(text("DELETE FROM audit_events WHERE session_id = :id"), {"id": str(late_session_id)})
+            await session.execute(text("DELETE FROM sessions WHERE id = :id"), {"id": str(late_session_id)})
+            await session.commit()
+
+
+@pytest.mark.asyncio
+async def test_unshippable_line_is_dead_lettered_and_later_lines_still_ship(tmp_path, clean_test_session):
+    """A line that can never ship (here: references a session that does not
+    exist) must not block every later audit event forever. After max_attempts
+    it moves to a dead-letter file and the checkpoint advances."""
+    from app.models.database import async_session_factory
+    from app.services.wal_shipper import WalShipper
+
+    agent_id, session_id = clean_test_session
+    wal_path = tmp_path / "audit.jsonl"
+    bad_event, good_event = uuid.uuid4(), uuid.uuid4()
+    _write_lines(wal_path, [
+        _wal_line(uuid.uuid4(), agent_id, "poison_tool", 0, bad_event),
+        _wal_line(session_id, agent_id, "after_poison_tool", 1, good_event),
+    ])
+
+    shipper = WalShipper(wal_path=wal_path, session_factory=async_session_factory, max_attempts=2)
+    await shipper._ship_once()
+    await shipper._ship_once()
+    await shipper._ship_once()
+
+    async with async_session_factory() as session:
+        shipped = (await session.execute(
+            text("SELECT COUNT(*) FROM audit_events WHERE id = :id"), {"id": str(good_event)}
+        )).scalar_one()
+    assert shipped == 1
+    dead_letter = wal_path.with_suffix(wal_path.suffix + ".deadletter")
+    assert dead_letter.exists()
+    assert str(bad_event) in dead_letter.read_text()
+
+
+@pytest.mark.asyncio
+async def test_malformed_wal_line_does_not_block_shipping(tmp_path, clean_test_session):
+    """A crash mid-write can leave a torn trailing line. json.loads on it used
+    to raise out of _ship_once on every cycle, stalling shipping permanently."""
+    from app.models.database import async_session_factory
+    from app.services.wal_shipper import WalShipper
+
+    agent_id, session_id = clean_test_session
+    wal_path = tmp_path / "audit.jsonl"
+    event_id = uuid.uuid4()
+    _write_lines(wal_path, [_wal_line(session_id, agent_id, "torn_line_tool", 0, event_id)])
+    with open(wal_path, "a") as f:
+        f.write('{"session_id": "abc", "tool_na')
+
+    shipper = WalShipper(wal_path=wal_path, session_factory=async_session_factory)
+    assert await shipper._ship_once() == 1
+
+
+@pytest.mark.asyncio
+async def test_shipped_lines_are_compacted_out_of_the_wal(tmp_path, clean_test_session):
+    """The WAL used to grow forever, and every request re-parsed all of it for
+    the unshipped-count lookups. Once lines are shipped they must be dropped."""
+    from app.models.database import async_session_factory
+    from app.services.wal import WalWriter
+    from app.services.wal_shipper import WalShipper
+
+    agent_id, session_id = clean_test_session
+    wal_path = tmp_path / "audit.jsonl"
+    writer = WalWriter(wal_path)
+    for i in range(3):
+        writer.append({
+            "session_id": str(session_id), "agent_id": str(agent_id),
+            "agent_name": "wal-shipper-test-agent", "tool_name": "compact_tool",
+            "tool_parameters": {}, "decision": "allow", "decision_reason": "default_allow",
+            "sequence_number": i, "duration_ms": 1,
+        })
+
+    shipper = WalShipper(wal_path=wal_path, session_factory=async_session_factory, compact_threshold_bytes=0)
+    assert await shipper._ship_once() == 3
+    assert wal_path.read_text() == ""
+
+    # A restarted writer must not reuse sequence numbers at or below the
+    # checkpoint, or its lines would be treated as already shipped.
+    restarted = WalWriter(wal_path)
+    restarted.append({
+        "session_id": str(session_id), "agent_id": str(agent_id),
+        "agent_name": "wal-shipper-test-agent", "tool_name": "compact_tool",
+        "tool_parameters": {}, "decision": "allow", "decision_reason": "default_allow",
+        "sequence_number": 9, "duration_ms": 1,
+    })
+    assert await shipper._ship_once() == 1
+
+
+def test_pending_count_reports_unshipped_lines(tmp_path):
+    from app.services.wal_shipper import WalShipper
+    wal_path = tmp_path / "audit.jsonl"
+    _write_lines(wal_path, [
+        _wal_line(uuid.uuid4(), uuid.uuid4(), "t", 0),
+        _wal_line(uuid.uuid4(), uuid.uuid4(), "t", 1),
+    ])
+    wal_path.with_suffix(".jsonl.checkpoint").write_text("0")
+    shipper = WalShipper(wal_path=wal_path, session_factory=None)
+    assert shipper.pending_count() == 1

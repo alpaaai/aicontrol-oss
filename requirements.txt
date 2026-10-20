@@ -1,42 +1,43 @@
 # API
-fastapi
-uvicorn[standard]
-httpx
+fastapi==0.135.1
+uvicorn[standard]==0.42.0
+httpx==0.28.1
 
 # Database
-sqlalchemy[asyncio]
-alembic
-asyncpg
-psycopg2-binary
+sqlalchemy[asyncio]==2.0.48
+alembic==1.18.4
+asyncpg==0.31.0
+psycopg2-binary==2.9.11
 
 # Data validation
-pydantic
-pydantic-settings
+pydantic==2.12.5
+pydantic-settings==2.13.1
 
 # Policy engine
 cedarpy==4.8.7
 
-# Human review
-slack-bolt
+# Human review (slack_sdk is imported directly; pinned alongside slack-bolt)
+slack-bolt==1.27.0
+slack_sdk==3.41.0
 
 # PDF export
-weasyprint
-markdown
-jinja2
+weasyprint==68.1
+markdown==3.10.2
+jinja2==3.1.6
 
 # Auth
-python-jose[cryptography]
-cryptography>=42.0.0
+python-jose[cryptography]==3.5.0
+cryptography==48.0.1
 
 # AI-native features
-litellm
+litellm==1.83.7
 
 # Utilities
-python-dotenv
-python-multipart
-structlog
-rich
-pyyaml
+python-dotenv==1.0.1
+python-multipart==0.0.22
+structlog==25.5.0
+rich==14.3.3
+pyyaml==6.0.3
 
 # MCP tool-response scanning (agent_os) -- imported unconditionally by
 # app/services/response_scanner.py, which /intercept calls on every request.

@@ -1,4 +1,5 @@
 """POST /slack/actions — handles Slack interactive button callbacks."""
+import asyncio
 import hashlib
 import hmac
 import json
@@ -89,7 +90,11 @@ async def handle_action(
        settings.slack_bot_token != "xoxb-placeholder":
         client = WebClient(token=settings.slack_bot_token)
 
-    reviewer_identity = _resolve_reviewer_email(client, reviewer) if client else reviewer
+    # WebClient is synchronous: run the Slack round trips in a worker thread so
+    # they do not block the event loop for every other request.
+    reviewer_identity = (
+        await asyncio.to_thread(_resolve_reviewer_email, client, reviewer) if client else reviewer
+    )
 
     new_status = "approved" if action_id == "hitl_approve" else "denied"
     review.status = new_status
@@ -107,7 +112,8 @@ async def handle_action(
     if client:
         icon = "Approved" if new_status == "approved" else "Denied"
         try:
-            client.chat_postMessage(
+            await asyncio.to_thread(
+                client.chat_postMessage,
                 channel=settings.slack_review_channel,
                 text=f"{icon}: Review `{str(review_id)[:8]}...` by {reviewer_identity}",
             )

@@ -451,3 +451,34 @@ async def test_license_sync_not_started_without_activation_code():
          patch("app.services.license_sync.LicenseSync.start"):
         async with _main.lifespan(_main.app):
             assert _main.app.state.license_sync is None
+
+
+@pytest.mark.asyncio
+async def test_purge_handles_more_expired_rows_than_one_bind_list_allows():
+    """asyncpg caps a statement at 32767 bind parameters. The purge used to
+    SELECT every expired id and then DELETE ... WHERE id IN (<all of them>),
+    so the first purge of a busy install (tens of thousands of expired rows)
+    failed on every run and the table grew without bound."""
+    from sqlalchemy import text
+
+    from app.models.database import async_session_factory
+
+    async with async_session_factory() as session:
+        await session.execute(text("""
+            INSERT INTO audit_events
+                (id, tool_name, decision, sequence_number, duration_ms, created_at)
+            SELECT gen_random_uuid(), 'retention_bulk_test', 'allow', g, 1,
+                   now() - interval '400 days'
+            FROM generate_series(1, 33000) AS g
+        """))
+        await session.commit()
+
+    async with async_session_factory() as session:
+        deleted = await purge_expired_audit_events(session, "enterprise")
+    assert deleted >= 33000
+
+    async with async_session_factory() as session:
+        left = (await session.execute(
+            text("SELECT COUNT(*) FROM audit_events WHERE tool_name = 'retention_bulk_test'")
+        )).scalar_one()
+    assert left == 0

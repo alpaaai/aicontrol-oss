@@ -135,13 +135,22 @@ async def update_user(
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    if body.is_active is not None:
-        user.is_active = body.is_active
+    new_role = None
     if body.role is not None:
         try:
-            user.role = UserRole(body.role)
+            new_role = UserRole(body.role)
         except ValueError:
             raise HTTPException(status_code=422, detail=f"Invalid role: {body.role}")
+
+    if user.is_root and (body.is_active is False or (new_role is not None and new_role != UserRole.admin)):
+        # Same protection DELETE has: the setup-created root account is the
+        # install's last-resort admin.
+        raise HTTPException(status_code=400, detail="Cannot deactivate or demote the root user")
+
+    if body.is_active is not None:
+        user.is_active = body.is_active
+    if new_role is not None:
+        user.role = new_role
 
     await db.commit()
     await db.refresh(user)

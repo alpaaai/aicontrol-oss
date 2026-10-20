@@ -57,7 +57,7 @@ async def get_org_settings(
 async def update_org_settings(
     body: UpdateOrgSettingsBody,
     db: AsyncSession = Depends(get_db),
-    _token: dict = Depends(require_human),
+    _token: dict = Depends(require_human_admin),
 ):
     result = await db.execute(select(OrgSettings).limit(1))
     org = result.scalar_one_or_none()

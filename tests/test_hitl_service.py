@@ -157,3 +157,52 @@ async def test_slack_hitl_allowed_for_business_license():
         )
 
     mock_client.chat_postMessage.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_post_slack_review_does_not_block_the_event_loop():
+    """slack_sdk's WebClient is synchronous. Calling it directly inside this
+    coroutine (scheduled with create_task on the request path) blocks the whole
+    API's event loop for the duration of Slack's response -- every concurrent
+    intercept stalls with it. It must run in a worker thread."""
+    import threading
+
+    from app.services.hitl_service import post_slack_review
+
+    seen = {}
+
+    def capture_post(**kwargs):
+        seen["thread"] = threading.current_thread()
+        return {"ok": True, "ts": "1.1"}
+
+    mock_client = MagicMock()
+    mock_client.chat_postMessage = capture_post
+
+    with patch("app.services.hitl_service.get_license_info", return_value=_BUSINESS), \
+         patch("app.services.hitl_service.WebClient", return_value=mock_client):
+        await post_slack_review(
+            review_id=uuid.uuid4(), audit_event_id=uuid.uuid4(), agent_name="a",
+            tool_name="http_request", tool_parameters={}, decision_reason="r",
+        )
+
+    assert seen["thread"] is not threading.main_thread()
+
+
+@pytest.mark.asyncio
+async def test_post_slack_review_swallows_network_errors():
+    """The call runs in a fire-and-forget task; a connection error from the
+    Slack client (not just SlackApiError) must be logged, not leak out as an
+    unretrieved task exception."""
+    from app.services.hitl_service import post_slack_review
+
+    mock_client = MagicMock()
+    mock_client.chat_postMessage = MagicMock(side_effect=ConnectionError("slack unreachable"))
+
+    with patch("app.services.hitl_service.get_license_info", return_value=_BUSINESS), \
+         patch("app.services.hitl_service.WebClient", return_value=mock_client):
+        result = await post_slack_review(
+            review_id=uuid.uuid4(), audit_event_id=uuid.uuid4(), agent_name="a",
+            tool_name="http_request", tool_parameters={}, decision_reason="r",
+        )
+
+    assert result is None

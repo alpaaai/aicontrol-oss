@@ -59,3 +59,42 @@ async def test_health_drift_detector_status_community():
 
     assert response.status_code == 200
     assert response.json()["drift_detector_status"] == "enterprise_only"
+
+
+@pytest.mark.asyncio
+async def test_health_reports_503_when_the_database_is_unreachable():
+    """/health used to depend on the DB only through the licence lookup, which
+    let a DB outage surface as an unhandled 500 and a green-looking process.
+    Orchestrators and the container HEALTHCHECK key off the status code, so a
+    DB outage must be a clean 503 that names the failed dependency."""
+    class BrokenFactory:
+        def __call__(self):
+            raise ConnectionRefusedError("postgres down")
+
+    with patch("app.main.async_session_factory", BrokenFactory()):
+        async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
+            response = await client.get("/health")
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["status"] == "unhealthy"
+    assert body["database"] == "unreachable"
+
+
+@pytest.mark.asyncio
+async def test_health_reports_database_and_audit_pipeline_state():
+    shipper = MagicMock()
+    shipper.pending_count.return_value = 3
+    shipper.dead_lettered = 1
+    _main.app.state.wal_shipper = shipper
+    try:
+        async with AsyncClient(transport=ASGITransport(app=_main.app), base_url="http://test") as client:
+            response = await client.get("/health")
+    finally:
+        del _main.app.state._state["wal_shipper"]
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["database"] == "ok"
+    assert body["audit_wal_pending"] == 3
+    assert body["audit_wal_dead_lettered"] == 1

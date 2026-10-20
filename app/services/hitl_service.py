@@ -1,4 +1,5 @@
 """HITL service — creates review rows and posts Slack notifications."""
+import asyncio
 import json
 import uuid
 from datetime import datetime, timedelta
@@ -121,7 +122,10 @@ async def post_slack_review(
     ]
 
     try:
-        response = client.chat_postMessage(
+        # WebClient is synchronous; run it off the event loop so a slow Slack
+        # API call cannot stall every concurrent request.
+        response = await asyncio.to_thread(
+            client.chat_postMessage,
             channel=settings.slack_review_channel,
             text=f"Agent `{agent_name}` wants to call `{tool_name}` — review required",
             blocks=blocks,
@@ -136,5 +140,9 @@ async def post_slack_review(
         return ts
     except SlackApiError as e:
         logger.error("slack_message_failed", error=str(e),
+                     review_id=str(review_id))
+        return None
+    except Exception as e:
+        logger.error("slack_message_failed", error=f"{type(e).__name__}: {e}",
                      review_id=str(review_id))
         return None

@@ -1,11 +1,14 @@
 services:
   api:
-    image: ghcr.io/alpaaai/aicontrol-api:latest
+    image: ghcr.io/alpaaai/aicontrol-api:${AICONTROL_VERSION:-latest}
     restart: unless-stopped
     env_file: .env
     environment:
       REPORTS_DIR: /app/reports
       WAL_DIR: /app/data/wal
+      # Apply pending migrations on start (see docker-entrypoint.sh). Set to
+      # false to run `alembic upgrade head` yourself.
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
     ports:
       - "8001:8001"
     depends_on:
@@ -20,22 +23,39 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+      start_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - aicontrol
 
   frontend:
-    image: ghcr.io/alpaaai/aicontrol-frontend:latest
+    image: ghcr.io/alpaaai/aicontrol-frontend:${AICONTROL_VERSION:-latest}
     restart: unless-stopped
+    environment:
+      # Browser-facing URL of the API. Leave unset to use the URL baked in at
+      # image build time (http://localhost:8001). Set it when the dashboard is
+      # reached from another machine, e.g. https://aicontrol.example.com/api
+      # behind a reverse proxy, or "/api" to use the bundled same-origin proxy.
+      AICONTROL_API_URL: ${AICONTROL_API_URL:-}
     ports:
       - "3000:3000"
     depends_on:
       api:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:3000 || exit 1"]
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1:3000/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
     networks:
       - aicontrol
 

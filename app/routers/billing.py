@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import calendar
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -70,6 +69,8 @@ TIER_ORDER = ["community", "business", "enterprise"]
 def _cascaded_features(plan: str) -> list[str]:
     if plan == "trial":
         return PLAN_CONFIG["enterprise"]["features"]
+    if plan not in TIER_ORDER:
+        plan = "community"
     features: list[str] = []
     for tier in TIER_ORDER[: TIER_ORDER.index(plan) + 1]:
         features.extend(PLAN_CONFIG[tier]["features"])
@@ -95,9 +96,10 @@ async def count_intercepts_in_period(
 
 def _month_bounds(year: int, month: int) -> tuple[datetime, datetime]:
     # DB stores naive UTC timestamps — pass naive datetimes to match column type
+    # The end bound is exclusive (count_intercepts_in_period uses created_at <
+    # date_to), so it is the first instant of the next month.
     start = datetime(year, month, 1)
-    _, last_day = calendar.monthrange(year, month)
-    end = datetime(year, month, last_day, 23, 59, 59)
+    end = datetime(year + 1, 1, 1) if month == 12 else datetime(year, month + 1, 1)
     return start, end
 
 
@@ -113,7 +115,7 @@ async def billing_usage(
     db: AsyncSession = Depends(get_db),
 ):
     info = await _lg.get_license_info(db)
-    config = PLAN_CONFIG[info.plan]
+    config = PLAN_CONFIG.get(info.plan, PLAN_CONFIG["community"])
 
     now = datetime.utcnow()
     this_year, this_month = now.year, now.month

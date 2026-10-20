@@ -63,4 +63,13 @@ class Settings(BaseSettings):
         return self
 
 
+def secret_key_warning(secret_key: str, app_env: str) -> str | None:
+    """HS256 signing keys shorter than 32 characters are brute-forceable. Not a
+    startup error: rejecting it would stop existing installs that chose a short
+    key from booting after an upgrade."""
+    if app_env == "production" and len(secret_key) < 32:
+        return "SECRET_KEY is shorter than 32 characters; use at least 32 random characters"
+    return None
+
+
 settings = Settings()

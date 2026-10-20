@@ -29,6 +29,8 @@ def load_yaml(path: Path = POLICIES_YAML) -> list[dict[str, Any]]:
 
 async def upsert_policies(session: AsyncSession, policies: list[dict]) -> None:
     """Insert or update each policy row, compiling its Cedar source on the way in.
+    An existing row keeps its current `active` state; every other field is
+    refreshed from the seed.
 
     Compilation happens here rather than at evaluation time so the hot path
     never parses a condition dict.
@@ -57,6 +59,12 @@ async def upsert_policies(session: AsyncSession, policies: list[dict]) -> None:
             select(Policy).where(Policy.name == row.name)
         )).scalar_one_or_none()
         row.id = existing.id if existing else uuid.uuid4()
+        if existing is not None:
+            # The YAML `active` flag only seeds a new row. load_all() runs on
+            # every API start, so an operator's later activate/deactivate must
+            # win -- otherwise a restart or upgrade silently re-disables an
+            # activated library policy or re-enables a default they turned off.
+            row.active = existing.active
         row.cedar_text = compile_policy(row)
         await session.merge(row)
     await session.commit()

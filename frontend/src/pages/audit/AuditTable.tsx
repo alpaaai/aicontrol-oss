@@ -5,7 +5,7 @@ type GroupBy = "none" | "workflow" | "session";
 
 function groupEvents(events: AuditEvent[], groupBy: GroupBy): [string, AuditEvent[]][] {
   if (groupBy === "none") return [["", events]];
-  const key = groupBy === "workflow" ? (e: AuditEvent) => e.workflow ?? "unassigned" : (e: AuditEvent) => e.session_id;
+  const key = groupBy === "workflow" ? (e: AuditEvent) => e.workflow ?? "unassigned" : (e: AuditEvent) => e.session_id ?? "no session";
   const groups = new Map<string, AuditEvent[]>();
   for (const event of events) {
     const k = key(event);

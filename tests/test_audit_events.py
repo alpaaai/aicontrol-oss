@@ -175,3 +175,54 @@ async def test_audit_events_export_includes_tool_parameters(human_admin_token, s
     matching = [r for r in rows if r["id"] == str(event_id)]
     assert len(matching) == 1
     assert json.loads(matching[0]["tool_parameters"]) == params
+
+
+@pytest_asyncio.fixture(loop_scope="session")
+async def seed_orphan_formula_event():
+    """An audit row with no session/agent (the gateway writes these for malformed
+    calls) whose tool_name is spreadsheet-formula text -- tool_name is supplied
+    by the calling agent, i.e. attacker-influenced."""
+    event_id = uuid.uuid4()
+    async with async_session_factory() as db:
+        await db.execute(text("""
+            INSERT INTO audit_events (id, sequence_number, tool_name, decision, decision_reason, created_at)
+            VALUES (:id, 0, :tool, 'deny', '@SUM(1+1)', NOW())
+        """), {"id": str(event_id), "tool": '=HYPERLINK("http://evil.example","click")'})
+        await db.commit()
+    yield event_id
+    async with async_session_factory() as db:
+        await db.execute(text("DELETE FROM audit_events WHERE id = :id"), {"id": str(event_id)})
+        await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_audit_events_list_returns_null_not_the_string_none(human_admin_token, seed_orphan_formula_event):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        resp = await client.get(
+            "/audit-events?decision=deny&limit=200",
+            headers={"Authorization": f"Bearer {human_admin_token}"},
+        )
+    assert resp.status_code == 200
+    event = next(e for e in resp.json()["events"] if e["id"] == str(seed_orphan_formula_event))
+    assert event["session_id"] is None
+    assert event["agent_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_audit_events_export_neutralizes_spreadsheet_formulas(human_admin_token, seed_orphan_formula_event):
+    """The compliance CSV is opened in Excel/Sheets. A cell starting with = + - @
+    executes as a formula there; cells are prefixed with an apostrophe."""
+    from app.core import license_gate
+    from app.core.license_gate import LicenseInfo
+    enterprise = LicenseInfo(plan="enterprise", company="Acme", email="a@acme.com", expires_at=None, license_status="active")
+
+    with patch.object(license_gate, "get_license_info", return_value=enterprise):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            resp = await client.get(
+                "/audit-events/export?decision=deny",
+                headers={"Authorization": f"Bearer {human_admin_token}"},
+            )
+    assert resp.status_code == 200
+    row = next(r for r in csv.DictReader(io.StringIO(resp.text)) if r["id"] == str(seed_orphan_formula_event))
+    assert row["tool_name"].startswith("'=")
+    assert row["decision_reason"].startswith("'@")

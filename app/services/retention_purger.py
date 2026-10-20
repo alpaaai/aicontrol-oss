@@ -46,28 +46,38 @@ RETENTION_DAYS: dict[str, int] = {
 }
 
 
+PURGE_BATCH_SIZE = 5000
+
+
 async def purge_expired_audit_events(session: AsyncSession, plan: str) -> int:
     """Delete audit_events (and any hitl_reviews referencing them) older than
     the given plan's retention window. Returns the number of audit_events
     rows deleted. hitl_reviews is deleted first -- it FK-references
     audit_event_id with no ON DELETE CASCADE, so deleting audit_events first
-    would raise IntegrityError (same ordering demo_provisioning.py uses)."""
+    would raise IntegrityError (same ordering demo_provisioning.py uses).
+
+    Deletes in committed batches through subqueries, never by binding a list
+    of ids: asyncpg rejects a statement with more than 32767 bind parameters,
+    which a first purge on a busy install exceeds, and one huge transaction
+    would hold locks on audit_events for its whole duration."""
     retention_days = RETENTION_DAYS.get(plan, RETENTION_DAYS["community"])
     # AuditEvent.created_at is TIMESTAMP WITHOUT TIME ZONE (naive, UTC by
     # convention -- server_default=func.now()); comparing against a
     # tz-aware cutoff raises asyncpg.DataError.
     cutoff = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=retention_days)
 
-    expired_ids = (await session.execute(
-        select(AuditEvent.id).where(AuditEvent.created_at < cutoff)
-    )).scalars().all()
-    if not expired_ids:
-        return 0
-
-    await session.execute(delete(HITLReview).where(HITLReview.audit_event_id.in_(expired_ids)))
-    await session.execute(delete(AuditEvent).where(AuditEvent.id.in_(expired_ids)))
-    await session.commit()
-    return len(expired_ids)
+    total = 0
+    while True:
+        ids = (await session.execute(
+            select(AuditEvent.id).where(AuditEvent.created_at < cutoff).limit(PURGE_BATCH_SIZE)
+        )).scalars().all()
+        if not ids:
+            return total
+        # ids is at most PURGE_BATCH_SIZE (5000) -- well under the bind limit.
+        await session.execute(delete(HITLReview).where(HITLReview.audit_event_id.in_(ids)))
+        await session.execute(delete(AuditEvent).where(AuditEvent.id.in_(ids)))
+        await session.commit()
+        total += len(ids)
 
 
 async def purge_demo_audit_events(session: AsyncSession, agent_ids: list) -> int:

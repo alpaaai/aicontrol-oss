@@ -1,8 +1,9 @@
 import axios from "axios";
 import { getStoredAuth, clearAuth } from "@/store/auth";
+import { API_BASE_URL } from "@/lib/apiBase";
 
 export const apiClient = axios.create({
-  baseURL: import.meta.env.VITE_API_URL ?? "http://localhost:8001",
+  baseURL: API_BASE_URL,
   headers: { "Content-Type": "application/json" },
 });
 

@@ -69,7 +69,11 @@ else
     LLM_MOCK_ENABLED=false
   fi
 
-  cat > .env << ENVEOF
+  # A custom password may contain URL-reserved characters (@ / : ?), which
+  # would corrupt DATABASE_URL if inserted raw.
+  DB_PASS_URL=$(python3 -c "import urllib.parse,sys; print(urllib.parse.quote(sys.argv[1], safe=''))" "$DB_PASS")
+
+  (umask 077; cat > .env << ENVEOF
 # PostgreSQL
 POSTGRES_USER=aicontrol
 POSTGRES_PASSWORD=${DB_PASS}
@@ -78,7 +82,7 @@ POSTGRES_HOST=postgres
 POSTGRES_PORT=5432
 
 # SQLAlchemy
-DATABASE_URL=postgresql+asyncpg://aicontrol:${DB_PASS}@postgres:5432/aicontrol
+DATABASE_URL=postgresql+asyncpg://aicontrol:${DB_PASS_URL}@postgres:5432/aicontrol
 
 # App
 APP_ENV=production
@@ -89,10 +93,13 @@ SLACK_BOT_TOKEN=${SLACK_TOKEN}
 SLACK_SIGNING_SECRET=${SLACK_SECRET}
 SLACK_REVIEW_CHANNEL=${SLACK_CHANNEL}
 
-# React dashboard env vars (baked into frontend image at build time)
-VITE_API_URL=http://localhost:8001
-
-# CORS — comma-separated allowed origins for React dashboard. Change for remote deployments.
+# Public URLs. Change all three when people reach AIControl at a hostname other
+# than localhost (see OPERATIONS.md).
+#   AICONTROL_API_URL  the API address as the BROWSER sees it (read by the dashboard at start)
+#   FRONTEND_BASE_URL  the dashboard address, used to build invite links
+#   CORS_ORIGINS       comma-separated dashboard origins the API accepts
+AICONTROL_API_URL=http://localhost:8001
+FRONTEND_BASE_URL=http://localhost:3000
 CORS_ORIGINS=http://localhost:3000
 
 # AI-native features — LLM calls use your own account, never billed by AIControl.
@@ -103,6 +110,7 @@ LLM_MODEL=${LLM_MODEL}
 LLM_API_KEY=${LLM_API_KEY}
 LLM_MOCK_ENABLED=${LLM_MOCK_ENABLED}
 ENVEOF
+  )
 
   echo ""
   echo -e "${GREEN}[done]${NC} .env created."
@@ -131,7 +139,7 @@ echo -e "${GREEN}[done]${NC} Infrastructure ready."
 # Run migrations
 echo "[3/4] Running database migrations..."
 docker compose -f docker-compose.yml -f docker-compose.app.yml \
-  run --rm api alembic upgrade head
+  run --rm -e RUN_MIGRATIONS=false api alembic upgrade head
 echo -e "${GREEN}[done]${NC} Migrations applied."
 
 # Start app services
@@ -149,4 +157,6 @@ echo ""
 echo "Next: open http://localhost:3000 to run the first-run setup wizard"
 echo "      and create your admin account."
 echo ""
+echo "Check the install: bash verify.sh"
+fi
 echo ""

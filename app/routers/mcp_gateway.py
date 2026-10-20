@@ -18,6 +18,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_gateway_agent
+from app.core.config import settings
 from app.core.logging import get_logger
 from app.models.database import get_db
 from app.models.mcp_server import MCPServer
@@ -35,6 +36,12 @@ logger = get_logger("mcp_gateway")
 UPSTREAM_UNREACHABLE = {
     "jsonrpc": "2.0", "id": None,
     "error": {"code": -32000, "message": "Downstream MCP server unreachable"},
+}
+
+
+UPSTREAM_INVALID_RESPONSE = {
+    "jsonrpc": "2.0", "id": None,
+    "error": {"code": -32002, "message": "Downstream MCP server returned an invalid response"},
 }
 
 
@@ -173,16 +180,27 @@ async def tools_list(
         logger.error("mcp_upstream_http_error", server_id=str(server_id),
                      status_code=exc.response.status_code, error=str(exc))
         return _downstream_http_error_response(exc, body.get("id"))
-    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+    except httpx.TransportError as exc:
+        # Covers ConnectError and TimeoutException, plus a downstream that
+        # accepts the connection and then drops it (ReadError,
+        # RemoteProtocolError, ...).
         logger.error("mcp_upstream_unreachable", server_id=str(server_id), error=str(exc))
         return {**UPSTREAM_UNREACHABLE, "id": body.get("id")}
+    except ValueError as exc:
+        # A 200 whose body is not JSON-RPC (e.g. a proxy's HTML error page).
+        logger.error("mcp_upstream_invalid_response", server_id=str(server_id), error=str(exc))
+        return {**UPSTREAM_INVALID_RESPONSE, "id": body.get("id")}
 
-    if not server.approved_tools:
+    result = upstream.get("result") if isinstance(upstream, dict) else None
+    if not server.approved_tools or not isinstance(result, dict):
+        # No filter configured, or a JSON-RPC error body with no result to
+        # filter: relay it as is.
         return upstream
 
-    tools = upstream.get("result", {}).get("tools", [])
-    filtered = [t for t in tools if t["name"] in server.approved_tools]
-    upstream["result"]["tools"] = filtered
+    tools = result.get("tools", [])
+    result["tools"] = [
+        t for t in tools if isinstance(t, dict) and t.get("name") in server.approved_tools
+    ]
     return upstream
 
 
@@ -196,6 +214,11 @@ async def call_tool(
 ) -> dict:
     start = time.monotonic()
     params = body.get("params", {})
+    if not isinstance(params, dict):
+        # Treated as having no fields: falls into the missing_tool_name
+        # malformed-request path below (audited, -32602) instead of an
+        # AttributeError 500 with no audit row.
+        params = {}
     tool_name = params.get("name")
     tool_arguments = params.get("arguments", {})
     agent_id = uuid.UUID(token["agent_id"])
@@ -218,6 +241,15 @@ async def call_tool(
             db, agent_id, None, None, tool_name, workflow, "missing_tool_name", start)
         return {"jsonrpc": "2.0", "id": body.get("id"),
                 "error": {"code": -32602, "message": "Invalid params: name is required"}}
+
+    if not isinstance(tool_arguments, dict):
+        # Cedar evaluates the arguments; substituting {} for a non-object
+        # would let a call dodge every parameter-based policy while the
+        # original body is still forwarded downstream.
+        await _audit_malformed_call_tool_request(
+            db, agent_id, None, None, tool_name, workflow, "arguments_not_object", start)
+        return {"jsonrpc": "2.0", "id": body.get("id"),
+                "error": {"code": -32602, "message": "Invalid params: arguments must be an object"}}
 
     try:
         session_id = uuid.UUID(params["session_id"])
@@ -388,7 +420,22 @@ async def call_tool(
             "bypass": gov_result.bypass, "enforced": True,
         })
         return _downstream_http_error_response(exc, body.get("id"))
-    except (httpx.ConnectError, httpx.TimeoutException) as exc:
+    except ValueError as exc:
+        logger.error("mcp_upstream_invalid_response", server_id=str(server_id), error=str(exc))
+        wal_writer.append({
+            "session_id": str(session_id), "agent_id": str(agent_id),
+            "agent_name": agent.name if agent else str(agent_id),
+            "tool_name": tool_name, "tool_parameters": enriched_arguments,
+            "decision": "allow", "decision_reason": "upstream_invalid_response",
+            "workflow": workflow,
+            "policy_id": gov_result.fired_policy_id, "policy_name": gov_result.fired_policy_name,
+            "sequence_number": sequence_number, "duration_ms": int((time.monotonic() - start) * 1000),
+            "risk_delta": 0,
+            "input_tokens": input_tokens, "output_tokens": output_tokens, "cost_usd": cost_usd,
+            "bypass": gov_result.bypass, "enforced": True,
+        })
+        return {**UPSTREAM_INVALID_RESPONSE, "id": body.get("id")}
+    except httpx.TransportError as exc:
         logger.error("mcp_upstream_unreachable", server_id=str(server_id), error=str(exc))
         wal_writer.append({
             "session_id": str(session_id), "agent_id": str(agent_id),
@@ -427,7 +474,15 @@ async def call_tool(
         return upstream_response
 
     scan_result = await scan_tool_response(upstream_response.get("result"), tool_name)
-    decision, reason = ("deny", f"response_scan_flagged:{','.join(t.category for t in scan_result.threats)}") if not scan_result.is_safe else ("allow", "response_scan_clean")
+    if scan_result.is_safe:
+        decision, reason = "allow", "response_scan_clean"
+    else:
+        # MCP_RESPONSE_SCAN_POLICY: "block" rejects the response; "log" delivers
+        # it and records the flag in the audit row.
+        decision = "deny" if settings.MCP_RESPONSE_SCAN_POLICY == "block" else "allow"
+        reason = f"response_scan_flagged:{','.join(t.category for t in scan_result.threats)}"
+        logger.warning("mcp_response_scan_flagged", tool_name=tool_name, agent_id=str(agent_id),
+                       policy=settings.MCP_RESPONSE_SCAN_POLICY)
 
     wal_writer.append({
         "session_id": str(session_id), "agent_id": str(agent_id),

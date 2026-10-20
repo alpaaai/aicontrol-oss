@@ -3,10 +3,11 @@ from contextlib import asynccontextmanager
 import httpx
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
-from app.core.config import settings as _settings
+from app.core.config import secret_key_warning, settings as _settings
 from app.core.license_gate import has_enterprise_license
 from app.core.logging import configure_logging, get_logger
 from app.models.database import async_session_factory
@@ -74,6 +75,9 @@ async def _safe_has_enterprise_license() -> bool:
 async def lifespan(app: FastAPI):
     """Run policy loader on startup and start the drift detector."""
     logger.info("aicontrol_starting")
+    weak_key = secret_key_warning(_settings.secret_key, _settings.app_env)
+    if weak_key:
+        logger.warning("weak_secret_key", detail=weak_key)
     async with async_session_factory() as session:
         await load_all(session)
 
@@ -186,12 +190,31 @@ if warnings_router is not None:
 
 @app.get("/health")
 async def health(request: Request) -> dict:
-    """Liveness check — returns ok when the app process is running."""
+    """Health check for the container HEALTHCHECK, load balancers and
+    monitoring. 200 when the process can reach Postgres, 503 when it cannot.
+    The audit_wal_* fields expose the audit pipeline: a pending count that
+    keeps growing means events are not reaching Postgres, and a non-zero
+    dead-lettered count means events were quarantined to the dead-letter file
+    next to the WAL (see OPERATIONS.md)."""
+    try:
+        async with async_session_factory() as session:
+            await session.execute(text("SELECT 1"))
+    except Exception as exc:
+        logger.error("health_database_unreachable", error=f"{type(exc).__name__}: {exc}")
+        return JSONResponse(
+            status_code=503,
+            content={"status": "unhealthy", "service": "aicontrol", "database": "unreachable"},
+        )
+
     drift_detector = getattr(request.app.state, "drift_detector", None)
+    wal_shipper = getattr(request.app.state, "wal_shipper", None)
     is_enterprise = await _safe_has_enterprise_license()
     return {
         "status": "ok",
         "service": "aicontrol",
+        "database": "ok",
+        "audit_wal_pending": wal_shipper.pending_count() if wal_shipper else None,
+        "audit_wal_dead_lettered": wal_shipper.dead_lettered if wal_shipper else None,
         # Cedar evaluates in this process, so there is no sidecar that can be
         # unreachable and nothing to poll. The field is kept so existing health
         # consumers do not break on a missing key.

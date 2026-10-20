@@ -16,6 +16,15 @@ from app.models.schemas import AuditEvent
 
 router = APIRouter(prefix="/audit-events", tags=["audit-events"])
 
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value: str) -> str:
+    """Neutralize spreadsheet formula injection. tool_name, agent_name and
+    decision_reason come from the calling agent or its tool arguments, and this
+    CSV is opened in Excel/Sheets, where a leading = + - @ runs as a formula."""
+    return "'" + value if value.startswith(_FORMULA_PREFIXES) else value
+
 
 @router.get("/export", dependencies=[Depends(require_enterprise_license)])
 async def export_audit_events(
@@ -57,12 +66,12 @@ async def export_audit_events(
         writer.writerow({
             "id": str(r.id),
             "created_at": r.created_at.isoformat() if r.created_at else "",
-            "agent_name": r.agent_name or "",
-            "tool_name": r.tool_name,
-            "tool_parameters": json.dumps(r.tool_parameters) if r.tool_parameters else "",
+            "agent_name": _csv_safe(r.agent_name or ""),
+            "tool_name": _csv_safe(r.tool_name),
+            "tool_parameters": _csv_safe(json.dumps(r.tool_parameters)) if r.tool_parameters else "",
             "decision": r.decision,
-            "decision_reason": r.decision_reason or "",
-            "policy_name": r.policy_name or "",
+            "decision_reason": _csv_safe(r.decision_reason or ""),
+            "policy_name": _csv_safe(r.policy_name or ""),
             "session_id": str(r.session_id) if r.session_id else "",
             "duration_ms": r.duration_ms if r.duration_ms is not None else "",
         })
@@ -122,8 +131,8 @@ async def list_audit_events(
         "events": [
             {
                 "id": str(r.id),
-                "session_id": str(r.session_id),
-                "agent_id": str(r.agent_id),
+                "session_id": str(r.session_id) if r.session_id else None,
+                "agent_id": str(r.agent_id) if r.agent_id else None,
                 "agent_name": r.agent_name,
                 "tool_name": r.tool_name,
                 "tool_parameters": r.tool_parameters,
@@ -146,7 +155,7 @@ async def list_audit_events(
                 } if r.policy else None,
                 "duration_ms": r.duration_ms,
                 "sequence_number": r.sequence_number,
-                "created_at": r.created_at.isoformat(),
+                "created_at": r.created_at.isoformat() if r.created_at else None,
                 "tool_response": str(r.tool_response)[:200] if r.tool_response else None,
             }
             for r in rows

@@ -54,7 +54,7 @@ export function AuditRow(props: { event: AuditEvent }) {
             </div>
             <div>
               <p className="text-caption text-ac-muted">Session</p>
-              <p className="text-identifier text-ac-body-strong break-all">{event.session_id}</p>
+              <p className="text-identifier text-ac-body-strong break-all">{event.session_id ?? "—"}</p>
             </div>
             <div>
               <p className="text-caption text-ac-muted">Sequence</p>

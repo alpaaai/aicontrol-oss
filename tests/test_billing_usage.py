@@ -380,3 +380,24 @@ async def test_billing_usage_license_synced_at_null_when_never_synced(human_admi
         assert data["license_synced_at"] is None
     finally:
         await _restore_org_settings(saved)
+
+
+def test_month_bounds_end_is_exclusive_start_of_next_month():
+    """count_intercepts_in_period uses created_at < date_to. The end bound was
+    the month's last day at 23:59:59, so every event in that final second was
+    counted in neither month."""
+    from datetime import datetime
+
+    from app.routers.billing import _month_bounds
+
+    assert _month_bounds(2026, 2) == (datetime(2026, 2, 1), datetime(2026, 3, 1))
+    assert _month_bounds(2026, 12) == (datetime(2026, 12, 1), datetime(2027, 1, 1))
+
+
+def test_cascaded_features_tolerates_an_unknown_plan():
+    """billing_usage() looked up PLAN_CONFIG[plan] and TIER_ORDER.index(plan)
+    directly, so any license_plan value outside the known four was a 500."""
+    from app.routers.billing import PLAN_CONFIG, _cascaded_features
+
+    assert _cascaded_features("something_new") == _cascaded_features("community")
+    assert PLAN_CONFIG.get("something_new") is None
