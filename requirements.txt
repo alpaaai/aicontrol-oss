@@ -14,7 +14,7 @@ pydantic==2.12.5
 pydantic-settings==2.13.1
 
 # Policy engine
-cedarpy==4.8.7
+cedarpy==4.12.2
 
 # Human review (slack_sdk is imported directly; pinned alongside slack-bolt)
 slack-bolt==1.27.0
