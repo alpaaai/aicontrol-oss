@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { getBillingUsage, activateLicense } from '../api/billing';
+import { getBillingUsage, activateLicense, startUpgrade } from '../api/billing';
 import type { BillingUsage } from '../api/billing';
 import { ReactivateBanner } from '../components/shared/ReactivateBanner';
 
@@ -53,6 +53,9 @@ export default function BillingPage() {
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activationSuccess, setActivationSuccess] = useState(false);
 
+  const [upgrading, setUpgrading] = useState<'business' | 'enterprise' | null>(null);
+  const [upgradeError, setUpgradeError] = useState<string | null>(null);
+
   const reload = () => {
     setLoading(true);
     getBillingUsage()
@@ -78,6 +81,21 @@ export default function BillingPage() {
       setActivationError(detail);
     } finally {
       setActivating(false);
+    }
+  };
+
+  const handleUpgrade = async (plan: 'business' | 'enterprise') => {
+    setUpgrading(plan);
+    setUpgradeError(null);
+    try {
+      const { url } = await startUpgrade(plan);
+      window.location.href = url;
+    } catch (err: unknown) {
+      const detail =
+        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
+        'Failed to start upgrade.';
+      setUpgradeError(detail);
+      setUpgrading(null);
     }
   };
 
@@ -188,23 +206,36 @@ export default function BillingPage() {
             </a>
           )}
 
-          {usage.plan === 'trial' && usage.upgrade_url && (
-            <a
-              href={usage.upgrade_url}
-              className="mt-2 inline-flex px-4 py-2 bg-ac-primary hover:opacity-90 text-white rounded-md text-sm"
-            >
-              Upgrade to Business
-            </a>
-          )}
+          {usage.plan === 'trial' &&
+            (['business', 'enterprise'] as const).map((plan) => (
+              <button
+                key={plan}
+                onClick={() => handleUpgrade(plan)}
+                disabled={upgrading !== null}
+                className="mt-2 inline-flex px-4 py-2 bg-ac-primary hover:opacity-90 text-white rounded-md text-sm
+                           disabled:opacity-50"
+              >
+                {upgrading === plan
+                  ? 'Redirecting…'
+                  : `Upgrade to ${plan === 'business' ? 'Business' : 'Enterprise'}`}
+              </button>
+            ))}
         </div>
+
+        {upgradeError && (
+          <p className="text-sm text-red-500">{upgradeError}</p>
+        )}
+
+        {usage.plan === 'trial' && (
+          <p className="text-xs text-ac-muted">
+            Your activation code stays the same after upgrading.
+          </p>
+        )}
 
         {!isCommunity && !usage.manage_subscription_url && (
           <p className="text-xs text-ac-muted">
-            Self-serve subscription management unavailable for this plan. Contact{' '}
-            <a href="mailto:hello@aictl.io" className="underline">
-              hello@aictl.io
-            </a>{' '}
-            to change your plan.
+            Subscription management is temporarily unavailable because the billing service
+            could not be reached. Try again later.
           </p>
         )}
 

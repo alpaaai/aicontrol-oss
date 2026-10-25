@@ -9,7 +9,6 @@ const COMMUNITY_USAGE = {
   this_month: { period: "2026-09", intercepts: 1234 },
   last_month: { period: "2026-08", intercepts: 987 },
   manage_subscription_url: null,
-  upgrade_url: null,
   license_status: null,
   license_synced_at: null,
 };
@@ -26,7 +25,6 @@ const ENTERPRISE_USAGE = {
   this_month: { period: "2026-09", intercepts: 2_400_000 },
   last_month: { period: "2026-08", intercepts: 1_800_000 },
   manage_subscription_url: "https://billing.stripe.com/session/abc",
-  upgrade_url: null,
   license_status: "active",
   license_synced_at: "2026-09-16T08:00:00Z",
 };
@@ -169,4 +167,45 @@ test("an expired trial shows the Trial expired label and a live upgrade link", a
   await expect(page.getByText("COMMUNITY")).toBeVisible();
   await expect(page.getByText("Trial expired")).toBeVisible();
   await expect(page.getByRole("link", { name: "Upgrade" })).toBeVisible();
+});
+
+test("trial plan offers upgrades to Business and Enterprise that open checkout", async ({ page }) => {
+  await mockUsage(page, TRIAL_USAGE);
+  let posted: unknown = null;
+  await page.route("**/billing/upgrade", (route) => {
+    posted = route.request().postDataJSON();
+    return route.fulfill({ status: 200, json: { url: "https://checkout.stripe.com/c/pay/cs_test_upgrade" } });
+  });
+  await page.route("https://checkout.stripe.com/**", (route) =>
+    route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>Stripe Checkout</body></html>" }),
+  );
+  await page.goto("/billing");
+  await expect(page.getByRole("button", { name: "Upgrade to Business" })).toBeVisible();
+  await page.getByRole("button", { name: "Upgrade to Enterprise" }).click();
+  await page.waitForURL("https://checkout.stripe.com/c/pay/cs_test_upgrade");
+  expect(posted).toEqual({ plan: "enterprise" });
+});
+
+test("a failed upgrade request shows an error and stays on the page", async ({ page }) => {
+  await mockUsage(page, TRIAL_USAGE);
+  await page.route("**/billing/upgrade", (route) =>
+    route.fulfill({ status: 502, json: { detail: "Billing service unavailable, please try again" } }),
+  );
+  await page.goto("/billing");
+  await page.getByRole("button", { name: "Upgrade to Business" }).click();
+  await expect(page.getByText("Billing service unavailable, please try again")).toBeVisible();
+  await expect(page).toHaveURL(/\/billing$/);
+});
+
+test("non-trial paid plans do not show trial upgrade buttons", async ({ page }) => {
+  await mockUsage(page, ENTERPRISE_USAGE);
+  await page.goto("/billing");
+  await expect(page.getByRole("button", { name: /Upgrade to/ })).toHaveCount(0);
+});
+
+test("unavailable subscription management says billing is unreachable, not contact sales", async ({ page }) => {
+  await mockUsage(page, { ...ENTERPRISE_USAGE, manage_subscription_url: null });
+  await page.goto("/billing");
+  await expect(page.getByText(/Subscription management is temporarily unavailable/)).toBeVisible();
+  await expect(page.getByText(/to change your plan/)).toHaveCount(0);
 });

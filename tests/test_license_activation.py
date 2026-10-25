@@ -57,7 +57,7 @@ async def test_valid_activation_code_saves_and_returns_license_status(_org_row, 
         "app.routers.org_settings.sync_license",
         new_callable=AsyncMock,
         return_value={"status": "active", "plan": "business"},
-    ):
+    ), patch("app.routers.org_settings.ensure_license_sync_running") as mock_ensure:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             resp = await c.put(
                 "/settings/license-activation",
@@ -66,6 +66,8 @@ async def test_valid_activation_code_saves_and_returns_license_status(_org_row, 
             )
 
     assert resp.status_code == 200
+    mock_ensure.assert_called_once()
+    assert mock_ensure.call_args.args[0] is app.state
     body = resp.json()
     assert body["license_status"] == "active"
     assert body["license_plan"] == "business"
@@ -85,7 +87,7 @@ async def test_invalid_activation_code_returns_400_and_does_not_save(_org_row, h
         "app.routers.org_settings.sync_license",
         new_callable=AsyncMock,
         side_effect=BillingClientError("billing-service returned 401"),
-    ):
+    ), patch("app.routers.org_settings.ensure_license_sync_running") as mock_ensure:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             resp = await c.put(
                 "/settings/license-activation",
@@ -94,6 +96,7 @@ async def test_invalid_activation_code_returns_400_and_does_not_save(_org_row, h
             )
 
     assert resp.status_code == 400
+    mock_ensure.assert_not_called()
 
     async with async_session_factory() as db:
         row = (await db.execute(text("SELECT activation_code FROM org_settings"))).first()

@@ -99,3 +99,14 @@ class LicenseSync:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)
             self._task = None
+
+
+def ensure_license_sync_running(app_state, session_factory) -> None:
+    """Start the daily sync if it isn't already running. Called at startup
+    when a code is on file and again on activation, so an instance that
+    booted without a code starts syncing as soon as one is entered."""
+    if getattr(app_state, "license_sync", None) is not None:
+        return
+    license_sync = LicenseSync(session_factory=session_factory)
+    license_sync.start()
+    app_state.license_sync = license_sync

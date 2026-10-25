@@ -5,7 +5,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import httpx
 import pytest
 
-from app.services.billing_client import BillingClientError, fetch_billing_urls, sync_license
+from app.services.billing_client import (
+    BillingClientError,
+    create_upgrade_checkout,
+    fetch_billing_urls,
+    sync_license,
+)
 
 
 def _mock_response(status_code: int, json_body: dict) -> MagicMock:
@@ -23,50 +28,13 @@ async def test_fetch_billing_urls_happy_path_returns_manage_subscription_url():
     mock_client.__aexit__.return_value = None
 
     with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
-        result = await fetch_billing_urls("test-activation-code", "business")
+        result = await fetch_billing_urls("test-activation-code")
 
-    assert result["manage_subscription_url"] == "https://billing.stripe.com/session/abc"
-    assert result["upgrade_url"] is None
+    assert result == {"manage_subscription_url": "https://billing.stripe.com/session/abc"}
     mock_client.post.assert_called_once()
     call_args = mock_client.post.call_args
     assert call_args.args[0].endswith("/billing/portal")
     assert call_args.kwargs["json"] == {"activation_code": "test-activation-code"}
-
-
-@pytest.mark.asyncio
-async def test_fetch_billing_urls_trial_plan_includes_upgrade_url():
-    portal_response = _mock_response(200, {"url": "https://billing.stripe.com/session/abc"})
-    upgrade_response = _mock_response(200, {"url": "https://checkout.stripe.com/session/xyz"})
-    mock_client = AsyncMock()
-    mock_client.post.side_effect = [portal_response, upgrade_response]
-    mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
-
-    with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
-        result = await fetch_billing_urls("test-activation-code", "trial")
-
-    assert result["manage_subscription_url"] == "https://billing.stripe.com/session/abc"
-    assert result["upgrade_url"] == "https://checkout.stripe.com/session/xyz"
-    assert mock_client.post.call_count == 2
-    upgrade_call = mock_client.post.call_args_list[1]
-    assert upgrade_call.args[0].endswith("/billing/upgrade")
-    assert upgrade_call.kwargs["json"] == {"activation_code": "test-activation-code", "plan": "business"}
-
-
-@pytest.mark.asyncio
-async def test_fetch_billing_urls_trial_plan_degrades_to_no_upgrade_url_on_upgrade_failure():
-    portal_response = _mock_response(200, {"url": "https://billing.stripe.com/session/abc"})
-    upgrade_response = _mock_response(429, {"detail": "rate limited"})
-    mock_client = AsyncMock()
-    mock_client.post.side_effect = [portal_response, upgrade_response]
-    mock_client.__aenter__.return_value = mock_client
-    mock_client.__aexit__.return_value = None
-
-    with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
-        result = await fetch_billing_urls("test-activation-code", "trial")
-
-    assert result["manage_subscription_url"] == "https://billing.stripe.com/session/abc"
-    assert result["upgrade_url"] is None
 
 
 @pytest.mark.asyncio
@@ -78,7 +46,7 @@ async def test_fetch_billing_urls_raises_billing_client_error_on_timeout():
 
     with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
         with pytest.raises(BillingClientError):
-            await fetch_billing_urls("test-activation-code", "business")
+            await fetch_billing_urls("test-activation-code")
 
 
 @pytest.mark.asyncio
@@ -90,7 +58,48 @@ async def test_fetch_billing_urls_raises_billing_client_error_on_non_200():
 
     with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
         with pytest.raises(BillingClientError):
-            await fetch_billing_urls("bad-code", "business")
+            await fetch_billing_urls("bad-code")
+
+
+@pytest.mark.parametrize("plan", ["business", "enterprise"])
+@pytest.mark.asyncio
+async def test_create_upgrade_checkout_returns_checkout_url(plan):
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _mock_response(200, {"url": "https://checkout.stripe.com/session/xyz"})
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
+        url = await create_upgrade_checkout("test-activation-code", plan)
+
+    assert url == "https://checkout.stripe.com/session/xyz"
+    call_args = mock_client.post.call_args
+    assert call_args.args[0].endswith("/billing/upgrade")
+    assert call_args.kwargs["json"] == {"activation_code": "test-activation-code", "plan": plan}
+
+
+@pytest.mark.asyncio
+async def test_create_upgrade_checkout_raises_on_non_200():
+    mock_client = AsyncMock()
+    mock_client.post.return_value = _mock_response(429, {"detail": "rate limited"})
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
+        with pytest.raises(BillingClientError):
+            await create_upgrade_checkout("test-activation-code", "business")
+
+
+@pytest.mark.asyncio
+async def test_create_upgrade_checkout_raises_on_connection_error():
+    mock_client = AsyncMock()
+    mock_client.post.side_effect = httpx.ConnectError("connection refused")
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    with patch("app.services.billing_client.httpx.AsyncClient", return_value=mock_client):
+        with pytest.raises(BillingClientError):
+            await create_upgrade_checkout("test-activation-code", "enterprise")
 
 
 @pytest.mark.asyncio

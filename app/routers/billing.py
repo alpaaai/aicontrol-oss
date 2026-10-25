@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Optional
+from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import func, select, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import require_human
+from app.core.auth import require_human, require_human_admin
 from app.core import license_gate as _lg
 from app.core.logging import get_logger
 from app.models.schemas import AuditEvent
 from app.models.database import get_db
 from app.models.user import OrgSettings
-from app.services.billing_client import BillingClientError, fetch_billing_urls
+from app.services.billing_client import (
+    BillingClientError,
+    create_upgrade_checkout,
+    fetch_billing_urls,
+)
 
 logger = get_logger("billing")
 
@@ -132,12 +137,10 @@ async def billing_usage(
     ).first() or (None, None)
 
     manage_subscription_url = None
-    upgrade_url = None
     if activation_code:
         try:
-            urls = await fetch_billing_urls(activation_code, info.plan)
+            urls = await fetch_billing_urls(activation_code)
             manage_subscription_url = urls["manage_subscription_url"]
-            upgrade_url = urls["upgrade_url"]
         except BillingClientError as exc:
             logger.warning("billing_client_fetch_urls_failed", error=str(exc))
 
@@ -156,7 +159,33 @@ async def billing_usage(
             "intercepts": prev_count,
         },
         "manage_subscription_url": manage_subscription_url,
-        "upgrade_url": upgrade_url,
         "license_status": info.license_status,
         "license_synced_at": license_synced_at.isoformat() if license_synced_at else None,
     }
+
+
+class UpgradeBody(BaseModel):
+    plan: Literal["business", "enterprise"]
+
+
+@router.post("/upgrade")
+async def billing_upgrade(
+    body: UpgradeBody,
+    _user=Depends(require_human_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Mid-trial upgrade: returns a Stripe Checkout URL for the chosen plan.
+    The activation code stays the same after the upgrade; the next license
+    sync (or re-entering the code) picks up the new plan."""
+    info = await _lg.get_license_info(db)
+    activation_code = (
+        await db.execute(select(OrgSettings.activation_code).limit(1))
+    ).scalar_one_or_none()
+    if not activation_code or info.plan != "trial":
+        raise HTTPException(status_code=400, detail="Only an activated trial can be upgraded here")
+    try:
+        url = await create_upgrade_checkout(activation_code, body.plan)
+    except BillingClientError as exc:
+        logger.warning("billing_client_upgrade_failed", error=str(exc))
+        raise HTTPException(status_code=502, detail="Billing service unavailable, please try again")
+    return {"url": url}

@@ -135,3 +135,30 @@ async def test_stop_cancels_task():
         await asyncio.sleep(0)
         await job.stop()
         assert job._task is None or job._task.cancelled()
+
+
+def test_ensure_license_sync_running_starts_sync_when_none_running():
+    """Activating a code on an instance that booted without one must start
+    the daily sync; otherwise cancellations never reach the instance until
+    the next API restart."""
+    from app.services.license_sync import ensure_license_sync_running
+
+    state = SimpleNamespace(license_sync=None)
+    factory = MagicMock()
+    with patch.object(LicenseSync, "start") as mock_start:
+        ensure_license_sync_running(state, factory)
+
+    assert isinstance(state.license_sync, LicenseSync)
+    mock_start.assert_called_once()
+
+
+def test_ensure_license_sync_running_is_noop_when_already_running():
+    from app.services.license_sync import ensure_license_sync_running
+
+    existing = MagicMock()
+    state = SimpleNamespace(license_sync=existing)
+    with patch.object(LicenseSync, "start") as mock_start:
+        ensure_license_sync_running(state, MagicMock())
+
+    assert state.license_sync is existing
+    mock_start.assert_not_called()

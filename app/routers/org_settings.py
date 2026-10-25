@@ -2,15 +2,16 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_human, require_human_admin
-from app.models.database import get_db
+from app.models.database import async_session_factory, get_db
 from app.models.user import OrgSettings
 from app.services.billing_client import BillingClientError, sync_license
+from app.services.license_sync import ensure_license_sync_running
 
 router = APIRouter(prefix="/org-settings", tags=["org-settings"])
 
@@ -85,6 +86,7 @@ class LicenseActivationResponse(BaseModel):
 @settings_router.put("/license-activation", response_model=LicenseActivationResponse)
 async def activate_license(
     body: LicenseActivationBody,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_human_admin),
 ):
@@ -108,4 +110,5 @@ async def activate_license(
     org.license_synced_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(org)
+    ensure_license_sync_running(request.app.state, async_session_factory)
     return org

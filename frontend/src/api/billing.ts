@@ -14,7 +14,6 @@ export interface BillingUsage {
   this_month: MonthUsage;
   last_month: MonthUsage;
   manage_subscription_url: string | null;
-  upgrade_url: string | null;
   license_status: 'active' | 'past_due' | 'canceled' | 'unreachable' | 'expired' | null;
   license_synced_at: string | null;
 }
@@ -32,3 +31,6 @@ export const activateLicense = (activationCode: string): Promise<ActivateLicense
   apiClient
     .put<ActivateLicenseResponse>('/settings/license-activation', { activation_code: activationCode })
     .then(r => r.data);
+
+export const startUpgrade = (plan: 'business' | 'enterprise'): Promise<{ url: string }> =>
+  apiClient.post<{ url: string }>('/billing/upgrade', { plan }).then(r => r.data);

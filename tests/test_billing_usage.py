@@ -227,7 +227,7 @@ async def test_billing_usage_with_activation_code_populates_billing_urls(human_a
              patch(
                  "app.routers.billing.fetch_billing_urls",
                  new_callable=AsyncMock,
-                 return_value={"manage_subscription_url": "https://billing.stripe.com/session/abc", "upgrade_url": None},
+                 return_value={"manage_subscription_url": "https://billing.stripe.com/session/abc"},
              ) as mock_fetch:
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
@@ -239,8 +239,8 @@ async def test_billing_usage_with_activation_code_populates_billing_urls(human_a
         assert r.status_code == 200
         data = r.json()
         assert data["manage_subscription_url"] == "https://billing.stripe.com/session/abc"
-        assert data["upgrade_url"] is None
-        mock_fetch.assert_called_once_with("test-activation-code", "business")
+        assert "upgrade_url" not in data
+        mock_fetch.assert_called_once_with("test-activation-code")
     finally:
         await _restore_org_settings(saved)
 
@@ -263,7 +263,7 @@ async def test_billing_usage_without_activation_code_leaves_urls_none_and_skips_
         assert r.status_code == 200
         data = r.json()
         assert data["manage_subscription_url"] is None
-        assert data["upgrade_url"] is None
+        assert "upgrade_url" not in data
         mock_fetch.assert_not_called()
     finally:
         await _restore_org_settings(saved)
@@ -291,7 +291,7 @@ async def test_billing_usage_falls_back_to_none_when_billing_client_fails(human_
         assert r.status_code == 200
         data = r.json()
         assert data["manage_subscription_url"] is None
-        assert data["upgrade_url"] is None
+        assert "upgrade_url" not in data
     finally:
         await _restore_org_settings(saved)
 
@@ -345,7 +345,7 @@ async def test_billing_usage_includes_license_status_and_synced_at(human_admin_t
     try:
         with patch.object(license_gate, "get_license_info", return_value=_business(license_status="past_due")), \
              patch("app.routers.billing.fetch_billing_urls", new_callable=AsyncMock,
-                   return_value={"manage_subscription_url": "https://billing.stripe.com/session/abc", "upgrade_url": None}):
+                   return_value={"manage_subscription_url": "https://billing.stripe.com/session/abc"}):
             async with AsyncClient(
                 transport=ASGITransport(app=app), base_url="http://test"
             ) as client:
@@ -401,3 +401,83 @@ def test_cascaded_features_tolerates_an_unknown_plan():
 
     assert _cascaded_features("something_new") == _cascaded_features("community")
     assert PLAN_CONFIG.get("something_new") is None
+
+
+async def _post_upgrade(token, plan="business"):
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        return await client.post(
+            "/billing/upgrade",
+            json={"plan": plan},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+
+@pytest.mark.parametrize("plan", ["business", "enterprise"])
+@pytest.mark.asyncio
+async def test_billing_upgrade_trial_returns_checkout_url(human_admin_token, plan):
+    """Trial customers can upgrade to Business or Enterprise. The checkout
+    session is created on click, not on every Billing page load."""
+    saved = await _set_activation_code("test-activation-code")
+    try:
+        with patch.object(license_gate, "get_license_info", return_value=_trial()), \
+             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock,
+                   return_value="https://checkout.stripe.com/session/xyz") as mock_create:
+            r = await _post_upgrade(human_admin_token, plan)
+        assert r.status_code == 200
+        assert r.json() == {"url": "https://checkout.stripe.com/session/xyz"}
+        mock_create.assert_called_once_with("test-activation-code", plan)
+    finally:
+        await _restore_org_settings(saved)
+
+
+@pytest.mark.asyncio
+async def test_billing_upgrade_non_trial_returns_400(human_admin_token):
+    saved = await _set_activation_code("test-activation-code")
+    try:
+        with patch.object(license_gate, "get_license_info", return_value=_business()), \
+             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock) as mock_create:
+            r = await _post_upgrade(human_admin_token)
+        assert r.status_code == 400
+        mock_create.assert_not_called()
+    finally:
+        await _restore_org_settings(saved)
+
+
+@pytest.mark.asyncio
+async def test_billing_upgrade_without_activation_code_returns_400(human_admin_token):
+    saved = await _set_activation_code(None)
+    try:
+        with patch.object(license_gate, "get_license_info", return_value=_trial()), \
+             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock) as mock_create:
+            r = await _post_upgrade(human_admin_token)
+        assert r.status_code == 400
+        mock_create.assert_not_called()
+    finally:
+        await _restore_org_settings(saved)
+
+
+@pytest.mark.asyncio
+async def test_billing_upgrade_invalid_plan_returns_422(human_admin_token):
+    r = await _post_upgrade(human_admin_token, "community")
+    assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_billing_upgrade_billing_service_error_returns_502(human_admin_token):
+    from app.services.billing_client import BillingClientError
+
+    saved = await _set_activation_code("test-activation-code")
+    try:
+        with patch.object(license_gate, "get_license_info", return_value=_trial()), \
+             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock,
+                   side_effect=BillingClientError("billing-service returned 429")):
+            r = await _post_upgrade(human_admin_token)
+        assert r.status_code == 502
+    finally:
+        await _restore_org_settings(saved)
+
+
+@pytest.mark.asyncio
+async def test_billing_upgrade_non_admin_gets_403(human_analyst_token):
+    r = await _post_upgrade(human_analyst_token)
+    assert r.status_code == 403

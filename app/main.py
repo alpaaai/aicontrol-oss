@@ -31,7 +31,7 @@ from app.routers.org_settings import settings_router
 from app.routers.mcp_gateway import router as mcp_gateway_router
 from app.routers.mcp_servers import router as mcp_servers_router
 from app.services.cedar_client import invalidate_policy_set_cache
-from app.services.license_sync import LicenseSync
+from app.services.license_sync import ensure_license_sync_running
 from app.services.policy_loader import load_all
 from app.services.retention_purger import RetentionPurger
 from app.services.wal import default_wal_writer
@@ -120,14 +120,9 @@ async def lifespan(app: FastAPI):
             await session.execute(select(OrgSettings.activation_code).where(OrgSettings.activation_code.isnot(None)))
         ).first() is not None
 
+    app.state.license_sync = None
     if has_activation_code:
-        license_sync = LicenseSync(
-            session_factory=async_session_factory,
-        )
-        license_sync.start()
-        app.state.license_sync = license_sync
-    else:
-        app.state.license_sync = None
+        ensure_license_sync_running(app.state, async_session_factory)
 
     logger.info("aicontrol_ready")
 
