@@ -1,5 +1,10 @@
 import { expect, test } from "@playwright/test";
 
+// Same fallback as src/pages/BillingPage.tsx; the dev server inherits this
+// process's VITE_* env.
+const STRIPE_LINK_BUSINESS = process.env.VITE_STRIPE_LINK_BUSINESS || "https://aictl.io/pricing";
+const STRIPE_LINK_ENTERPRISE = process.env.VITE_STRIPE_LINK_ENTERPRISE || "https://aictl.io/pricing";
+
 const COMMUNITY_USAGE = {
   plan: "community",
   company: null,
@@ -161,51 +166,47 @@ test("trial plan shows the TRIAL pill and enterprise-tier features", async ({ pa
   ).toBeVisible();
 });
 
-test("an expired trial shows the Trial expired label and a live upgrade link", async ({ page }) => {
+test("an expired license shows the License expired label and a live upgrade link", async ({ page }) => {
   await mockUsage(page, EXPIRED_TRIAL_USAGE);
   await page.goto("/billing");
   await expect(page.getByText("COMMUNITY")).toBeVisible();
-  await expect(page.getByText("Trial expired")).toBeVisible();
+  await expect(page.getByText("License expired")).toBeVisible();
   await expect(page.getByRole("link", { name: "Upgrade" })).toBeVisible();
 });
 
-test("trial plan offers upgrades to Business and Enterprise that open checkout", async ({ page }) => {
+test("trial plan offers upgrades to Business and Enterprise as Stripe Payment Links", async ({ page }) => {
   await mockUsage(page, TRIAL_USAGE);
-  let posted: unknown = null;
+  let upgradeCalled = false;
   await page.route("**/billing/upgrade", (route) => {
-    posted = route.request().postDataJSON();
-    return route.fulfill({ status: 200, json: { url: "https://checkout.stripe.com/c/pay/cs_test_upgrade" } });
+    upgradeCalled = true;
+    return route.fulfill({ status: 502, json: {} });
   });
-  await page.route("https://checkout.stripe.com/**", (route) =>
-    route.fulfill({ status: 200, contentType: "text/html", body: "<html><body>Stripe Checkout</body></html>" }),
-  );
   await page.goto("/billing");
-  await expect(page.getByRole("button", { name: "Upgrade to Business" })).toBeVisible();
-  await page.getByRole("button", { name: "Upgrade to Enterprise" }).click();
-  await page.waitForURL("https://checkout.stripe.com/c/pay/cs_test_upgrade");
-  expect(posted).toEqual({ plan: "enterprise" });
+  const business = page.getByRole("link", { name: "Upgrade to Business" });
+  const enterprise = page.getByRole("link", { name: "Upgrade to Enterprise" });
+  await expect(business).toHaveAttribute("href", STRIPE_LINK_BUSINESS);
+  await expect(enterprise).toHaveAttribute("href", STRIPE_LINK_ENTERPRISE);
+  await expect(business).toHaveAttribute("target", "_blank");
+  expect(upgradeCalled).toBe(false);
 });
 
-test("a failed upgrade request shows an error and stays on the page", async ({ page }) => {
+test("trial plan does not claim the activation code survives an upgrade", async ({ page }) => {
   await mockUsage(page, TRIAL_USAGE);
-  await page.route("**/billing/upgrade", (route) =>
-    route.fulfill({ status: 502, json: { detail: "Billing service unavailable, please try again" } }),
-  );
   await page.goto("/billing");
-  await page.getByRole("button", { name: "Upgrade to Business" }).click();
-  await expect(page.getByText("Billing service unavailable, please try again")).toBeVisible();
-  await expect(page).toHaveURL(/\/billing$/);
+  await expect(page.getByRole("link", { name: "Upgrade to Business" })).toBeVisible();
+  await expect(page.getByText(/activation code stays the same/)).toHaveCount(0);
 });
 
 test("non-trial paid plans do not show trial upgrade buttons", async ({ page }) => {
   await mockUsage(page, ENTERPRISE_USAGE);
   await page.goto("/billing");
-  await expect(page.getByRole("button", { name: /Upgrade to/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Upgrade to/ })).toHaveCount(0);
 });
 
-test("unavailable subscription management says billing is unreachable, not contact sales", async ({ page }) => {
+test("a paid plan without subscription management shows no billing-unreachable notice", async ({ page }) => {
   await mockUsage(page, { ...ENTERPRISE_USAGE, manage_subscription_url: null });
   await page.goto("/billing");
-  await expect(page.getByText(/Subscription management is temporarily unavailable/)).toBeVisible();
-  await expect(page.getByText(/to change your plan/)).toHaveCount(0);
+  await expect(page.getByText("ENTERPRISE")).toBeVisible();
+  await expect(page.getByText(/Subscription management is temporarily unavailable/)).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Manage Subscription" })).toHaveCount(0);
 });

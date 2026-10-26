@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
-import { getBillingUsage, activateLicense, startUpgrade } from '../api/billing';
+import { getBillingUsage, activateLicense } from '../api/billing';
 import type { BillingUsage } from '../api/billing';
 import { ReactivateBanner } from '../components/shared/ReactivateBanner';
 
@@ -16,10 +16,16 @@ const LICENSE_STATUS_LABEL: Record<string, string> = {
   past_due: 'Past due',
   canceled: 'Canceled',
   unreachable: 'Unreachable',
-  expired: 'Trial expired',
+  expired: 'License expired',
 };
 
 const UPGRADE_URL = 'https://aictl.io/pricing';
+
+// Trial upgrades go straight to the Stripe Payment Links; licensing is then
+// the same as a new purchase (a new signed code by email). Build-time vars,
+// falling back to the pricing page, which links to the same checkouts.
+const STRIPE_LINK_BUSINESS = import.meta.env.VITE_STRIPE_LINK_BUSINESS || UPGRADE_URL;
+const STRIPE_LINK_ENTERPRISE = import.meta.env.VITE_STRIPE_LINK_ENTERPRISE || UPGRADE_URL;
 
 function formatNumber(n: number): string {
   if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(2)}M`;
@@ -53,9 +59,6 @@ export default function BillingPage() {
   const [activationError, setActivationError] = useState<string | null>(null);
   const [activationSuccess, setActivationSuccess] = useState(false);
 
-  const [upgrading, setUpgrading] = useState<'business' | 'enterprise' | null>(null);
-  const [upgradeError, setUpgradeError] = useState<string | null>(null);
-
   const reload = () => {
     setLoading(true);
     getBillingUsage()
@@ -81,21 +84,6 @@ export default function BillingPage() {
       setActivationError(detail);
     } finally {
       setActivating(false);
-    }
-  };
-
-  const handleUpgrade = async (plan: 'business' | 'enterprise') => {
-    setUpgrading(plan);
-    setUpgradeError(null);
-    try {
-      const { url } = await startUpgrade(plan);
-      window.location.href = url;
-    } catch (err: unknown) {
-      const detail =
-        (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail ??
-        'Failed to start upgrade.';
-      setUpgradeError(detail);
-      setUpgrading(null);
     }
   };
 
@@ -207,37 +195,21 @@ export default function BillingPage() {
           )}
 
           {usage.plan === 'trial' &&
-            (['business', 'enterprise'] as const).map((plan) => (
-              <button
-                key={plan}
-                onClick={() => handleUpgrade(plan)}
-                disabled={upgrading !== null}
-                className="mt-2 inline-flex px-4 py-2 bg-ac-primary hover:opacity-90 text-white rounded-md text-sm
-                           disabled:opacity-50"
+            ([
+              ['Business', STRIPE_LINK_BUSINESS],
+              ['Enterprise', STRIPE_LINK_ENTERPRISE],
+            ] as const).map(([label, href]) => (
+              <a
+                key={label}
+                href={href}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-flex px-4 py-2 bg-ac-primary hover:opacity-90 text-white rounded-md text-sm"
               >
-                {upgrading === plan
-                  ? 'Redirecting…'
-                  : `Upgrade to ${plan === 'business' ? 'Business' : 'Enterprise'}`}
-              </button>
+                Upgrade to {label}
+              </a>
             ))}
         </div>
-
-        {upgradeError && (
-          <p className="text-sm text-red-500">{upgradeError}</p>
-        )}
-
-        {usage.plan === 'trial' && (
-          <p className="text-xs text-ac-muted">
-            Your activation code stays the same after upgrading.
-          </p>
-        )}
-
-        {!isCommunity && !usage.manage_subscription_url && (
-          <p className="text-xs text-ac-muted">
-            Subscription management is temporarily unavailable because the billing service
-            could not be reached. Try again later.
-          </p>
-        )}
 
         {/* Activation code entry */}
         <div className="pt-4 border-t border-ac-hairline space-y-2">

@@ -50,3 +50,22 @@ async def test_org_settings_licensing_columns_are_nullable():
         assert fetched.activation_code is None
         await db.delete(fetched)
         await db.commit()
+
+
+@pytest.mark.asyncio
+async def test_org_settings_license_key_round_trip_and_defaults_to_null():
+    async with async_session_factory() as db:
+        with_key = OrgSettings(id=uuid.uuid4(), org_name="Key Org", license_key="AICTL1.payload.signature")
+        without_key = OrgSettings(id=uuid.uuid4(), org_name="No Key Org")
+        db.add_all([with_key, without_key])
+        await db.commit()
+        ids = (with_key.id, without_key.id)
+
+    async with async_session_factory() as db:
+        fetched_with = await db.get(OrgSettings, ids[0])
+        fetched_without = await db.get(OrgSettings, ids[1])
+        assert fetched_with.license_key == "AICTL1.payload.signature"
+        assert fetched_without.license_key is None
+        await db.delete(fetched_with)
+        await db.delete(fetched_without)
+        await db.commit()

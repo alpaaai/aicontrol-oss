@@ -202,6 +202,32 @@ async def restore_org_settings(db, rows: list[dict]) -> None:
         )
 
 
+@pytest.fixture
+def license_code():
+    """Factory for signed license codes. Patches license_key.PUBLIC_KEY to an
+    ephemeral keypair for the test, so codes verify in-process without the
+    real signing key. days < 0 gives an already-expired code."""
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from app.core import license_key
+
+    signing_key = Ed25519PrivateKey.generate()
+
+    def make(plan: str = "enterprise", days: int = 395, email: str = "pytest@example.com",
+             order: str = "pytest-order") -> str:
+        now = datetime.now(timezone.utc)
+        return license_key.encode_license_code(signing_key, {
+            "plan": plan,
+            "email": email,
+            "order": order,
+            "iat": int(now.timestamp()),
+            "exp": int((now + timedelta(days=days)).timestamp()),
+        })
+
+    with patch.object(license_key, "PUBLIC_KEY", license_key.public_key_to_str(signing_key.public_key())):
+        yield make
+
+
 @pytest_asyncio.fixture(loop_scope="session")
 async def db_session():
     """An async ORM session that never commits. Tests flush to exercise the

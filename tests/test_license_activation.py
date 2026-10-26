@@ -1,6 +1,7 @@
-"""Tests for PUT /settings/license-activation (plans/v4 task 23) -- the
-only way an activation code enters an aicontrol instance (BillingPage.tsx
-only, no install.sh prompt, per scope decision 4)."""
+"""Tests for PUT /settings/license-activation -- the only way a license
+code enters an aicontrol instance (BillingPage.tsx only). Since plans/v5
+2026-10-26-signed-license-keys the code is a signed license code verified
+locally; billing-service is never called."""
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -11,10 +12,9 @@ from sqlalchemy import text
 from app.main import app
 from app.models.database import async_session_factory
 from tests.conftest import restore_org_settings, snapshot_org_settings
-from app.services.billing_client import BillingClientError
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module", loop_scope="session")
 async def _org_row():
     """Replace org_settings with a single known row; restore after.
     Session-scoped: matches tests/test_org_settings.py's own fixture --
@@ -44,63 +44,89 @@ async def _reset_activation_fields(row_id):
     async with async_session_factory() as db:
         await db.execute(
             text("UPDATE org_settings SET activation_code = NULL, license_status = NULL, "
-                 "license_plan = NULL, license_synced_at = NULL WHERE id = :id"),
+                 "license_plan = NULL, license_synced_at = NULL, license_key = NULL WHERE id = :id"),
             {"id": row_id},
         )
         await db.commit()
 
 
-@pytest.mark.asyncio
-async def test_valid_activation_code_saves_and_returns_license_status(_org_row, human_admin_token):
-    await _reset_activation_fields(_org_row["id"])
-    with patch(
-        "app.routers.org_settings.sync_license",
-        new_callable=AsyncMock,
-        return_value={"status": "active", "plan": "business"},
-    ), patch("app.routers.org_settings.ensure_license_sync_running") as mock_ensure:
+async def _activate(token, code):
+    with patch("app.services.license_sync.LicenseSync.start") as mock_sync_start:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
             resp = await c.put(
                 "/settings/license-activation",
-                json={"activation_code": "valid-code"},
-                headers={"Authorization": f"Bearer {human_admin_token}"},
+                json={"activation_code": code},
+                headers={"Authorization": f"Bearer {token}"},
             )
+    mock_sync_start.assert_not_called()
+    return resp
+
+
+async def _license_row():
+    async with async_session_factory() as db:
+        return (await db.execute(text("SELECT license_key, activation_code FROM org_settings"))).first()
+
+
+@pytest.mark.asyncio
+async def test_valid_signed_code_is_stored_and_returns_its_plan(_org_row, human_admin_token, license_code):
+    await _reset_activation_fields(_org_row["id"])
+    code = license_code("business")
+    resp = await _activate(human_admin_token, code)
 
     assert resp.status_code == 200
-    mock_ensure.assert_called_once()
-    assert mock_ensure.call_args.args[0] is app.state
     body = resp.json()
     assert body["license_status"] == "active"
     assert body["license_plan"] == "business"
     assert body["license_synced_at"] is not None
-
-    async with async_session_factory() as db:
-        row = (await db.execute(text("SELECT activation_code, license_status, license_plan FROM org_settings"))).first()
-    assert row.activation_code == "valid-code"
-    assert row.license_status == "active"
-    assert row.license_plan == "business"
+    row = await _license_row()
+    assert row.license_key == code
+    assert row.activation_code is None
 
 
 @pytest.mark.asyncio
-async def test_invalid_activation_code_returns_400_and_does_not_save(_org_row, human_admin_token):
+async def test_activation_replaces_previous_code_and_clears_activation_code(_org_row, human_admin_token, license_code):
     await _reset_activation_fields(_org_row["id"])
-    with patch(
-        "app.routers.org_settings.sync_license",
-        new_callable=AsyncMock,
-        side_effect=BillingClientError("billing-service returned 401"),
-    ), patch("app.routers.org_settings.ensure_license_sync_running") as mock_ensure:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-            resp = await c.put(
-                "/settings/license-activation",
-                json={"activation_code": "bad-code"},
-                headers={"Authorization": f"Bearer {human_admin_token}"},
-            )
+    async with async_session_factory() as db:
+        await db.execute(
+            text("UPDATE org_settings SET license_key = :k, activation_code = 'old-billing-code' WHERE id = :id"),
+            {"k": license_code("trial"), "id": _org_row["id"]},
+        )
+        await db.commit()
+    upgrade = license_code("business")
+    resp = await _activate(human_admin_token, upgrade)
+
+    assert resp.status_code == 200
+    assert resp.json()["license_plan"] == "business"
+    row = await _license_row()
+    assert row.license_key == upgrade
+    assert row.activation_code is None
+
+
+@pytest.mark.asyncio
+async def test_never_calls_billing_service(_org_row, human_admin_token, license_code):
+    await _reset_activation_fields(_org_row["id"])
+    with patch("app.services.billing_client.sync_license", new_callable=AsyncMock) as mock_sync:
+        resp = await _activate(human_admin_token, license_code("enterprise"))
+    assert resp.status_code == 200
+    mock_sync.assert_not_called()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("make_code", [
+    lambda make: "not-a-license-code",
+    lambda make: make("enterprise", days=-1),
+    lambda make: make("enterprise")[:-4] + "AAAA",
+])
+async def test_invalid_expired_or_tampered_code_returns_400_and_saves_nothing(
+    _org_row, human_admin_token, license_code, make_code
+):
+    await _reset_activation_fields(_org_row["id"])
+    resp = await _activate(human_admin_token, make_code(license_code))
 
     assert resp.status_code == 400
-    mock_ensure.assert_not_called()
-
-    async with async_session_factory() as db:
-        row = (await db.execute(text("SELECT activation_code FROM org_settings"))).first()
-    assert row.activation_code is None
+    assert resp.json()["detail"] == "Invalid activation code"
+    row = await _license_row()
+    assert row.license_key is None
 
 
 @pytest.mark.asyncio

@@ -9,7 +9,7 @@ from app.models.database import async_session_factory
 from tests.conftest import restore_org_settings, snapshot_org_settings
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module", loop_scope="session")
 async def _org_row():
     """Replace org_settings with a single known row; restore after."""
     async with async_session_factory() as db:

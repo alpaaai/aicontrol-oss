@@ -29,7 +29,7 @@ async def test_users_table_has_new_columns():
 async def test_org_settings_table_exists():
     expected = {
         "id", "org_name", "timezone", "created_at", "updated_at",
-        "license_plan", "license_status", "license_synced_at", "activation_code",
+        "license_plan", "license_status", "license_synced_at", "activation_code", "license_key",
     }
     async with async_session_factory() as db:
         result = await db.execute(
@@ -104,7 +104,7 @@ async def _restore_users(db, saved):
     await restore_org_settings(db, saved_org_settings)
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module", loop_scope="session")
 async def _setup_db_clean():
     """Clear users + org_settings before setup behavioral tests, restore after."""
     async with async_session_factory() as db:

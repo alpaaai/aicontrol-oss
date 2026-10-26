@@ -54,7 +54,7 @@ def _user_row_to_params(row):
     }
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="module", loop_scope="session")
 async def _isolated_setup_db():
     """Snapshot/clear users+org_settings for this test only, restore after --
     /setup/complete behaves differently depending on whether any user exists,

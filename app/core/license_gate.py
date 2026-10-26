@@ -1,10 +1,12 @@
 """
 FastAPI dependencies for plan-gating.
 
-DB-backed (plans/v4 task 15): get_license_info() reads the single
-OrgSettings row directly -- no RS256, no PUBLIC_KEY, no signed license-key
-env var. No row / no license_plan set = community, matching the old
-empty-key-decodes-to-community default.
+Signed-code licensing (plans/v5 2026-10-26-signed-license-keys):
+get_license_info() re-verifies OrgSettings.license_key with
+app/core/license_key.py on every call and takes plan + expiry from inside
+the code. license_plan/license_status columns are not read, so editing them
+grants nothing. No row / no code / bad signature = community; a valid code
+past its expiry = community with license_status "expired".
 
 Usage in routers:
     @router.get("/endpoint", dependencies=[Depends(require_enterprise_license)])
@@ -21,13 +23,14 @@ Correct test patching:
     app.dependency_overrides[require_enterprise_license] = lambda: None
 """
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.license_key import decode_license_code
 from app.models.database import get_db
 from app.models.user import OrgSettings
 
@@ -70,21 +73,32 @@ class LicenseInfo:
 
 async def get_license_info(db: AsyncSession) -> LicenseInfo:
     """
-    Read the current license from the single OrgSettings row.
+    Read the current license from the single OrgSettings row's signed
+    license_key, re-verified on every call (signature check is cached per
+    code string in license_key; expiry is compared here every time).
 
-    Returns LicenseInfo(plan="community") when no row exists or no
-    license_plan is set.
+    Returns LicenseInfo(plan="community") when no row exists, no code is
+    stored, or the code doesn't verify.
     """
     result = await db.execute(select(OrgSettings).limit(1))
     org = result.scalar_one_or_none()
-    if org is None or not org.license_plan:
+    payload = decode_license_code(org.license_key) if org is not None and org.license_key else None
+    if payload is None:
         return LicenseInfo(plan="community", company=None, email=None, expires_at=None)
+    if payload.is_expired(datetime.now(timezone.utc)):
+        return LicenseInfo(
+            plan="community",
+            company=org.org_name,
+            email=payload.email,
+            expires_at=payload.expires_at,
+            license_status="expired",
+        )
     return LicenseInfo(
-        plan=org.license_plan,
+        plan=payload.plan,
         company=org.org_name,
-        email=None,
-        expires_at=None,
-        license_status=org.license_status,
+        email=payload.email,
+        expires_at=payload.expires_at,
+        license_status="active",
     )
 
 
@@ -96,9 +110,9 @@ async def has_enterprise_license(db: AsyncSession) -> bool:
 
 
 def _paid_plan_is_active(info: LicenseInfo) -> bool:
-    """A business/enterprise plan only counts as usable when its synced
-    status is 'active' -- past_due/canceled (or never-synced None) must
-    402 the same as community, no grace period."""
+    """A business/enterprise plan only counts as usable when its status is
+    'active' -- get_license_info sets that only for a verified, unexpired
+    license code."""
     return info.license_status == "active"
 
 

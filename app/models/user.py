@@ -56,11 +56,16 @@ class OrgSettings(Base):
     timezone = Column(String(100), nullable=False, default="UTC", server_default="UTC")
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    # Licensing (plans/v4 self-serve onboarding + Stripe): DB-backed source
-    # for app/core/license_gate.py, synced daily from billing.aictl.io.
+    # Licensing (plans/v4 self-serve onboarding + Stripe). license_plan /
+    # license_status / license_synced_at / activation_code belong to the
+    # parked billing-service sync; license_gate no longer reads them.
     license_plan = Column(String(20), nullable=True)
     license_status = Column(String(20), nullable=True)
     license_synced_at = Column(DateTime(timezone=True), nullable=True)
     # Plaintext, not hashed -- sent server-to-server on every sync call, so
     # it can't be one-way hashed the way invite tokens are.
     activation_code = Column(String(255), nullable=True)
+    # Signed license code (app/core/license_key.py). The only source of the
+    # plan: license_gate re-verifies it on every check and ignores
+    # license_plan/license_status.
+    license_key = Column(Text, nullable=True)

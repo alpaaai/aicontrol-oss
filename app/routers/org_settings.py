@@ -2,16 +2,15 @@
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_human, require_human_admin
-from app.models.database import async_session_factory, get_db
+from app.core.license_key import decode_license_code
+from app.models.database import get_db
 from app.models.user import OrgSettings
-from app.services.billing_client import BillingClientError, sync_license
-from app.services.license_sync import ensure_license_sync_running
 
 router = APIRouter(prefix="/org-settings", tags=["org-settings"])
 
@@ -86,17 +85,16 @@ class LicenseActivationResponse(BaseModel):
 @settings_router.put("/license-activation", response_model=LicenseActivationResponse)
 async def activate_license(
     body: LicenseActivationBody,
-    request: Request,
     db: AsyncSession = Depends(get_db),
     _token: dict = Depends(require_human_admin),
 ):
-    """Only way an activation code enters the system (plans/v4 task 23,
-    scope decision 4 -- BillingPage.tsx only, no install.sh prompt).
-    Validates against billing-service before saving: a code that doesn't
-    work is never stored."""
-    try:
-        result = await sync_license(body.activation_code)
-    except BillingClientError:
+    """Only way a license code enters the system (BillingPage.tsx only).
+    Verifies the signed code locally (app/core/license_key.py) -- no
+    network call. A code that doesn't verify or has expired is never
+    stored. Clears activation_code so the parked billing-service daily sync
+    (license_sync.py) never starts."""
+    payload = decode_license_code(body.activation_code)
+    if payload is None or payload.is_expired(datetime.now(timezone.utc)):
         raise HTTPException(status_code=400, detail="Invalid activation code")
 
     org_result = await db.execute(select(OrgSettings).limit(1))
@@ -104,11 +102,11 @@ async def activate_license(
     if org is None:
         raise HTTPException(status_code=404, detail="Org settings not configured")
 
-    org.activation_code = body.activation_code
-    org.license_status = result["status"]
-    org.license_plan = result["plan"]
-    org.license_synced_at = datetime.now(timezone.utc)
+    org.license_key = body.activation_code
+    org.activation_code = None
     await db.commit()
-    await db.refresh(org)
-    ensure_license_sync_running(request.app.state, async_session_factory)
-    return org
+    return LicenseActivationResponse(
+        license_status="active",
+        license_plan=payload.plan,
+        license_synced_at=datetime.now(timezone.utc),
+    )
