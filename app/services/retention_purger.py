@@ -22,13 +22,13 @@ No other code path may delete from audit_events or hitl_reviews.
 import asyncio
 from datetime import datetime, timedelta, timezone
 
-from fastapi import HTTPException
 from sqlalchemy import delete, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.license_gate import get_license_info
 from app.core.logging import get_logger
 from app.models.schemas import AuditEvent, HITLReview, Session as SessionModel
+from app.models.user import OrgSettings
 
 logger = get_logger("retention_purger")
 
@@ -47,6 +47,27 @@ RETENTION_DAYS: dict[str, int] = {
 
 
 PURGE_BATCH_SIZE = 5000
+
+# Legacy license_plan values that mean a paid install predating signed codes.
+_LEGACY_PAID_PLANS = ("business", "enterprise", "trial")
+
+
+async def _unverified_license_reason(session: AsyncSession) -> "str | None":
+    """Why this install must not be purged under the Community window, or
+    None when purging is safe. Deleting is irreversible: a code that is
+    expired or fails verification, or a paid install still waiting on a signed
+    code, reads as Community here, and purging 7 days would destroy data the
+    customer paid to retain. No row, or no code and no legacy fields, is a
+    real Community install."""
+    org = (await session.execute(select(OrgSettings).limit(1))).scalar_one_or_none()
+    if org is None:
+        return None
+    if org.license_key:
+        status = (await get_license_info(session)).license_status
+        return None if status == "active" else f"license_{status or 'invalid'}"
+    if org.license_plan in _LEGACY_PAID_PLANS or org.activation_code:
+        return "awaiting_signed_code"
+    return None
 
 
 async def purge_expired_audit_events(session: AsyncSession, plan: str) -> int:
@@ -130,17 +151,12 @@ class RetentionPurger:
     async def run_once(self) -> None:
         try:
             async with self._session_factory() as session:
-                try:
-                    plan = (await get_license_info(session)).plan
-                except HTTPException:
-                    # A set-but-invalid/expired license key must not crash the
-                    # purge loop, but it also must not guess a plan for a
-                    # destructive delete -- skip this cycle rather than risk
-                    # purging a paying customer's data under community's
-                    # shorter window because their key glitched.
-                    logger.warning("retention_purge_skipped_invalid_license")
+                reason = await _unverified_license_reason(session)
+                if reason is not None:
+                    logger.warning("retention_purge_skipped", reason=reason)
                     self.status = "degraded"
                     return
+                plan = (await get_license_info(session)).plan
                 deleted = await purge_expired_audit_events(session, plan)
             self.status = "healthy"
             logger.info("retention_purge_complete", plan=plan, deleted=deleted)

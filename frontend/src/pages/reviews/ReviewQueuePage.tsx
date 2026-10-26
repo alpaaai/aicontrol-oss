@@ -3,7 +3,6 @@ import { listReviews } from '../../api/reviews'
 import type { Review } from '../../api/reviews'
 import { ReviewRow } from './ReviewRow'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
-import { ReactivateGuard } from '../../components/shared/ReactivateGuard'
 import { usePoll } from '../../hooks/usePoll'
 import { useLicense } from '../../hooks/useLicense'
 
@@ -93,18 +92,7 @@ function ResolvedReviews() {
 }
 
 export function ReviewQueuePage() {
-  const { isBusiness, needsReactivation } = useLicense()
-  if (needsReactivation) {
-    return (
-      <div className="p-6">
-        <h2 className="text-[18px] font-semibold text-ac-ink mb-4">Review queue</h2>
-        <ReactivateGuard
-          title="Reactivate your plan"
-          description="In-dashboard review approvals require an active Business or Enterprise subscription."
-        />
-      </div>
-    )
-  }
+  const { isBusiness } = useLicense()
   if (!isBusiness) {
     return (
       <div className="p-6">

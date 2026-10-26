@@ -63,7 +63,10 @@ def encode_license_code(private_key: Ed25519PrivateKey, payload: dict) -> str:
 
 def _timestamp(value) -> Optional[datetime]:
     if isinstance(value, int) and not isinstance(value, bool):
-        return datetime.fromtimestamp(value, tz=timezone.utc)
+        try:
+            return datetime.fromtimestamp(value, tz=timezone.utc)
+        except (OverflowError, OSError, ValueError):
+            return None
     return None
 
 

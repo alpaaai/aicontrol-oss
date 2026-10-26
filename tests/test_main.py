@@ -2,7 +2,6 @@
 import pytest
 from httpx import AsyncClient, ASGITransport
 from unittest.mock import patch
-from fastapi import HTTPException
 
 
 @pytest.mark.asyncio
@@ -38,14 +37,32 @@ async def test_health_includes_service_name():
 
 
 @pytest.mark.asyncio
-async def test_health_reports_enterprise_only_when_license_invalid():
-    """An invalid/expired license key must not 402 or crash /health (2.5 fix) --
-    has_enterprise_license() raising HTTPException is caught and treated as
-    'not enterprise', same as no key set."""
+async def test_health_reports_enterprise_only_when_license_is_expired(license_code):
+    """An expired code must not 402 or crash /health -- it reads as community,
+    so the drift detector is reported enterprise_only."""
+    from sqlalchemy import text
     from app.main import app
-    with patch("app.main.has_enterprise_license", side_effect=HTTPException(status_code=402, detail="invalid")):
+    from app.models.database import async_session_factory
+    from tests.conftest import restore_org_settings, snapshot_org_settings
+
+    async with async_session_factory() as db:
+        existing = await snapshot_org_settings(db)
+        await db.execute(text("DELETE FROM org_settings"))
+        await db.execute(
+            text("""
+                INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at, license_key)
+                VALUES (gen_random_uuid(), 'Acme', 'UTC', now(), now(), :k)
+            """),
+            {"k": license_code("enterprise", days=-1)},
+        )
+        await db.commit()
+    try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             response = await client.get("/health")
+    finally:
+        async with async_session_factory() as db:
+            await restore_org_settings(db, existing)
+            await db.commit()
     assert response.status_code == 200
     assert response.json()["drift_detector_status"] == "enterprise_only"
 

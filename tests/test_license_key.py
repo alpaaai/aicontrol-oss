@@ -99,3 +99,16 @@ def test_is_expired_compares_against_now(signing_key):
     decoded = license_key.decode_license_code(code)
     assert decoded.is_expired(NOW - timedelta(seconds=1)) is False
     assert decoded.is_expired(NOW) is True
+
+
+@pytest.mark.parametrize("value", [10**18, -(10**18)])
+def test_signed_code_with_out_of_range_exp_is_rejected(signing_key, value):
+    code = license_key.encode_license_code(signing_key, _payload(exp=value))
+    assert license_key.decode_license_code(code) is None
+
+
+def test_signed_code_with_out_of_range_iat_decodes_without_an_issue_date(signing_key):
+    code = license_key.encode_license_code(signing_key, _payload(iat=10**18))
+    decoded = license_key.decode_license_code(code)
+    assert decoded is not None
+    assert decoded.issued_at is None

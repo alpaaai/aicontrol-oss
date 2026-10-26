@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { getBillingUsage, activateLicense } from '../api/billing';
 import type { BillingUsage } from '../api/billing';
-import { ReactivateBanner } from '../components/shared/ReactivateBanner';
 
 const PLAN_PILL: Record<string, string> = {
   community: 'bg-violet-50 text-violet-700 border border-violet-200',
@@ -13,13 +12,11 @@ const PLAN_PILL: Record<string, string> = {
 
 const LICENSE_STATUS_LABEL: Record<string, string> = {
   active: 'Active',
-  past_due: 'Past due',
-  canceled: 'Canceled',
-  unreachable: 'Unreachable',
   expired: 'License expired',
 };
 
 const UPGRADE_URL = 'https://aictl.io/pricing';
+const MANAGE_SUBSCRIPTION_URL = 'https://aictl.io/docs/manage-subscription';
 
 // Trial upgrades go straight to the Stripe Payment Links; licensing is then
 // the same as a new purchase (a new signed code by email). Build-time vars,
@@ -33,11 +30,8 @@ function formatNumber(n: number): string {
   return n.toString();
 }
 
-function formatSyncedAt(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  });
+function formatDate(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { dateStyle: 'medium' });
 }
 
 function PlanPill({ plan }: { plan: string }) {
@@ -113,10 +107,6 @@ export default function BillingPage() {
   ];
 
   const isCommunity = usage.plan === 'community';
-  const needsReactivation =
-    usage.license_status === 'past_due' ||
-    usage.license_status === 'canceled' ||
-    usage.license_status === 'unreachable';
 
   return (
     <div className="p-8 max-w-3xl space-y-8">
@@ -154,9 +144,9 @@ export default function BillingPage() {
           )}
         </div>
 
-        {usage.license_synced_at && (
-          <p className="text-xs text-ac-muted">
-            Last synced {formatSyncedAt(usage.license_synced_at)}
+        {usage.license_status === 'expired' && usage.expires_at && (
+          <p className="text-sm text-amber-600">
+            Your license expired on {formatDate(usage.expires_at)}. Enter a renewed activation code below.
           </p>
         )}
 
@@ -182,15 +172,15 @@ export default function BillingPage() {
         </ul>
 
         <div className="flex gap-2">
-          {!isCommunity && usage.manage_subscription_url && (
+          {!isCommunity && (
             <a
-              href={usage.manage_subscription_url}
+              href={MANAGE_SUBSCRIPTION_URL}
               target="_blank"
               rel="noreferrer"
               className="mt-2 inline-flex px-4 py-2 border border-ac-hairline rounded-md text-sm
                          text-ac-ink hover:bg-ac-surface-sunk"
             >
-              Manage Subscription
+              Manage subscription
             </a>
           )}
 
@@ -245,45 +235,41 @@ export default function BillingPage() {
         </div>
       </div>
 
-      {/* Usage chart / reactivate prompt */}
-      {needsReactivation ? (
-        <ReactivateBanner manageSubscriptionUrl={usage.manage_subscription_url} />
-      ) : (
-        <div className="bg-ac-surface-card border border-ac-hairline rounded-lg p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-ac-ink">Intercept Usage</h2>
+      {/* Usage chart */}
+      <div className="bg-ac-surface-card border border-ac-hairline rounded-lg p-6 space-y-4">
+        <h2 className="text-lg font-semibold text-ac-ink">Intercept Usage</h2>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-ac-muted uppercase tracking-wide">This month</p>
-              <p className="text-2xl font-bold text-ac-ink">
-                {formatNumber(usage.this_month.intercepts)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-ac-muted uppercase tracking-wide">Last month</p>
-              <p className="text-2xl font-bold text-ac-ink">
-                {formatNumber(usage.last_month.intercepts)}
-              </p>
-            </div>
-          </div>
-
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" />
-              <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-              <YAxis tickFormatter={(v) => formatNumber(v)} tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(v) => [formatNumber(Number(v)), 'Intercepts']} />
-              <Bar dataKey="intercepts" fill="#0284A8" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-
-          {isCommunity && (
-            <p className="text-xs text-ac-muted">
-              Upgrade for Slack HITL, longer retention, and compliance features.
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className="text-xs text-ac-muted uppercase tracking-wide">This month</p>
+            <p className="text-2xl font-bold text-ac-ink">
+              {formatNumber(usage.this_month.intercepts)}
             </p>
-          )}
+          </div>
+          <div>
+            <p className="text-xs text-ac-muted uppercase tracking-wide">Last month</p>
+            <p className="text-2xl font-bold text-ac-ink">
+              {formatNumber(usage.last_month.intercepts)}
+            </p>
+          </div>
         </div>
-      )}
+
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={chartData} margin={{ top: 4, right: 4, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#E9ECEF" />
+            <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+            <YAxis tickFormatter={(v) => formatNumber(v)} tick={{ fontSize: 12 }} />
+            <Tooltip formatter={(v) => [formatNumber(Number(v)), 'Intercepts']} />
+            <Bar dataKey="intercepts" fill="#0284A8" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+
+        {isCommunity && (
+          <p className="text-xs text-ac-muted">
+            Upgrade for Slack HITL, longer retention, and compliance features.
+          </p>
+        )}
+      </div>
 
     </div>
   );

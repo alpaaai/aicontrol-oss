@@ -2,8 +2,6 @@
 code enters an aicontrol instance (BillingPage.tsx only). Since plans/v5
 2026-10-26-signed-license-keys the code is a signed license code verified
 locally; billing-service is never called."""
-from unittest.mock import AsyncMock, patch
-
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
@@ -51,15 +49,12 @@ async def _reset_activation_fields(row_id):
 
 
 async def _activate(token, code):
-    with patch("app.services.license_sync.LicenseSync.start") as mock_sync_start:
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
-            resp = await c.put(
-                "/settings/license-activation",
-                json={"activation_code": code},
-                headers={"Authorization": f"Bearer {token}"},
-            )
-    mock_sync_start.assert_not_called()
-    return resp
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        return await c.put(
+            "/settings/license-activation",
+            json={"activation_code": code},
+            headers={"Authorization": f"Bearer {token}"},
+        )
 
 
 async def _license_row():
@@ -77,7 +72,7 @@ async def test_valid_signed_code_is_stored_and_returns_its_plan(_org_row, human_
     body = resp.json()
     assert body["license_status"] == "active"
     assert body["license_plan"] == "business"
-    assert body["license_synced_at"] is not None
+    assert set(body) == {"license_status", "license_plan"}
     row = await _license_row()
     assert row.license_key == code
     assert row.activation_code is None
@@ -100,15 +95,6 @@ async def test_activation_replaces_previous_code_and_clears_activation_code(_org
     row = await _license_row()
     assert row.license_key == upgrade
     assert row.activation_code is None
-
-
-@pytest.mark.asyncio
-async def test_never_calls_billing_service(_org_row, human_admin_token, license_code):
-    await _reset_activation_fields(_org_row["id"])
-    with patch("app.services.billing_client.sync_license", new_callable=AsyncMock) as mock_sync:
-        resp = await _activate(human_admin_token, license_code("enterprise"))
-    assert resp.status_code == 200
-    mock_sync.assert_not_called()
 
 
 @pytest.mark.asyncio

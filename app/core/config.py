@@ -41,10 +41,6 @@ class Settings(BaseSettings):
     slack_review_channel: str = "#aicontrol-reviews"
     CORS_ORIGINS: str = "http://localhost:3000"
     FRONTEND_BASE_URL: str = "http://localhost:3000"
-    # billing-service base URL. Operator-level deployment fact (not
-    # per-org state, unlike OrgSettings.activation_code) -- used by
-    # app/services/billing_client.py.
-    AICONTROL_LICENSE_SYNC_URL: str = "https://billing.aictl.io"
 
     # AI-native features — customer's own LLM account. AIControl never bills tokens.
     LLM_PROVIDER: str = "anthropic"

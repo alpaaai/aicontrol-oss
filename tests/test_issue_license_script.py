@@ -76,3 +76,35 @@ def test_cli_keygen_then_issue_prints_a_verifiable_code(tmp_path, capsys):
         decoded = license_key.decode_license_code(code)
     assert decoded.plan == "business"
     assert decoded.order == "pi_456"
+
+
+@pytest.mark.parametrize("days", [0, -1, 3651])
+def test_issue_code_rejects_days_outside_1_to_3650(tmp_path, days):
+    key_path = tmp_path / "signing.pem"
+    issue_license.generate_keypair(key_path)
+    with pytest.raises(ValueError):
+        issue_license.issue_code(
+            issue_license.load_private_key(key_path), "business", "a@b.c", "x", now=NOW, days=days
+        )
+
+
+@pytest.mark.parametrize("days", [1, 3650])
+def test_issue_code_accepts_the_days_bounds(tmp_path, days):
+    key_path = tmp_path / "signing.pem"
+    issue_license.generate_keypair(key_path)
+    assert issue_license.issue_code(
+        issue_license.load_private_key(key_path), "business", "a@b.c", "x", now=NOW, days=days
+    )
+
+
+def test_cli_rejects_out_of_range_days_without_printing_a_code(tmp_path, capsys):
+    key_path = tmp_path / "signing.pem"
+    issue_license.generate_keypair(key_path)
+    rc = issue_license.main([
+        "issue", "--key", str(key_path), "--plan", "business",
+        "--email", "a@b.c", "--order", "x", "--days", "0",
+    ])
+    captured = capsys.readouterr()
+    assert rc == 1
+    assert "AICTL1" not in captured.out
+    assert "days" in captured.err

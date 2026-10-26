@@ -1,17 +1,16 @@
 from contextlib import asynccontextmanager
 
 import httpx
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from sqlalchemy import select, text
+from sqlalchemy import text
 
 from app.core.config import secret_key_warning, settings as _settings
 from app.core.license_gate import has_enterprise_license
 from app.core.logging import configure_logging, get_logger
 from app.models.database import async_session_factory
-from app.models.user import OrgSettings
 from app.routers.auth import router as auth_router
 from app.routers.audit_events import router as audit_events_router
 from app.routers.dashboard import router as dashboard_router
@@ -31,7 +30,6 @@ from app.routers.org_settings import settings_router
 from app.routers.mcp_gateway import router as mcp_gateway_router
 from app.routers.mcp_servers import router as mcp_servers_router
 from app.services.cedar_client import invalidate_policy_set_cache
-from app.services.license_sync import ensure_license_sync_running
 from app.services.policy_loader import load_all
 from app.services.retention_purger import RetentionPurger
 from app.services.wal import default_wal_writer
@@ -59,16 +57,11 @@ logger = get_logger("main")
 
 
 async def _safe_has_enterprise_license() -> bool:
-    """has_enterprise_license() raises HTTPException(402) for a set-but-invalid/
-    expired key -- correct for a request handler, but here it is called outside
-    a request (startup) and inside /health, neither of which should 402 or crash
-    over a bad license key. An unusable key is treated the same as no key: not
-    enterprise."""
-    try:
-        async with async_session_factory() as session:
-            return await has_enterprise_license(session)
-    except HTTPException:
-        return False
+    """has_enterprise_license() on its own session, for startup and /health,
+    which run outside a request. An invalid or expired code reads as
+    community, so it is not enterprise."""
+    async with async_session_factory() as session:
+        return await has_enterprise_license(session)
 
 
 @asynccontextmanager
@@ -89,8 +82,9 @@ async def lifespan(app: FastAPI):
 
     # DriftDetector — enterprise only, and only importable when enterprise/ is present.
     # Gated on the decoded plan (has_enterprise_license), not bare key presence: a
-    # Business-tier or invalid/expired key would otherwise start the background scan
+    # Business-tier or invalid/expired code would otherwise start the background scan
     # even though GET /warnings (require_enterprise_license) can never show its results.
+    # Checked once at boot; activating an enterprise code later needs a restart.
     if DriftDetector is not None and await _safe_has_enterprise_license():
         drift_detector = DriftDetector(
             session_factory=async_session_factory,
@@ -111,27 +105,12 @@ async def lifespan(app: FastAPI):
     retention_purger.start()
     app.state.retention_purger = retention_purger
 
-    # License sync -- only started when an activation code is on file at
-    # boot (community installs, and business/enterprise installs not yet
-    # activated, skip it entirely). Checked once here, same pattern as
-    # DriftDetector's has_enterprise_license gate above.
-    async with async_session_factory() as session:
-        has_activation_code = (
-            await session.execute(select(OrgSettings.activation_code).where(OrgSettings.activation_code.isnot(None)))
-        ).first() is not None
-
-    app.state.license_sync = None
-    if has_activation_code:
-        ensure_license_sync_running(app.state, async_session_factory)
-
     logger.info("aicontrol_ready")
 
     yield
 
     if app.state.drift_detector is not None:
         await app.state.drift_detector.stop()
-    if app.state.license_sync is not None:
-        await app.state.license_sync.stop()
     await app.state.retention_purger.stop()
     await app.state.wal_shipper.stop()
     await _http_client.aclose()

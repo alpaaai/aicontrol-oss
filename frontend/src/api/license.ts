@@ -21,9 +21,8 @@ export interface FeatureFlags {
 export interface LicenseFeatures {
   tier: 'free' | 'business' | 'enterprise';
   features: FeatureFlags;
-  // "active" | "past_due" | "canceled" | null (community, or business/
-  // enterprise not yet synced). See app/routers/license.py.
-  license_status: 'active' | 'past_due' | 'canceled' | 'unreachable' | null;
+  // "active" | "expired" | null (no code). See app/routers/license.py.
+  license_status: 'active' | 'expired' | null;
 }
 
 export const getLicenseFeatures = (): Promise<LicenseFeatures> =>

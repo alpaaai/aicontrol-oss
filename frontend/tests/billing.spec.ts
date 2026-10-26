@@ -13,9 +13,8 @@ const COMMUNITY_USAGE = {
   features: ["Policy engine enforcement"],
   this_month: { period: "2026-09", intercepts: 1234 },
   last_month: { period: "2026-08", intercepts: 987 },
-  manage_subscription_url: null,
   license_status: null,
-  license_synced_at: null,
+  expires_at: null,
 };
 
 const ENTERPRISE_USAGE = {
@@ -29,14 +28,8 @@ const ENTERPRISE_USAGE = {
   ],
   this_month: { period: "2026-09", intercepts: 2_400_000 },
   last_month: { period: "2026-08", intercepts: 1_800_000 },
-  manage_subscription_url: "https://billing.stripe.com/session/abc",
   license_status: "active",
-  license_synced_at: "2026-09-16T08:00:00Z",
-};
-
-const PAST_DUE_USAGE = {
-  ...ENTERPRISE_USAGE,
-  license_status: "past_due",
+  expires_at: "2027-09-16T08:00:00Z",
 };
 
 const TRIAL_USAGE = {
@@ -50,6 +43,7 @@ const EXPIRED_TRIAL_USAGE = {
   ...COMMUNITY_USAGE,
   company: "Acme Insurance",
   license_status: "expired",
+  expires_at: "2026-09-01T12:00:00Z",
 };
 
 test.beforeEach(async ({ page }) => {
@@ -82,7 +76,7 @@ test("community plan shows the retention warning and a live upgrade link", async
   await expect(page.getByRole("link", { name: "Manage Subscription" })).not.toBeVisible();
 });
 
-test("enterprise plan lists its features and links to real subscription management", async ({ page }) => {
+test("enterprise plan lists its features", async ({ page }) => {
   await mockUsage(page, ENTERPRISE_USAGE);
   await page.goto("/billing");
   await expect(page.getByText("ENTERPRISE")).toBeVisible();
@@ -90,9 +84,6 @@ test("enterprise plan lists its features and links to real subscription manageme
   await expect(
     page.getByText("Compliance report export (SOC 2, EU AI Act, NIST AI RMF, ISO 42001)"),
   ).toBeVisible();
-  const manageLink = page.getByRole("link", { name: "Manage Subscription" });
-  await expect(manageLink).toBeVisible();
-  await expect(manageLink).toHaveAttribute("href", "https://billing.stripe.com/session/abc");
 });
 
 test("enterprise plan shows exactly one retention line sourced from retention_days", async ({ page }) => {
@@ -102,11 +93,11 @@ test("enterprise plan shows exactly one retention line sourced from retention_da
   await expect(page.getByText(/7-day retention|30-day retention|90-day retention|1-year retention/i)).toHaveCount(0);
 });
 
-test("license status and last sync time are shown for a synced plan", async ({ page }) => {
+test("license status is shown with no sync time for an active plan", async ({ page }) => {
   await mockUsage(page, ENTERPRISE_USAGE);
   await page.goto("/billing");
   await expect(page.getByText(/Active/i)).toBeVisible();
-  await expect(page.getByText(/Last synced/i)).toBeVisible();
+  await expect(page.getByText(/Last synced/i)).toHaveCount(0);
 });
 
 test("activation code entry saves the code and refreshes status", async ({ page }) => {
@@ -114,7 +105,7 @@ test("activation code entry saves the code and refreshes status", async ({ page 
   await page.route("**/settings/license-activation", (route) =>
     route.fulfill({
       status: 200,
-      json: { license_status: "active", license_plan: "business", license_synced_at: "2026-09-16T09:00:00Z" },
+      json: { license_status: "active", license_plan: "business" },
     }),
   );
   await page.goto("/billing");
@@ -133,15 +124,6 @@ test("an invalid activation code shows an error and does not clear the field", a
   await page.getByRole("button", { name: "Activate" }).click();
   await expect(page.getByText("Invalid activation code")).toBeVisible();
   await expect(page.getByPlaceholder("Activation code")).toHaveValue("bad-code");
-});
-
-test("past_due status shows a reactivate prompt instead of the usage chart", async ({ page }) => {
-  await mockUsage(page, PAST_DUE_USAGE);
-  await page.goto("/billing");
-  await expect(page.getByText(/Reactivate your plan/i)).toBeVisible();
-  const reactivateLink = page.getByRole("link", { name: /Reactivate/i });
-  await expect(reactivateLink).toHaveAttribute("href", "https://billing.stripe.com/session/abc");
-  await expect(page.getByText("Intercept Usage")).not.toBeVisible();
 });
 
 test("usage numbers are shown for this month and last month", async ({ page }) => {
@@ -170,8 +152,23 @@ test("an expired license shows the License expired label and a live upgrade link
   await mockUsage(page, EXPIRED_TRIAL_USAGE);
   await page.goto("/billing");
   await expect(page.getByText("COMMUNITY")).toBeVisible();
-  await expect(page.getByText("License expired")).toBeVisible();
+  await expect(page.getByText("License expired", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Upgrade" })).toBeVisible();
+});
+
+test("an expired license says when it expired and asks for a renewed code", async ({ page }) => {
+  await mockUsage(page, EXPIRED_TRIAL_USAGE);
+  await page.goto("/billing");
+  const date = new Date("2026-09-01T12:00:00Z").toLocaleDateString(undefined, { dateStyle: "medium" });
+  await expect(
+    page.getByText(`Your license expired on ${date}. Enter a renewed activation code below.`),
+  ).toBeVisible();
+});
+
+test("an active license shows no expiry message", async ({ page }) => {
+  await mockUsage(page, ENTERPRISE_USAGE);
+  await page.goto("/billing");
+  await expect(page.getByText(/Your license expired on/)).toHaveCount(0);
 });
 
 test("trial plan offers upgrades to Business and Enterprise as Stripe Payment Links", async ({ page }) => {
@@ -203,10 +200,32 @@ test("non-trial paid plans do not show trial upgrade buttons", async ({ page }) 
   await expect(page.getByRole("link", { name: /Upgrade to/ })).toHaveCount(0);
 });
 
-test("a paid plan without subscription management shows no billing-unreachable notice", async ({ page }) => {
-  await mockUsage(page, { ...ENTERPRISE_USAGE, manage_subscription_url: null });
+const MANAGE_DOCS_URL = "https://aictl.io/docs/manage-subscription";
+
+for (const [label, usage] of [
+  ["enterprise", ENTERPRISE_USAGE],
+  ["trial", TRIAL_USAGE],
+  ["business", { ...ENTERPRISE_USAGE, plan: "business" }],
+] as const) {
+  test(`${label} plan links to the manage-subscription docs page`, async ({ page }) => {
+    await mockUsage(page, usage);
+    await page.goto("/billing");
+    const link = page.getByRole("link", { name: "Manage subscription", exact: true });
+    await expect(link).toHaveAttribute("href", MANAGE_DOCS_URL);
+    await expect(link).toHaveAttribute("target", "_blank");
+  });
+}
+
+test("community plan has no manage-subscription link", async ({ page }) => {
+  await mockUsage(page, COMMUNITY_USAGE);
   await page.goto("/billing");
-  await expect(page.getByText("ENTERPRISE")).toBeVisible();
-  await expect(page.getByText(/Subscription management is temporarily unavailable/)).toHaveCount(0);
-  await expect(page.getByRole("link", { name: "Manage Subscription" })).toHaveCount(0);
+  await expect(page.getByText("COMMUNITY")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Manage subscription/i })).toHaveCount(0);
+});
+
+test("an expired license (community plan) has no manage-subscription link", async ({ page }) => {
+  await mockUsage(page, EXPIRED_TRIAL_USAGE);
+  await page.goto("/billing");
+  await expect(page.getByText("COMMUNITY")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Manage subscription/i })).toHaveCount(0);
 });

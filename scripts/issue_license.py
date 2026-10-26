@@ -9,7 +9,7 @@ Per sale:
         --email buyer@example.com --order pi_123
 
 Expiry: trial 90 days, business/enterprise 395 days (365 + 30 grace).
---days overrides it (internal/demo instances). The key path defaults to
+--days (1-3650) overrides it (internal/demo instances). The key path defaults to
 $AICONTROL_LICENSE_SIGNING_KEY, then ~/.aicontrol/license-signing.pem.
 """
 import argparse
@@ -31,6 +31,7 @@ from app.core.license_key import PLANS, encode_license_code, public_key_to_str
 
 DEFAULT_DAYS = {"trial": 90, "business": 395, "enterprise": 395}
 DEFAULT_KEY_PATH = "~/.aicontrol/license-signing.pem"
+MAX_DAYS = 3650
 
 
 def generate_keypair(path: Path) -> str:
@@ -65,6 +66,8 @@ def issue_code(
 ) -> str:
     if plan not in PLANS:
         raise ValueError(f"plan must be one of {PLANS}, got {plan!r}")
+    if days is not None and not 1 <= days <= MAX_DAYS:
+        raise ValueError(f"--days must be between 1 and {MAX_DAYS}, got {days}")
     now = now or datetime.now(timezone.utc)
     expires_at = now + timedelta(days=days if days is not None else DEFAULT_DAYS[plan])
     return encode_license_code(private_key, {
@@ -105,7 +108,11 @@ def main(argv: Optional[list] = None) -> int:
         print(public_key)
         return 0
 
-    code = issue_code(load_private_key(Path(args.key)), args.plan, args.email, args.order, days=args.days)
+    try:
+        code = issue_code(load_private_key(Path(args.key)), args.plan, args.email, args.order, days=args.days)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
     expires_days = args.days if args.days is not None else DEFAULT_DAYS[args.plan]
     print(f"{args.plan} license for {args.email} (order {args.order}), valid {expires_days} days:")
     print(code)

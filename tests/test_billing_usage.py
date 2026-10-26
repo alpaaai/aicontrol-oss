@@ -5,13 +5,12 @@ from datetime import datetime, timezone
 from app.main import app
 from app.core.license_gate import LicenseInfo
 from app.core import license_gate
-from tests.conftest import restore_org_settings, snapshot_org_settings
 
 
 def _community():
     return LicenseInfo(plan="community", company=None, email=None, expires_at=None)
 
-def _business(license_status=None):
+def _business(license_status="active"):
     return LicenseInfo(plan="business", company="Acme", email="a@acme.com", expires_at=None,
                         license_status=license_status)
 
@@ -190,112 +189,6 @@ async def test_billing_usage_requires_auth():
     assert r.status_code == 401
 
 
-async def _set_activation_code(code):
-    """Replace org_settings with a single known row carrying the given
-    activation_code; caller restores via _restore_org_settings."""
-    from sqlalchemy import text
-    from app.models.database import async_session_factory
-
-    async with async_session_factory() as db:
-        saved = await snapshot_org_settings(db)
-        await db.execute(text("DELETE FROM org_settings"))
-        await db.execute(
-            text("""
-                INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at, activation_code)
-                VALUES (gen_random_uuid(), 'Acme', 'UTC', now(), now(), :code)
-            """),
-            {"code": code},
-        )
-        await db.commit()
-    return saved
-
-
-async def _restore_org_settings(existing):
-    from sqlalchemy import text
-    from app.models.database import async_session_factory
-
-    async with async_session_factory() as db:
-        await restore_org_settings(db, existing)
-        await db.commit()
-
-
-@pytest.mark.asyncio
-async def test_billing_usage_with_activation_code_populates_billing_urls(human_admin_token):
-    saved = await _set_activation_code("test-activation-code")
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_business()), \
-             patch(
-                 "app.routers.billing.fetch_billing_urls",
-                 new_callable=AsyncMock,
-                 return_value={"manage_subscription_url": "https://billing.stripe.com/session/abc"},
-             ) as mock_fetch:
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                r = await client.get(
-                    "/billing/usage",
-                    headers={"Authorization": f"Bearer {human_admin_token}"},
-                )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["manage_subscription_url"] == "https://billing.stripe.com/session/abc"
-        assert "upgrade_url" not in data
-        mock_fetch.assert_called_once_with("test-activation-code")
-    finally:
-        await _restore_org_settings(saved)
-
-
-@pytest.mark.asyncio
-async def test_billing_usage_without_activation_code_leaves_urls_none_and_skips_call(human_admin_token):
-    saved = await _set_activation_code(None)
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_community()), \
-             patch(
-                 "app.routers.billing.fetch_billing_urls", new_callable=AsyncMock
-             ) as mock_fetch:
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                r = await client.get(
-                    "/billing/usage",
-                    headers={"Authorization": f"Bearer {human_admin_token}"},
-                )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["manage_subscription_url"] is None
-        assert "upgrade_url" not in data
-        mock_fetch.assert_not_called()
-    finally:
-        await _restore_org_settings(saved)
-
-
-@pytest.mark.asyncio
-async def test_billing_usage_falls_back_to_none_when_billing_client_fails(human_admin_token):
-    from app.services.billing_client import BillingClientError
-
-    saved = await _set_activation_code("test-activation-code")
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_business()), \
-             patch(
-                 "app.routers.billing.fetch_billing_urls",
-                 new_callable=AsyncMock,
-                 side_effect=BillingClientError("billing-service unreachable"),
-             ):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                r = await client.get(
-                    "/billing/usage",
-                    headers={"Authorization": f"Bearer {human_admin_token}"},
-                )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["manage_subscription_url"] is None
-        assert "upgrade_url" not in data
-    finally:
-        await _restore_org_settings(saved)
-
-
 @pytest.mark.asyncio
 async def test_billing_usage_intercepts_count_is_informational_only(human_admin_token):
     """Task 14: usage stays operational visibility only -- no dollar
@@ -315,71 +208,55 @@ async def test_billing_usage_intercepts_count_is_informational_only(human_admin_
     assert "estimated_cost_usd" not in data["this_month"]
 
 
-async def _set_activation_code_and_synced_at(code, synced_at):
-    """Like _set_activation_code but also sets license_synced_at, for
-    plans/v4 task 24's BillingPage.tsx fields."""
-    from sqlalchemy import text
-    from app.models.database import async_session_factory
-
-    async with async_session_factory() as db:
-        saved = await snapshot_org_settings(db)
-        await db.execute(text("DELETE FROM org_settings"))
-        await db.execute(
-            text("""
-                INSERT INTO org_settings (id, org_name, timezone, created_at, updated_at,
-                                           activation_code, license_synced_at)
-                VALUES (gen_random_uuid(), 'Acme', 'UTC', now(), now(), :code, :synced_at)
-            """),
-            {"code": code, "synced_at": synced_at},
-        )
-        await db.commit()
-    return saved
+@pytest.mark.asyncio
+async def test_billing_usage_has_no_billing_service_fields(human_admin_token):
+    """The billing-service sync is gone: /billing/usage reads the signed code
+    only and never calls out."""
+    with patch.object(license_gate, "get_license_info", return_value=_business()):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r = await client.get(
+                "/billing/usage",
+                headers={"Authorization": f"Bearer {human_admin_token}"},
+            )
+    assert r.status_code == 200
+    data = r.json()
+    assert "manage_subscription_url" not in data
+    assert "license_synced_at" not in data
 
 
 @pytest.mark.asyncio
-async def test_billing_usage_includes_license_status_and_synced_at(human_admin_token):
-    """plans/v4 task 24 note: BillingPage.tsx reads license_status and
-    license_synced_at off /billing/usage rather than a second endpoint call."""
-    synced_at = datetime(2026, 9, 15, 12, 0, 0, tzinfo=timezone.utc)
-    saved = await _set_activation_code_and_synced_at("test-activation-code", synced_at)
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_business(license_status="past_due")), \
-             patch("app.routers.billing.fetch_billing_urls", new_callable=AsyncMock,
-                   return_value={"manage_subscription_url": "https://billing.stripe.com/session/abc"}):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                r = await client.get(
-                    "/billing/usage",
-                    headers={"Authorization": f"Bearer {human_admin_token}"},
-                )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["license_status"] == "past_due"
-        assert data["license_synced_at"] is not None
-        assert data["license_synced_at"].startswith("2026-09-15")
-    finally:
-        await _restore_org_settings(saved)
+async def test_billing_usage_includes_license_status_and_expires_at(human_admin_token):
+    expires = datetime(2026, 12, 1, 9, 30, tzinfo=timezone.utc)
+    info = LicenseInfo(plan="community", company="Acme", email="a@acme.com",
+                       expires_at=expires, license_status="expired")
+    with patch.object(license_gate, "get_license_info", return_value=info):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r = await client.get(
+                "/billing/usage",
+                headers={"Authorization": f"Bearer {human_admin_token}"},
+            )
+    data = r.json()
+    assert data["license_status"] == "expired"
+    assert data["expires_at"].startswith("2026-12-01")
 
 
 @pytest.mark.asyncio
-async def test_billing_usage_license_synced_at_null_when_never_synced(human_admin_token):
-    saved = await _set_activation_code(None)
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_community()):
-            async with AsyncClient(
-                transport=ASGITransport(app=app), base_url="http://test"
-            ) as client:
-                r = await client.get(
-                    "/billing/usage",
-                    headers={"Authorization": f"Bearer {human_admin_token}"},
-                )
-        assert r.status_code == 200
-        data = r.json()
-        assert data["license_status"] is None
-        assert data["license_synced_at"] is None
-    finally:
-        await _restore_org_settings(saved)
+async def test_billing_usage_expires_at_null_without_a_code(human_admin_token):
+    with patch.object(license_gate, "get_license_info", return_value=_community()):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
+            r = await client.get(
+                "/billing/usage",
+                headers={"Authorization": f"Bearer {human_admin_token}"},
+            )
+    data = r.json()
+    assert data["license_status"] is None
+    assert data["expires_at"] is None
 
 
 def test_month_bounds_end_is_exclusive_start_of_next_month():
@@ -403,81 +280,12 @@ def test_cascaded_features_tolerates_an_unknown_plan():
     assert PLAN_CONFIG.get("something_new") is None
 
 
-async def _post_upgrade(token, plan="business"):
+@pytest.mark.asyncio
+async def test_billing_upgrade_endpoint_is_removed(human_admin_token):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        return await client.post(
+        r = await client.post(
             "/billing/upgrade",
-            json={"plan": plan},
-            headers={"Authorization": f"Bearer {token}"},
+            json={"plan": "business"},
+            headers={"Authorization": f"Bearer {human_admin_token}"},
         )
-
-
-@pytest.mark.parametrize("plan", ["business", "enterprise"])
-@pytest.mark.asyncio
-async def test_billing_upgrade_trial_returns_checkout_url(human_admin_token, plan):
-    """Trial customers can upgrade to Business or Enterprise. The checkout
-    session is created on click, not on every Billing page load."""
-    saved = await _set_activation_code("test-activation-code")
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_trial()), \
-             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock,
-                   return_value="https://checkout.stripe.com/session/xyz") as mock_create:
-            r = await _post_upgrade(human_admin_token, plan)
-        assert r.status_code == 200
-        assert r.json() == {"url": "https://checkout.stripe.com/session/xyz"}
-        mock_create.assert_called_once_with("test-activation-code", plan)
-    finally:
-        await _restore_org_settings(saved)
-
-
-@pytest.mark.asyncio
-async def test_billing_upgrade_non_trial_returns_400(human_admin_token):
-    saved = await _set_activation_code("test-activation-code")
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_business()), \
-             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock) as mock_create:
-            r = await _post_upgrade(human_admin_token)
-        assert r.status_code == 400
-        mock_create.assert_not_called()
-    finally:
-        await _restore_org_settings(saved)
-
-
-@pytest.mark.asyncio
-async def test_billing_upgrade_without_activation_code_returns_400(human_admin_token):
-    saved = await _set_activation_code(None)
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_trial()), \
-             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock) as mock_create:
-            r = await _post_upgrade(human_admin_token)
-        assert r.status_code == 400
-        mock_create.assert_not_called()
-    finally:
-        await _restore_org_settings(saved)
-
-
-@pytest.mark.asyncio
-async def test_billing_upgrade_invalid_plan_returns_422(human_admin_token):
-    r = await _post_upgrade(human_admin_token, "community")
-    assert r.status_code == 422
-
-
-@pytest.mark.asyncio
-async def test_billing_upgrade_billing_service_error_returns_502(human_admin_token):
-    from app.services.billing_client import BillingClientError
-
-    saved = await _set_activation_code("test-activation-code")
-    try:
-        with patch.object(license_gate, "get_license_info", return_value=_trial()), \
-             patch("app.routers.billing.create_upgrade_checkout", new_callable=AsyncMock,
-                   side_effect=BillingClientError("billing-service returned 429")):
-            r = await _post_upgrade(human_admin_token)
-        assert r.status_code == 502
-    finally:
-        await _restore_org_settings(saved)
-
-
-@pytest.mark.asyncio
-async def test_billing_upgrade_non_admin_gets_403(human_analyst_token):
-    r = await _post_upgrade(human_analyst_token)
-    assert r.status_code == 403
+    assert r.status_code in (404, 405)

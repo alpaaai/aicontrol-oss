@@ -63,7 +63,6 @@ this when the API port is reachable solely through that proxy.
 
 | Destination | When | Needed for |
 |-------------|------|------------|
-| `billing.aictl.io` (`AICONTROL_LICENSE_SYNC_URL`) | Only after an activation code is entered | Daily license sync. Unreachable: last known status is kept for 7 days, then paid features lock. |
 | `slack.com` API | Business/Enterprise with `SLACK_BOT_TOKEN` set | Review notifications |
 | Your LLM provider | When `LLM_MOCK_ENABLED=false` | AI-native features, with your own key |
 | Registered downstream MCP servers | Every governed tool call | The gateway forwards allowed calls |
@@ -97,7 +96,6 @@ files (`install.sh` creates it, mode 600).
 | `MCP_RESPONSE_SCAN_POLICY` | `block` | `block` rejects a tool response flagged unsafe; `log` records it only. |
 | `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`, `SLACK_REVIEW_CHANNEL` | unset / `#aicontrol-reviews` | Slack review notifications (Business+). |
 | `LLM_PROVIDER`, `LLM_MODEL`, `LLM_API_KEY`, `LLM_MOCK_ENABLED` | anthropic / haiku / empty / `false` | AI-native features on your own account. |
-| `AICONTROL_LICENSE_SYNC_URL` | `https://billing.aictl.io` | License sync endpoint. |
 | `DEMO_MODE` | `false` | Exposes unauthenticated demo endpoints that delete audit rows. Never enable on a real install. |
 
 Compose-level variables (read by `docker-compose.app.yml`):
@@ -187,7 +185,7 @@ Logs are JSON lines on stdout when `APP_ENV=production` (collect with your
 usual container log driver; compose keeps the last 5 files of 10 MB per
 container). Useful event names: `aicontrol_ready`, `wal_ship_line_failed`,
 `wal_line_dead_lettered`, `retention_purge_complete`, `retention_purge_failed`,
-`license_sync_complete`, `license_sync_unreachable`, `slack_message_failed`,
+`retention_purge_skipped`, `slack_message_failed`,
 `mcp_upstream_unreachable`.
 
 Support bundle: `bash diagnose.sh`.

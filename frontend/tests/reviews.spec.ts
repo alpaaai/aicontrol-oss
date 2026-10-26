@@ -16,22 +16,6 @@ test("reviews page shows business lock for community", async ({ page }) => {
   await expect(page.getByText("Review Queue — Business Feature")).toBeVisible();
 });
 
-test("reviews page shows a reactivate prompt for a past_due business org, not the lock or content", async ({ page }) => {
-  await page.route("**/license-info", (route) =>
-    route.fulfill({
-      json: { plan: "business", company: "Acme", is_enterprise: false, is_business: true, expires_at: null },
-    }),
-  );
-  await page.route("**/license/features", (route) =>
-    route.fulfill({
-      json: { tier: "business", features: { nl_authoring: true, simulation: true, hitl: true, compliance_reports: false }, license_status: "past_due" },
-    }),
-  );
-  await page.goto("/reviews");
-  await expect(page.getByText(/Reactivate your plan/i)).toBeVisible();
-  await expect(page.getByText("Review Queue — Business Feature")).not.toBeVisible();
-});
-
 const PENDING_REVIEW = {
   id: "r1",
   audit_event_id: "ae1",

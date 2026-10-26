@@ -38,12 +38,8 @@ class FeatureFlags(BaseModel):
 class LicenseFeatures(BaseModel):
     tier: str
     features: FeatureFlags
-    # plans/v4 task 17: "active" | "past_due" | "canceled" | None. None means
-    # either community (never subscribed) or a business/enterprise plan that
-    # hasn't synced yet. Lets the frontend tell "never subscribed" (tier
-    # alone decides nav visibility, unchanged) apart from "had business/
-    # enterprise, now past_due/canceled" (same tier as when active, so the
-    # frontend can render a reactivate banner instead of hiding the nav).
+    # "active" | "expired" | None. None means no code, or one that does not
+    # verify. An expired code reports tier "free" with status "expired".
     license_status: str | None
 
 
@@ -53,10 +49,7 @@ async def license_features(
 ) -> LicenseFeatures:
     """Which destinations exist for this install. The nav renders from this:
     a paid destination is absent on a free install, never locked or greyed.
-    tier reflects the plan the org is licensed for regardless of
-    license_status, so a past_due/canceled business org still sees its
-    business nav items (task 25 routes them to a reactivate banner instead
-    of hiding them)."""
+    tier comes from get_license_info, so an expired code is "free"."""
     info = await license_gate.get_license_info(db)
     tier = "enterprise" if info.is_enterprise else "business" if info.is_business else "free"
     return LicenseFeatures(

@@ -79,7 +79,6 @@ class LicenseActivationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     license_status: str | None
     license_plan: str | None
-    license_synced_at: datetime | None
 
 
 @settings_router.put("/license-activation", response_model=LicenseActivationResponse)
@@ -91,8 +90,7 @@ async def activate_license(
     """Only way a license code enters the system (BillingPage.tsx only).
     Verifies the signed code locally (app/core/license_key.py) -- no
     network call. A code that doesn't verify or has expired is never
-    stored. Clears activation_code so the parked billing-service daily sync
-    (license_sync.py) never starts."""
+    stored. Clears the legacy activation_code."""
     payload = decode_license_code(body.activation_code)
     if payload is None or payload.is_expired(datetime.now(timezone.utc)):
         raise HTTPException(status_code=400, detail="Invalid activation code")
@@ -108,5 +106,4 @@ async def activate_license(
     return LicenseActivationResponse(
         license_status="active",
         license_plan=payload.plan,
-        license_synced_at=datetime.now(timezone.utc),
     )

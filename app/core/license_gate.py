@@ -46,10 +46,9 @@ class LicenseInfo:
     company: Optional[str]
     email: Optional[str]
     expires_at: Optional[datetime]
-    # DB-status-based licensing (plans/v4 task 15): "active" | "past_due" |
-    # "canceled" | None (never synced / community). None only for a business
-    # or enterprise plan that hasn't synced yet -- community always has this
-    # unset since it has no subscription to have a status.
+    # "active" (verified, unexpired code) | "expired" (verified code past its
+    # expiry; plan falls back to community) | None (no code, or a code that
+    # does not verify).
     license_status: Optional[str] = None
 
     @property

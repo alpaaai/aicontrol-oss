@@ -9,7 +9,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.core.license_gate import LicenseInfo
@@ -336,31 +335,95 @@ def db_session_factory_mock():
     return factory
 
 
-@pytest.mark.asyncio
-async def test_run_once_uses_the_decoded_plan(db_session_factory_mock):
-    with patch("app.services.retention_purger.get_license_info",
-               return_value=LicenseInfo(plan="business", company=None, email=None, expires_at=None)), \
-         patch("app.services.retention_purger.purge_expired_audit_events",
-               new_callable=AsyncMock, return_value=3) as mock_purge:
-        purger = RetentionPurger(db_session_factory_mock, interval_hours=24)
-        await purger.run_once()
-        mock_purge.assert_called_once()
-        assert mock_purge.call_args[0][1] == "business"
-        assert purger.status == "healthy"
+async def _run_once_with_org(license_code_value=None, license_plan=None, activation_code=None, no_row=False):
+    """Run RetentionPurger.run_once against the real org_settings table with
+    the given license fields; returns (purge mock, purger). Restores the
+    original org_settings rows afterwards."""
+    from sqlalchemy import text
+    from app.models.database import async_session_factory
+    from tests.conftest import restore_org_settings, snapshot_org_settings
+
+    async with async_session_factory() as db:
+        existing = await snapshot_org_settings(db)
+        await db.execute(text("DELETE FROM org_settings"))
+        if not no_row:
+            await db.execute(
+                text("""
+                    INSERT INTO org_settings (
+                        id, org_name, timezone, created_at, updated_at,
+                        license_key, license_plan, activation_code
+                    ) VALUES (
+                        gen_random_uuid(), 'Acme', 'UTC', now(), now(),
+                        :license_key, :license_plan, :activation_code
+                    )
+                """),
+                {"license_key": license_code_value, "license_plan": license_plan,
+                 "activation_code": activation_code},
+            )
+        await db.commit()
+    try:
+        with patch("app.services.retention_purger.purge_expired_audit_events",
+                   new_callable=AsyncMock, return_value=0) as mock_purge:
+            purger = RetentionPurger(async_session_factory, interval_hours=24)
+            await purger.run_once()
+        return mock_purge, purger
+    finally:
+        async with async_session_factory() as db:
+            await restore_org_settings(db, existing)
+            await db.commit()
 
 
 @pytest.mark.asyncio
-async def test_run_once_skips_cycle_on_invalid_license_without_purging(db_session_factory_mock):
-    """An invalid/expired key must not guess a plan for a destructive delete --
-    skip the cycle rather than risk purging under the wrong (shorter) window."""
-    with patch("app.services.retention_purger.get_license_info",
-               side_effect=HTTPException(status_code=402, detail="invalid")), \
-         patch("app.services.retention_purger.purge_expired_audit_events",
-               new_callable=AsyncMock) as mock_purge:
-        purger = RetentionPurger(db_session_factory_mock, interval_hours=24)
-        await purger.run_once()
-        mock_purge.assert_not_called()
-        assert purger.status == "degraded"
+async def test_run_once_skips_purge_for_expired_code(license_code):
+    mock_purge, purger = await _run_once_with_org(license_code("enterprise", days=-1))
+    mock_purge.assert_not_called()
+    assert purger.status == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_run_once_skips_purge_for_bad_signature_code(license_code):
+    prefix, payload, signature = license_code("enterprise").split(".")
+    flipped = ("A" if signature[0] != "A" else "B") + signature[1:]
+    mock_purge, purger = await _run_once_with_org(f"{prefix}.{payload}.{flipped}")
+    mock_purge.assert_not_called()
+    assert purger.status == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_run_once_skips_purge_for_legacy_paid_plan_without_code():
+    mock_purge, purger = await _run_once_with_org(license_plan="business")
+    mock_purge.assert_not_called()
+    assert purger.status == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_run_once_skips_purge_for_legacy_activation_code_without_key():
+    mock_purge, purger = await _run_once_with_org(activation_code="ACT-123")
+    mock_purge.assert_not_called()
+    assert purger.status == "degraded"
+
+
+@pytest.mark.asyncio
+async def test_run_once_purges_with_active_codes_window(license_code):
+    mock_purge, purger = await _run_once_with_org(license_code("business"))
+    mock_purge.assert_called_once()
+    assert mock_purge.call_args[0][1] == "business"
+    assert purger.status == "healthy"
+
+
+@pytest.mark.asyncio
+async def test_run_once_purges_community_window_when_nothing_is_set():
+    mock_purge, purger = await _run_once_with_org()
+    mock_purge.assert_called_once()
+    assert mock_purge.call_args[0][1] == "community"
+    assert purger.status == "healthy"
+
+
+@pytest.mark.asyncio
+async def test_run_once_purges_community_window_with_no_org_row():
+    mock_purge, purger = await _run_once_with_org(no_row=True)
+    mock_purge.assert_called_once()
+    assert mock_purge.call_args[0][1] == "community"
 
 
 @pytest.mark.asyncio
@@ -402,55 +465,15 @@ async def test_retention_purger_started_for_community_deployment():
 
 
 @pytest.mark.asyncio
-async def test_license_sync_started_when_activation_code_on_file():
-    """plans/v4 task 21 -- the sync job (task 20) only actually runs once
-    it's wired into lifespan."""
+async def test_no_license_sync_task_is_started():
+    """The billing-service daily sync was removed; an activation_code on
+    file must not start any background task."""
     import app.main as _main
-    from app.models.database import async_session_factory
-    from app.models.user import OrgSettings
-
-    async with async_session_factory() as db:
-        row = OrgSettings(id=uuid.uuid4(), org_name="Task21 Activated Org", activation_code="task21-test-code")
-        db.add(row)
-        await db.commit()
-        row_id = row.id
-
-    try:
-        with patch("app.main.has_enterprise_license", return_value=False), \
-             patch("app.services.retention_purger.RetentionPurger.start"), \
-             patch("app.services.license_sync.LicenseSync.start"):
-            async with _main.lifespan(_main.app):
-                assert _main.app.state.license_sync is not None
-    finally:
-        async with async_session_factory() as db:
-            row = await db.get(OrgSettings, row_id)
-            await db.delete(row)
-            await db.commit()
-
-
-@pytest.mark.asyncio
-async def test_license_sync_not_started_without_activation_code():
-    """plans/v4 task 21 -- community installs, and installs never
-    activated, must not spin up the background sync task at all."""
-    import app.main as _main
-    from app.models.database import async_session_factory
-    from app.models.user import OrgSettings
-    from sqlalchemy import select
-
-    async with async_session_factory() as db:
-        existing = (
-            await db.execute(select(OrgSettings).where(OrgSettings.activation_code.isnot(None)))
-        ).scalars().all()
-        assert not existing, (
-            "dev DB already has an org with an activation_code set -- this test "
-            "can't assert 'not started' while one exists; clean it up first"
-        )
 
     with patch("app.main.has_enterprise_license", return_value=False), \
-         patch("app.services.retention_purger.RetentionPurger.start"), \
-         patch("app.services.license_sync.LicenseSync.start"):
+         patch("app.services.retention_purger.RetentionPurger.start"):
         async with _main.lifespan(_main.app):
-            assert _main.app.state.license_sync is None
+            assert not hasattr(_main.app.state, "license_sync")
 
 
 @pytest.mark.asyncio

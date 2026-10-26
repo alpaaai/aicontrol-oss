@@ -3,7 +3,6 @@ import { listWarnings } from '../../api/warnings'
 import type { PolicyWarning } from '../../api/warnings'
 import { DriftWarningRow } from './DriftWarningRow'
 import { EnterpriseLock } from '../../components/shared/EnterpriseLock'
-import { ReactivateGuard } from '../../components/shared/ReactivateGuard'
 import { usePoll } from '../../hooks/usePoll'
 import { useLicense } from '../../hooks/useLicense'
 
@@ -90,18 +89,7 @@ function ResolvedWarnings() {
 }
 
 export function DriftPage() {
-  const { isEnterprise, needsReactivation } = useLicense()
-  if (needsReactivation) {
-    return (
-      <div className="p-6">
-        <h2 className="text-[18px] font-semibold text-ac-ink mb-4">Policy drift</h2>
-        <ReactivateGuard
-          title="Reactivate your plan"
-          description="Automated drift detection requires an active Enterprise subscription."
-        />
-      </div>
-    )
-  }
+  const { isEnterprise } = useLicense()
   if (!isEnterprise) {
     return (
       <div className="p-6">
