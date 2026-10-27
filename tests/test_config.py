@@ -30,7 +30,11 @@ def test_production_rejects_default_secret_key():
     """A production deployment must never sign JWTs with the changeme default."""
     from app.core.config import Settings
     with pytest.raises(ValueError):
-        Settings(database_url="postgresql+asyncpg://x/y", app_env="production")
+        Settings(
+            database_url="postgresql+asyncpg://x/y",
+            app_env="production",
+            secret_key="changeme",
+        )
 
 
 def test_production_rejects_unset_secret_key():

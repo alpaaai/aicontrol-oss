@@ -101,3 +101,78 @@ def test_policies_yaml_excludes_demo_scenario_policies():
     assert names.isdisjoint(demo_only_names), (
         f"demo-scenario policies leaked into default seed: {names & demo_only_names}"
     )
+
+
+_demo_seeds_absent = pytest.mark.skipif(
+    not Path(__file__).resolve().parent.parent.joinpath("policies", "demo_seeds").is_dir(),
+    reason="policies/demo_seeds/ is gitignored and absent from a clean checkout",
+)
+
+
+@_demo_seeds_absent
+def test_load_yaml_accepts_explicit_path_for_demo_seeds():
+    """load_yaml(path) must read an arbitrary policies-shaped YAML file, so
+    demo seed files under policies/demo_seeds/ can reuse the same loader."""
+    from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
+    policies = load_yaml(DEMO_SEEDS_DIR / "lending.yaml")
+    names = {p["name"] for p in policies}
+    assert names == {"deny_bulk_credit_query", "deny_bulk_credit_query_rate"}
+
+
+@_demo_seeds_absent
+def test_all_demo_seed_files_load_and_have_valid_effects():
+    """Every YAML file under policies/demo_seeds/ must parse and contain only
+    valid policy effects -- same contract as the default policies.yaml."""
+    from app.services.demo_scenario_service import all_scenario_ids
+    from app.services.policy_loader import load_yaml, DEMO_SEEDS_DIR
+    valid_effects = {"deny", "review"}
+    seed_files = sorted(DEMO_SEEDS_DIR.glob("*.yaml"))
+    # One seed file per registered demo scenario (app/demo_scenarios/*.json /
+    # demo_scenario_service.all_scenario_ids()) -- a stray demo_seeds/*.yaml
+    # with no matching scenario is dead: scripts/internal/seed.py glob-loads every
+    # file in this directory regardless of whether a scenario references it,
+    # so an orphan silently ships a policy nothing demos (see gtm.yaml,
+    # removed for exactly this reason -- its deny_unscoped_crm_query name
+    # collided with and was silently clobbered by revops.yaml's own policy
+    # of the same name on every seed run, since 'g' sorts before 'r').
+    assert len(seed_files) == len(all_scenario_ids()), (
+        f"expected one demo seed file per scenario ({len(all_scenario_ids())}), "
+        f"found {len(seed_files)}"
+    )
+    for path in seed_files:
+        for p in load_yaml(path):
+            assert p["effect"] in valid_effects, f"{path.name}: invalid effect {p['effect']}"
+
+
+@pytest.mark.asyncio
+async def test_upsert_policies_keeps_operator_active_toggle_across_restarts(db_session):
+    """load_all() re-runs upsert_policies on every API start. The seed YAML's
+    `active` flag is only the initial state: an operator who activated a
+    library policy (shipped inactive) or switched off a default one must not
+    have that silently reverted by the next restart/upgrade."""
+    from sqlalchemy import select
+
+    from app.models.schemas import Policy
+    from app.services.policy_loader import upsert_policies
+
+    seed = {
+        "name": "test_loader_keeps_active",
+        "description": "",
+        "effect": "deny",
+        "action_tool": "delete_database",
+        "condition": {"numeric_conditions": {"rows": {"gt": 10}}},
+        "severity": "low",
+        "compliance_frameworks": [],
+        "active": False,
+    }
+    await upsert_policies(db_session, [seed])
+
+    row = (await db_session.execute(select(Policy).where(Policy.name == seed["name"]))).scalar_one()
+    row.active = True
+    await db_session.commit()
+
+    await upsert_policies(db_session, [{**seed, "description": "edited upstream"}])
+
+    await db_session.refresh(row)
+    assert row.active is True, "restart reset the operator's activation"
+    assert row.description == "edited upstream", "template edits must still be picked up"
