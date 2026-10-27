@@ -1,6 +1,6 @@
 services:
   api:
-    image: ghcr.io/alpaaai/aicontrol-api:${AICONTROL_VERSION:-latest}
+    image: ${AICONTROL_API_IMAGE:-ghcr.io/alpaaai/aicontrol-community}:${AICONTROL_VERSION:-latest}
     restart: unless-stopped
     env_file: .env
     environment:

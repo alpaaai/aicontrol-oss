@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-FROM python:3.14-slim AS base
+FROM python:3.14-slim AS app
 
 WORKDIR /app
 ENV PYTHONPATH=/app
@@ -20,7 +20,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY app/ app/
-COPY enterprise/ enterprise/
 COPY alembic.ini .
 COPY migrations/ migrations/
 COPY policies/ policies/
@@ -40,3 +39,13 @@ HEALTHCHECK --interval=10s --timeout=5s --retries=5 --start-period=60s \
 
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
+
+# Public image: no enterprise code, only the empty package stub that
+# app/main.py's guarded imports tolerate.
+FROM app AS community
+RUN mkdir -p enterprise && touch enterprise/__init__.py
+
+# Private image for licensed customers. Kept last so a plain `docker build`
+# produces the full image.
+FROM app AS enterprise
+COPY --chown=aicontrol:aicontrol enterprise/ enterprise/
