@@ -1,6 +1,6 @@
 """Seed the 18 real-world library policies into the database.
 
-Run: PYTHONPATH=/home/deven/aicontrol python scripts/seed_library_policies.py
+Run: PYTHONPATH=/home/deven/aicontrol python scripts/public/seed_library_policies.py
 Idempotent — safe to run multiple times.
 """
 import asyncio
@@ -8,7 +8,7 @@ import json
 import sys
 import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from sqlalchemy import text
 from app.models.database import async_session_factory

@@ -1,4 +1,4 @@
-"""Tests for the scripts/db_hygiene_check.py CLI's pure reporting logic
+"""Tests for the scripts/public/db_hygiene_check.py CLI's pure reporting logic
 and end-to-end report/--fix exit-code contract against a real leaked row."""
 import uuid
 
@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import text
 
 from app.models.database import async_session_factory
-from scripts import db_hygiene, db_hygiene_check
+from scripts.public import db_hygiene, db_hygiene_check
 
 
 def test_format_report_lists_only_nonzero_labels():

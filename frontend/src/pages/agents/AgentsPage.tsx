@@ -109,7 +109,7 @@ export function AgentsPage() {
           Couldn't load agents. Try refreshing the page.
         </p>
       ) : agents.length === 0 ? (
-        <EmptyState title={`No agents connected yet — register one with scripts/onboard_agent.py${isAdmin ? ", use the Register new agent button above," : ""} or issue an agent token and let the SDK self-register.`} />
+        <EmptyState title={`No agents connected yet — register one with scripts/public/onboard_agent.py${isAdmin ? ", use the Register new agent button above," : ""} or issue an agent token and let the SDK self-register.`} />
       ) : (
         <div
           data-testid="agents-table"

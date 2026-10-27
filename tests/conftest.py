@@ -8,9 +8,9 @@ from unittest.mock import patch
 import httpx
 from sqlalchemy import text
 
-from scripts import db_hygiene
+from scripts.public import db_hygiene
 
-# Demo agent fixture data, copied from scripts/seed.py (which is gitignored --
+# Demo agent fixture data, copied from scripts/internal/seed.py (which is gitignored --
 # demo-only, not shipped). Kept here so core test infra doesn't depend on a
 # file that may be absent on a fresh clone or in CI.
 AGENTS = [
@@ -245,7 +245,7 @@ async def db_session():
 
 
 
-# The agents/policies/discovery sweeps below all delegate to scripts/db_hygiene.py
+# The agents/policies/discovery sweeps below all delegate to scripts/public/db_hygiene.py
 # -- the single source of truth for what a leaked test row looks like and how to
 # clean it, shared with the standalone db_hygiene_check.py CLI. Each wrapper here
 # exists only to keep the pre-existing import paths that test_conftest_*_cleanup.py
@@ -296,7 +296,7 @@ async def _cleanup_test_mcp_servers():
     accumulate across pytest runs. test_mcp_servers_router.py creates these
     inline with no cleanup of its own -- same class of gap the agents/
     policies/discovery sweeps above already cover, just never extended here;
-    confirmed leaking via `python scripts/db_hygiene_check.py` after a plain
+    confirmed leaking via `python scripts/public/db_hygiene_check.py` after a plain
     `pytest tests/` run (mcp_servers: 4, user_activity_log: 5 referencing
     them) with no other test having touched either table that session."""
     from app.models.database import async_session_factory
@@ -456,7 +456,7 @@ async def _gateway_agent_setup():
     a different loop" in this stack; every fixture that touches the DB for
     gateway tests is session-scoped to avoid it). Cleanup rides on
     _cleanup_test_agents's existing test-agent-% sweep, which removes this
-    row's api_tokens too (see scripts/db_hygiene._clean_agents's FK-safe
+    row's api_tokens too (see scripts/public/db_hygiene._clean_agents's FK-safe
     ordering)."""
     from app.core.auth import create_token, hash_token
     from app.models.database import async_session_factory

@@ -1,14 +1,17 @@
-"""Tests for scripts/issue_license.py -- keygen and per-sale code issuing.
+"""Tests for scripts/internal/issue_license.py -- keygen and per-sale code issuing.
 Issued codes must decode with app.core.license_key using the generated
 public key."""
+import os
 import stat
+import subprocess
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from app.core import license_key
-from scripts import issue_license
+from scripts.internal import issue_license
 
 NOW = datetime(2026, 10, 26, tzinfo=timezone.utc)
 
@@ -108,3 +111,38 @@ def test_cli_rejects_out_of_range_days_without_printing_a_code(tmp_path, capsys)
     assert rc == 1
     assert "AICTL1" not in captured.out
     assert "days" in captured.err
+
+
+SH = Path(__file__).resolve().parent.parent / "scripts" / "internal" / "issue_license.sh"
+
+
+def _run_sh(args, key_path):
+    env = {**os.environ, "AICONTROL_LICENSE_SIGNING_KEY": str(key_path)}
+    return subprocess.run(["bash", str(SH), *args], capture_output=True, text=True, env=env, cwd="/")
+
+
+def test_sh_wrapper_issues_a_verifiable_code_from_any_cwd(tmp_path):
+    key_path = tmp_path / "signing.pem"
+    public_key = issue_license.generate_keypair(key_path)
+    result = _run_sh(["enterprise", "buyer@example.com", "pi_123"], key_path)
+    assert result.returncode == 0, result.stderr
+    code = result.stdout.strip().splitlines()[-1]
+    with patch.object(license_key, "PUBLIC_KEY", public_key):
+        decoded = license_key.decode_license_code(code)
+    assert decoded.plan == "enterprise"
+    assert decoded.email == "buyer@example.com"
+    assert decoded.order == "pi_123"
+
+
+def test_sh_wrapper_passes_optional_days(tmp_path):
+    key_path = tmp_path / "signing.pem"
+    issue_license.generate_keypair(key_path)
+    result = _run_sh(["business", "buyer@example.com", "pi_123", "30"], key_path)
+    assert result.returncode == 0, result.stderr
+    assert "valid 30 days" in result.stdout
+
+
+def test_sh_wrapper_prints_usage_without_enough_args(tmp_path):
+    result = _run_sh(["enterprise"], tmp_path / "signing.pem")
+    assert result.returncode == 2
+    assert "Usage:" in result.stderr

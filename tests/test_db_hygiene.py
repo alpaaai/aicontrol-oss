@@ -1,8 +1,8 @@
-"""Tests for the canonical test/demo-artifact hygiene sweep (scripts/db_hygiene.py).
+"""Tests for the canonical test/demo-artifact hygiene sweep (scripts/public/db_hygiene.py).
 
 This module is the single source of truth for what counts as a leaked
 test row and how to clean it -- used by both tests/conftest.py's autouse
-cleanup fixtures and the standalone scripts/db_hygiene_check.py CLI.
+cleanup fixtures and the standalone scripts/public/db_hygiene_check.py CLI.
 """
 import uuid
 
@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import text
 
 from app.models.database import async_session_factory
-from scripts import db_hygiene
+from scripts.public import db_hygiene
 
 
 @pytest.mark.asyncio

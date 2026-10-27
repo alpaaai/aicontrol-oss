@@ -3,7 +3,7 @@ AIControl — Agent Onboarding
 Registers a new agent AND issues a scoped token in one step.
 
 Usage:
-    python scripts/onboard_agent.py \
+    python scripts/public/onboard_agent.py \
         --name "loan-underwriting-agent" \
         --owner "lending-team" \
         --tools "query_credit_bureau,run_risk_model"
@@ -33,7 +33,7 @@ def main() -> None:
     if not ADMIN_TOKEN:
         print("Error: AICONTROL_ADMIN_TOKEN environment variable not set.")
         print("Issue an admin token first:")
-        print("  PYTHONPATH=. python scripts/issue_token.py --role admin --desc 'admin'")
+        print("  PYTHONPATH=. python scripts/public/issue_token.py --role admin --desc 'admin'")
         sys.exit(1)
 
     headers = {"Authorization": f"Bearer {ADMIN_TOKEN}"}

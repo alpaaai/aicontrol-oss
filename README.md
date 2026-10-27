@@ -100,7 +100,7 @@ curl -X PATCH http://localhost:8001/mcp-servers/<server_id> \
 ```
 
 Then point the agent's MCP client at `http://localhost:8001/mcp/<server_id>/`
-with an agent-scoped bearer token (`scripts/onboard_agent.py` issues one).
+with an agent-scoped bearer token (`scripts/public/onboard_agent.py` issues one).
 AIControl evaluates Cedar policy on every `tools/list` and `tools/call`,
 audits the result, and forwards allowed calls to the real downstream server.
 

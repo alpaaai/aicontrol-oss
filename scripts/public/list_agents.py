@@ -3,7 +3,7 @@ AIControl — List Agents
 Shows all registered agents with their IDs and status.
 
 Usage:
-    python scripts/list_agents.py
+    python scripts/public/list_agents.py
 """
 import os
 import sys

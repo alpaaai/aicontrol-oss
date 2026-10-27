@@ -30,19 +30,16 @@ docs/
 PROJECT_CONTEXT.md
 CLAUDE.md
 .claude/
-scripts/prospecting/.env
-scripts/prospecting/state.json
+
+# Internal scripts (license issuing, release, prospecting, demo seeding) --
+# never committed or shipped in the image (see .dockerignore).
+scripts/internal/
+tests/test_issue_license_script.py
 
 # Demo-only data/scripts — my local dev/demo use, not shipped to customers.
 # The /demo feature code (app/routers/demo.py, app/services/demo_provisioning.py,
 # app/services/demo_scenario_service.py, app/demo_scenarios/*.json) stays tracked;
 # these are the standalone seed/scenario scripts that feed manual demo runs.
-scripts/seed.py
-scripts/demo_reset.py
-scripts/demo_run.py
-scripts/demo_seed_synthetic.py
-scripts/seed_demo.sh
-scripts/demos/
 policies/demo_seeds/
 docker-compose.demo.yml
 tests/test_demo_reset.py

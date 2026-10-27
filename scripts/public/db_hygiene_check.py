@@ -1,20 +1,20 @@
 """Report or clean leaked test/demo-artifact rows in the dev database.
 
 Uses the same sweep definitions as tests/conftest.py's autouse cleanup
-fixtures (scripts/db_hygiene.py) -- catches junk left behind by manual
+fixtures (scripts/public/db_hygiene.py) -- catches junk left behind by manual
 dev/demo runs (onboard_agent.py, issue_token.py, hand-testing a feature)
 that pytest's own cleanup never touches.
 
 Usage:
-    PYTHONPATH=/home/deven/aicontrol python scripts/db_hygiene_check.py
-    PYTHONPATH=/home/deven/aicontrol python scripts/db_hygiene_check.py --fix
+    PYTHONPATH=/home/deven/aicontrol python scripts/public/db_hygiene_check.py
+    PYTHONPATH=/home/deven/aicontrol python scripts/public/db_hygiene_check.py --fix
 """
 import argparse
 import asyncio
 import sys
 
 from app.models.database import async_session_factory
-from scripts import db_hygiene
+from scripts.public import db_hygiene
 
 
 def format_report(counts: dict[str, int]) -> str:

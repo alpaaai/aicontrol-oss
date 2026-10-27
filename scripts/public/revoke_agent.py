@@ -3,8 +3,8 @@ AIControl — Revoke Agent
 Deactivates the agent AND revokes its scoped token in one step.
 
 Usage:
-    python scripts/revoke_agent.py --name "loan-underwriting-agent"
-    python scripts/revoke_agent.py --id <agent-uuid>
+    python scripts/public/revoke_agent.py --name "loan-underwriting-agent"
+    python scripts/public/revoke_agent.py --id <agent-uuid>
 """
 import argparse
 import os

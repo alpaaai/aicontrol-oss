@@ -89,7 +89,7 @@ def test_load_yaml_never_uses_compliance_tags_key():
 def test_policies_yaml_excludes_demo_scenario_policies():
     """The default shipped seed (policies.yaml) must contain only generic
     policies -- demo-scenario-specific policies live under policies/demo_seeds/
-    and are loaded explicitly by scripts/seed.py, never by app startup."""
+    and are loaded explicitly by scripts/internal/seed.py, never by app startup."""
     from app.services.policy_loader import load_yaml
     demo_only_names = {
         "deny_bulk_credit_query", "deny_bulk_credit_query_rate",

@@ -3,12 +3,12 @@
 missing from an existing .env file (e.g. new fields added since the .env
 was first generated). Read-only — never writes or modifies .env.
 
-Usage: python3 scripts/check_env_completeness.py [path-to-env]
+Usage: python3 scripts/public/check_env_completeness.py [path-to-env]
 """
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from app.core.config import Settings  # noqa: E402
 

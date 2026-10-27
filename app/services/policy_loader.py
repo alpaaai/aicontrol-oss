@@ -84,5 +84,5 @@ async def load_all(session: AsyncSession) -> None:
     policies = load_yaml()
     await upsert_policies(session, policies)
 
-    from scripts.seed_library_policies import LIBRARY_POLICIES
+    from scripts.public.seed_library_policies import LIBRARY_POLICIES
     await upsert_policies(session, LIBRARY_POLICIES)

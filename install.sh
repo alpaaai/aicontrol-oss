@@ -30,7 +30,7 @@ if [ -f .env ]; then
   echo -e "${YELLOW}[skip]${NC} .env already exists — using existing configuration."
   echo "       Delete .env to reconfigure from scratch."
   echo ""
-  python3 scripts/check_env_completeness.py .env || true
+  python3 scripts/public/check_env_completeness.py .env || true
 else
   echo -e "${BOLD}Let's configure AIControl.${NC}"
   echo ""

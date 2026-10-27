@@ -1,9 +1,9 @@
 """Issue a new API token and store its hash in the DB.
 
 Usage:
-    python scripts/issue_token.py --role agent --desc "Insurance claims agent"
-    python scripts/issue_token.py --role admin --desc "Customer A admin"
-    python scripts/issue_token.py --role agent --agent-id <uuid> --desc "Scoped agent token"
+    python scripts/public/issue_token.py --role agent --desc "Insurance claims agent"
+    python scripts/public/issue_token.py --role admin --desc "Customer A admin"
+    python scripts/public/issue_token.py --role agent --agent-id <uuid> --desc "Scoped agent token"
 """
 import argparse
 import asyncio

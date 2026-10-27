@@ -1,7 +1,7 @@
 """Revoke an API token by its DB ID.
 
 Usage:
-    python scripts/revoke_token.py --id <uuid>
+    python scripts/public/revoke_token.py --id <uuid>
 """
 import argparse
 import asyncio

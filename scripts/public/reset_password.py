@@ -1,8 +1,8 @@
 """Reset a user's password directly in the DB.
 
 Usage:
-    python scripts/reset_password.py --email hello@aictl.io --password "NewPassw0rd!"
-    python scripts/reset_password.py --email hello@aictl.io   # prompts for password
+    python scripts/public/reset_password.py --email hello@aictl.io --password "NewPassw0rd!"
+    python scripts/public/reset_password.py --email hello@aictl.io   # prompts for password
 """
 import argparse
 import asyncio

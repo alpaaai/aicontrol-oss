@@ -5,4 +5,4 @@
 
 enterprise/          # Compliance export, license gate, enterprise-only features
 docs/                # Internal plans, specs, strategy/GTM docs
-scripts/prospecting/ # Internal sales prospecting agent — stays in the private repo only
+scripts/internal/prospecting/ # Internal sales prospecting agent — stays in the private repo only

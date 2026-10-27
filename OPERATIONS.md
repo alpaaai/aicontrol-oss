@@ -105,7 +105,7 @@ Compose-level variables (read by `docker-compose.app.yml`):
 | `AICONTROL_VERSION` | `latest` | Image tag for both the API and dashboard images. |
 | `RUN_MIGRATIONS` | `true` | Apply pending migrations when the API container starts. |
 
-`python3 scripts/check_env_completeness.py .env` lists settings added in newer
+`python3 scripts/public/check_env_completeness.py .env` lists settings added in newer
 releases that your `.env` does not mention yet.
 
 ## Install, upgrade, rollback
@@ -208,7 +208,7 @@ Enterprise and Trial 90 days. Export what you need to keep for longer (Enterpris
   deactivating, demoting or deleting a user takes full effect when their
   current token expires. Rotate `SECRET_KEY` to end every session at once.
 - Agent tokens do not expire. Revoke them from the dashboard Tokens page or
-  `scripts/revoke_token.py`.
+  `scripts/public/revoke_token.py`.
 - The `.env` file holds database and signing secrets; keep it out of version
   control and readable only by the operator account.
 

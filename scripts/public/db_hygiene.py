@@ -2,7 +2,7 @@
 
 Single source of truth for what counts as a leaked test row and how to
 clean it up. Used by tests/conftest.py's autouse cleanup fixtures and by
-the standalone `scripts/db_hygiene_check.py` CLI, so the two never drift
+the standalone `scripts/public/db_hygiene_check.py` CLI, so the two never drift
 out of sync the way the old per-table fixtures did.
 
 Convention: any row created by a test or a manual dev/demo run must be
